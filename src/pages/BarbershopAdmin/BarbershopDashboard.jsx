@@ -8,6 +8,8 @@ import NewAppointmentModal from "../../components/calendar/NewAppointmentModal";
 import UserProfileView from "./UserProfileView";
 import BarbershopSettingsView from "./BarbershopSettingsView";
 import SupportView from "./SupportView";
+import ReferralProgramView from "./ReferralProgramView";
+import BarbersTeamView from "./BarbersTeamView";
 
 export default function BarbershopDashboard({
   tenant = {
@@ -36,6 +38,12 @@ export default function BarbershopDashboard({
     { id: "clientes", label: "Clientes & Prontuário", icon: "👥" },
     { id: "caixa", label: "Frente de Caixa (PDV)", icon: "🧾" },
     { id: "financeiro", label: "Relatórios Financeiros", icon: "💰" },
+    {
+      id: "indicacoes",
+      label: "Indique & Ganhe 50%",
+      icon: "🎁",
+      badge: "Ganhe 50%",
+    }, // 👈 AQUI!
   ];
 
   return (
@@ -96,6 +104,18 @@ export default function BarbershopDashboard({
             {/* Tela 3: Central de Suporte (NOVO!) */}
             {activeMenuTab === "suporte" && (
               <SupportView onBack={() => setActiveMenuTab("servicos")} />
+            )}
+
+            {/* Tela: Indique & Ganhe (NOVO!) */}
+            {activeMenuTab === "indicacoes" && (
+              <ReferralProgramView
+                onBack={() => setActiveMenuTab("servicos")}
+              />
+            )}
+
+            {/* Tela 5: Equipe de Barbeiros (NOVO!) */}
+            {activeMenuTab === "profissionais" && (
+              <BarbersTeamView onBack={() => setActiveMenuTab("servicos")} />
             )}
 
             {/* Tela 4: Serviços & Produtos */}
