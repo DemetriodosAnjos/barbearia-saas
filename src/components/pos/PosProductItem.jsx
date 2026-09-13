@@ -7,15 +7,21 @@ export default function PosProductItem({
     name: "Pomada Modeladora Matte",
     category: "Vitrine",
     icon: "🧴",
+    costPrice: 20,
     price: 45,
     stock: 8,
-    commissionPercent: 10, // Barbeiro ganha 10%
-    variants: [], // Ex: [{ name: "50g", price: 35 }, { name: "100g", price: 55 }]
+    commissionPercent: 10,
+    active: true,
+    variants: [],
   },
-  quantityInComanda = 0, // Se o item já estiver na comanda aberta
+  quantityInComanda = 0,
   onAddToCart,
+  onEdit,
+  onDelete,
+  onRestore,
   className = "",
 }) {
+  const isInactive = product.active === false;
   const hasVariants = product.variants && product.variants.length > 0;
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
 
@@ -24,30 +30,29 @@ export default function PosProductItem({
     : null;
   const currentPrice = activeVariant ? activeVariant.price : product.price;
 
-  // Estados de estoque
   const isOutOfStock = product.stock <= 0;
   const isLowStock = product.stock > 0 && product.stock <= 3;
+  const isManagementMode = Boolean(onEdit || onDelete || onRestore);
 
-  const currentStyle = isOutOfStock
-    ? posProductStyles.states.outOfStock
-    : isLowStock
-      ? posProductStyles.states.lowStock
-      : posProductStyles.states.available;
-
-  const handleAdd = () => {
-    if (isOutOfStock || !onAddToCart) return;
-    onAddToCart({
-      ...product,
-      selectedVariant: activeVariant,
-      finalPrice: currentPrice,
-    });
-  };
+  // 👇 CORREÇÃO: No modo de gestão, não bloqueia ponteiro do mouse
+  const currentStyle = isInactive
+    ? "opacity-60 bg-neutral-950 border-neutral-800"
+    : isManagementMode
+      ? "bg-neutral-900/80 border-neutral-800 hover:border-neutral-700"
+      : isOutOfStock
+        ? posProductStyles.states.outOfStock
+        : isLowStock
+          ? posProductStyles.states.lowStock
+          : posProductStyles.states.available;
 
   return (
     <div
-      className={`${posProductStyles.container} ${currentStyle} ${className}`}
+      className={`
+        ${posProductStyles.container}
+        ${currentStyle}
+        ${className}
+      `}
     >
-      {/* 1. CABEÇALHO: Ícone, Nome e Selos de Estoque */}
       <div className={posProductStyles.header}>
         <div className={posProductStyles.productIcon}>
           {product.icon || "📦"}
@@ -60,17 +65,18 @@ export default function PosProductItem({
           </span>
         </div>
 
-        {/* Badges de Estoque */}
         <div className={posProductStyles.badgesGroup}>
-          {isOutOfStock && (
+          {isInactive ? (
+            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-red-950/60 text-red-400 border border-red-800/60">
+              Desativado
+            </span>
+          ) : isOutOfStock ? (
             <span className={posProductStyles.outBadge}>Esgotado</span>
-          )}
-          {isLowStock && (
+          ) : isLowStock ? (
             <span className={posProductStyles.lowBadge}>
               Restam {product.stock}
             </span>
-          )}
-          {!isOutOfStock && !isLowStock && (
+          ) : (
             <span className={posProductStyles.stockCount}>
               {product.stock} un.
             </span>
@@ -78,19 +84,14 @@ export default function PosProductItem({
         </div>
       </div>
 
-      {/* 2. VARIAÇÕES DE TAMANHO / EMBALAGEM (SE HOUVER) */}
-      {hasVariants && (
+      {hasVariants && !isInactive && (
         <div className={posProductStyles.variantsWrapper}>
           <span className="text-[10px] text-neutral-500 mr-1">Tamanho:</span>
           {product.variants.map((v, idx) => (
             <button
               key={idx}
               type="button"
-              disabled={isOutOfStock}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedVariantIndex(idx);
-              }}
+              onClick={() => setSelectedVariantIndex(idx)}
               className={`
                 ${posProductStyles.variantPill}
                 ${selectedVariantIndex === idx ? posProductStyles.variantActive : posProductStyles.variantInactive}
@@ -102,34 +103,69 @@ export default function PosProductItem({
         </div>
       )}
 
-      {/* 3. RODAPÉ: Preço, Comissão e Botão de Adicionar */}
-      <div className={posProductStyles.footer}>
+      <div
+        className={posProductStyles.footer}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={posProductStyles.priceGroup}>
           <span className={posProductStyles.priceText}>
-            R$ {Number(currentPrice).toFixed(2).replace(".", ",")}
+            R${" "}
+            {Number(currentPrice || 0)
+              .toFixed(2)
+              .replace(".", ",")}
           </span>
-          {product.commissionPercent && (
+          {product.commissionPercent !== undefined && (
             <span className={posProductStyles.commissionBadge}>
               +{product.commissionPercent}% comissão
             </span>
           )}
         </div>
 
-        {/* Botão de Adição Rápida */}
-        <button
-          type="button"
-          disabled={isOutOfStock}
-          onClick={handleAdd}
-          className={posProductStyles.addButton}
-          aria-label={`Adicionar ${product.name} na comanda`}
-        >
-          {quantityInComanda > 0 && (
-            <span className={posProductStyles.counterBadge}>
-              {quantityInComanda}
-            </span>
-          )}
-          <span>+ Comanda</span>
-        </button>
+        {isManagementMode ? (
+          <div className="flex items-center gap-1.5 pointer-events-auto">
+            {isInactive ? (
+              <button
+                type="button"
+                onClick={() => onRestore && onRestore(product)}
+                className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-emerald-600 text-neutral-200 hover:text-white border border-neutral-700 transition-all cursor-pointer shadow-sm active:scale-95"
+              >
+                ↺ Reativar
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onEdit && onEdit(product)}
+                  className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors cursor-pointer"
+                >
+                  ✏️ Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete && onDelete(product)}
+                  className="text-xs font-bold p-1.5 rounded-xl bg-neutral-800 hover:bg-red-950/40 text-neutral-400 hover:text-red-400 border border-neutral-700 hover:border-red-800/60 transition-colors cursor-pointer"
+                  title="Desativar produto"
+                >
+                  🗑️
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={isOutOfStock}
+            onClick={() => onAddToCart && onAddToCart(product)}
+            className={posProductStyles.addButton}
+          >
+            {quantityInComanda > 0 && (
+              <span className={posProductStyles.counterBadge}>
+                {quantityInComanda}
+              </span>
+            )}
+            <span>+ Comanda</span>
+          </button>
+        )}
       </div>
     </div>
   );

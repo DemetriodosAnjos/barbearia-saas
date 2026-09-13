@@ -3,13 +3,63 @@ import { barbershopStyles } from "./BarbershopDashboard.styles";
 import Sidebar from "../../components/ui/Sidebar";
 import Navbar from "../../components/ui/Navbar";
 import TrialBanner from "../../components/dashboard/TrialBanner";
+import ScheduleView from "./ScheduleView";
 import ServicesAndProductsView from "./ServicesAndProductsView";
-import NewAppointmentModal from "../../components/calendar/NewAppointmentModal";
-import UserProfileView from "./UserProfileView";
+import BarbersTeamView from "./BarbersTeamView";
 import BarbershopSettingsView from "./BarbershopSettingsView";
+import UserProfileView from "./UserProfileView";
 import SupportView from "./SupportView";
 import ReferralProgramView from "./ReferralProgramView";
-import BarbersTeamView from "./BarbersTeamView";
+
+// Catálogo Central Oficial de Serviços da Barbearia
+const initialSharedServices = [
+  {
+    id: "s1",
+    name: "Corte Degradê Navalhado",
+    description:
+      "Acabamento de precisão na navalha, lavagem refrescante e pomada matte inclusa.",
+    category: "Cabelo",
+    durationMinutes: 40,
+    price: 55,
+    commissionPercent: 50,
+    onlineBooking: true,
+    tag: "Mais Pedido ⭐",
+  },
+  {
+    id: "s2",
+    name: "Barboterapia Tradicional",
+    description:
+      "Toalha quente com óleos essenciais, massagem facial e alinhamento na lâmina.",
+    category: "Barba",
+    durationMinutes: 30,
+    price: 45,
+    commissionPercent: 50,
+    onlineBooking: true,
+  },
+  {
+    id: "s3",
+    name: "Combo VIP: Cabelo + Barba",
+    description:
+      "Experiência completa com direito a cerveja artesanal ou café cortesia.",
+    category: "Combos",
+    durationMinutes: 70,
+    price: 90,
+    commissionPercent: 45,
+    onlineBooking: true,
+    tag: "15% OFF",
+  },
+  {
+    id: "s4",
+    name: "Corte na Tesoura Clássico",
+    description:
+      "Corte tradicional totalmente executado na tesoura com alinhamento de fios.",
+    category: "Cabelo",
+    durationMinutes: 60,
+    price: 50,
+    commissionPercent: 50,
+    onlineBooking: true,
+  },
+];
 
 export default function BarbershopDashboard({
   tenant = {
@@ -20,11 +70,31 @@ export default function BarbershopDashboard({
   },
   onLogout,
 }) {
-  const [activeMenuTab, setActiveMenuTab] = useState("servicos");
+  const [activeMenuTab, setActiveMenuTab] = useState("agenda");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [barberPresenceStatus, setBarberPresenceStatus] = useState("available");
-  const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] =
-    useState(false);
+
+  // 👇 FONTE ÚNICA DA VERDADE: O Catálogo Oficial fica centralizado aqui!
+  const [services, setServices] = useState(initialSharedServices);
+
+  // Função para adicionar novo serviço de qualquer lugar do sistema
+  const handleAddNewService = (newService) => {
+    setServices((prev) => [newService, ...prev]);
+  };
+
+  // Atualiza um serviço existente
+  const handleUpdateService = (updatedService) => {
+    setServices((prev) =>
+      prev.map((s) => (s.id === updatedService.id ? updatedService : s)),
+    );
+  };
+
+  // Desativação Segura (Soft Delete): marca active = false
+  const handleDeleteService = (serviceId) => {
+    setServices((prev) =>
+      prev.map((s) => (s.id === serviceId ? { ...s, active: false } : s)),
+    );
+  };
 
   const barbershopMenuItems = [
     {
@@ -43,21 +113,17 @@ export default function BarbershopDashboard({
       label: "Indique & Ganhe 50%",
       icon: "🎁",
       badge: "Ganhe 50%",
-    }, // 👈 AQUI!
+    },
   ];
 
   return (
     <div className={barbershopStyles.pageWrapper}>
-      {/* 1. BANNER DE CONTAGEM REGRESSIVA DOS 7 DIAS GRÁTIS */}
       <TrialBanner
         trialDaysLeft={tenant.trialDaysLeft}
-        onSubscribePlan={(plan) => {
-          console.log("Plano assinado:", plan);
-        }}
+        onSubscribePlan={(plan) => console.log("Plano assinado:", plan)}
       />
 
       <div className={barbershopStyles.layoutBody}>
-        {/* 2. SIDEBAR DA BARBEARIA */}
         <Sidebar
           tenantName={tenant.name}
           tenantPlan={tenant.plan}
@@ -70,9 +136,7 @@ export default function BarbershopDashboard({
           onLogout={onLogout}
         />
 
-        {/* 3. ÁREA DE TRABALHO (NAVBAR + CONTEÚDO) */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Navbar Superior do Painel */}
           <Navbar
             variant="admin"
             breadcrumbs={["Painel da Barbearia", activeMenuTab.toUpperCase()]}
@@ -80,84 +144,54 @@ export default function BarbershopDashboard({
             onStatusChange={setBarberPresenceStatus}
             notificationsCount={3}
             onMenuClick={() => setIsMobileSidebarOpen(true)}
-            onQuickAction={() => setIsNewAppointmentModalOpen(true)}
+            onQuickAction={() => setActiveMenuTab("servicos")}
             onProfileClick={() => setActiveMenuTab("perfil")}
             onSettingsClick={() => setActiveMenuTab("configuracoes")}
             onSupportClick={() => setActiveMenuTab("suporte")}
             onLogout={onLogout}
           />
 
-          {/* Área Central Fluida */}
           <main className={barbershopStyles.mainContent}>
-            {/* Tela 1: Meu Perfil */}
-            {activeMenuTab === "perfil" && (
-              <UserProfileView onBack={() => setActiveMenuTab("servicos")} />
+            {/* 1. AGENDA: Recebe os serviços e a função de cadastrar novo on-the-fly */}
+            {activeMenuTab === "agenda" && (
+              <ScheduleView
+                services={services}
+                onAddService={handleAddNewService}
+                onNavigateToCashier={() => setActiveMenuTab("caixa")}
+              />
             )}
 
-            {/* Tela 2: Configurações da Barbearia */}
+            {/* 2. SERVIÇOS & PRODUTOS: Consome a mesma lista compartilhada! */}
+            {activeMenuTab === "servicos" && (
+              <ServicesAndProductsView
+                services={services}
+                onAddService={handleAddNewService}
+                onUpdateService={handleUpdateService}
+                onDeleteService={handleDeleteService}
+              />
+            )}
+
+            {/* Telas complementares */}
+            {activeMenuTab === "perfil" && (
+              <UserProfileView onBack={() => setActiveMenuTab("agenda")} />
+            )}
             {activeMenuTab === "configuracoes" && (
               <BarbershopSettingsView
-                onBack={() => setActiveMenuTab("servicos")}
+                onBack={() => setActiveMenuTab("agenda")}
               />
             )}
-
-            {/* Tela 3: Central de Suporte (NOVO!) */}
             {activeMenuTab === "suporte" && (
-              <SupportView onBack={() => setActiveMenuTab("servicos")} />
+              <SupportView onBack={() => setActiveMenuTab("agenda")} />
             )}
-
-            {/* Tela: Indique & Ganhe (NOVO!) */}
             {activeMenuTab === "indicacoes" && (
-              <ReferralProgramView
-                onBack={() => setActiveMenuTab("servicos")}
-              />
+              <ReferralProgramView onBack={() => setActiveMenuTab("agenda")} />
             )}
-
-            {/* Tela 5: Equipe de Barbeiros (NOVO!) */}
             {activeMenuTab === "profissionais" && (
-              <BarbersTeamView onBack={() => setActiveMenuTab("servicos")} />
+              <BarbersTeamView onBack={() => setActiveMenuTab("agenda")} />
             )}
-
-            {/* Tela 4: Serviços & Produtos */}
-            {activeMenuTab === "servicos" && <ServicesAndProductsView />}
-
-            {/* Outras telas em montagem */}
-            {activeMenuTab !== "servicos" &&
-              activeMenuTab !== "perfil" &&
-              activeMenuTab !== "configuracoes" &&
-              activeMenuTab !== "suporte" && (
-                <div className="p-12 text-center text-sm text-neutral-400 space-y-3 bg-neutral-900 border border-neutral-800 rounded-3xl">
-                  <p className="text-xl font-bold text-white">
-                    Módulo em Montagem: {activeMenuTab.toUpperCase()}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setActiveMenuTab("servicos")}
-                    className="text-xs text-amber-500 font-bold underline cursor-pointer"
-                  >
-                    ← Voltar para Serviços & Produtos
-                  </button>
-                </div>
-              )}
           </main>
         </div>
       </div>
-      {/* MODAL OPERACIONAL DE NOVO AGENDAMENTO */}
-      <NewAppointmentModal
-        isOpen={isNewAppointmentModalOpen}
-        onClose={() => setIsNewAppointmentModalOpen(false)}
-        onSaveAppointment={(appointment) => {
-          alert(
-            `🎉 AGENDAMENTO CONFIRMADO COM SUCESSO!\n\n` +
-              `• Cliente: ${appointment.clientName}\n` +
-              `• WhatsApp: ${appointment.clientPhone}\n` +
-              `• Barbeiro: ${appointment.barberName}\n` +
-              `• Serviço: ${appointment.serviceName} (R$ ${appointment.price},00)\n` +
-              `• Horário: ${appointment.startTime}h • Duração: ${appointment.durationMinutes} min\n\n` +
-              `Horário bloqueado na agenda e notificação pronta para envio!`,
-          );
-        }}
-      />
     </div>
   );
 }

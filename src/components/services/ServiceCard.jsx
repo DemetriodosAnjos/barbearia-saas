@@ -5,91 +5,137 @@ export default function ServiceCard({
     id: "serv-1",
     name: "Corte Degradê Navalhado",
     description:
-      "Acabamento com navalha, toalha quente e finalização com pomada modeladora.",
+      "Acabamento com navalha, toalha quente e finalização com pomada.",
     category: "Cabelo",
     durationMinutes: 40,
     price: 55,
-    tag: "Mais Pedido ⭐", // Opcional: tag promocional ou destaque
+    commissionPercent: 50,
+    active: true,
+    tag: "Mais Pedido ⭐",
   },
   isSelected = false,
   onToggleSelect,
+  onEdit,
+  onDelete,
+  onRestore,
   disabled = false,
   className = "",
 }) {
-  const currentState = disabled
-    ? serviceCardStyles.states.disabled
-    : isSelected
-      ? serviceCardStyles.states.selected
-      : serviceCardStyles.states.default;
+  const isInactive = service.active === false;
+  const isManagementMode = Boolean(onEdit || onDelete || onRestore);
 
-  const handleCardClick = () => {
-    if (!disabled && onToggleSelect) {
-      onToggleSelect(service);
-    }
-  };
+  // 👇 CORREÇÃO: No modo de gestão, NUNCA aplicamos pointer-events-none para permitir reativar!
+  const currentState = isInactive
+    ? "opacity-60 bg-neutral-950 border-neutral-800"
+    : disabled
+      ? serviceCardStyles.states.disabled
+      : isSelected
+        ? serviceCardStyles.states.selected
+        : serviceCardStyles.states.default;
 
   return (
     <div
-      onClick={handleCardClick}
+      onClick={() =>
+        !isManagementMode && onToggleSelect && onToggleSelect(service)
+      }
       className={`
         ${serviceCardStyles.container}
         ${currentState}
         ${className}
       `}
     >
-      {/* 1. TOPO: Categoria e Selo de Destaque */}
+      {/* TOPO */}
       <div className={serviceCardStyles.header}>
-        <span className={serviceCardStyles.categoryBadge}>
-          {service.category}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={serviceCardStyles.categoryBadge}>
+            {service.category}
+          </span>
+          {isInactive && (
+            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-red-950/60 text-red-400 border border-red-800/60">
+              Desativado
+            </span>
+          )}
+        </div>
 
-        {service.tag && (
+        {service.tag && !isInactive && (
           <span className={serviceCardStyles.promoBadge}>{service.tag}</span>
         )}
       </div>
 
-      {/* 2. CENTRO: Nome e Descrição */}
-      <div className="flex-1">
+      {/* CENTRO */}
+      <div className="flex-1 my-1">
         <h3 className={serviceCardStyles.title}>{service.name}</h3>
         {service.description && (
           <p className={serviceCardStyles.description}>{service.description}</p>
         )}
+
+        {service.commissionPercent !== undefined && (
+          <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
+            <span>✂️</span>
+            <span>Comissão do Barbeiro: {service.commissionPercent}%</span>
+          </div>
+        )}
       </div>
 
-      {/* 3. RODAPÉ: Duração, Preço e Botão de Ação */}
-      <div className={serviceCardStyles.footer}>
+      {/* RODAPÉ */}
+      <div
+        className={serviceCardStyles.footer}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div>
           <span className={serviceCardStyles.priceText}>
-            R$ {Number(service.price).toFixed(2).replace(".", ",")}
+            R${" "}
+            {Number(service.price || 0)
+              .toFixed(2)
+              .replace(".", ",")}
           </span>
           <div className={serviceCardStyles.metaGroup}>
             <span className={serviceCardStyles.durationIcon}>⏱️</span>
-            <span>{service.durationMinutes} min</span>
+            <span>{service.durationMinutes} min de cadeira</span>
           </div>
         </div>
 
-        {/* Botão de Alternância de Seleção */}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={(e) => {
-            e.stopPropagation(); // Evita duplo clique
-            handleCardClick();
-          }}
-          className={`
-            ${serviceCardStyles.selectButton}
-            ${isSelected ? serviceCardStyles.btnSelected : serviceCardStyles.btnDefault}
-          `}
-        >
-          {isSelected ? (
-            <>
-              <span>✓</span>
-              <span>Selecionado</span>
-            </>
-          ) : (
-            <span>+ Adicionar</span>
-          )}
-        </button>
+        {isManagementMode ? (
+          <div className="flex items-center gap-1.5 pointer-events-auto">
+            {isInactive ? (
+              <button
+                type="button"
+                onClick={() => onRestore && onRestore(service)}
+                className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-emerald-600 text-neutral-200 hover:text-white border border-neutral-700 transition-all cursor-pointer shadow-sm active:scale-95"
+              >
+                ↺ Reativar
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onEdit && onEdit(service)}
+                  className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors cursor-pointer"
+                >
+                  ✏️ Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete && onDelete(service)}
+                  className="text-xs font-bold p-1.5 rounded-xl bg-neutral-800 hover:bg-red-950/40 text-neutral-400 hover:text-red-400 border border-neutral-700 hover:border-red-800/60 transition-colors cursor-pointer"
+                  title="Desativar serviço"
+                >
+                  🗑️
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={`
+              ${serviceCardStyles.selectButton}
+              ${isSelected ? serviceCardStyles.btnSelected : serviceCardStyles.btnDefault}
+            `}
+          >
+            {isSelected ? "✓ Selecionado" : "+ Adicionar"}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { timelineColumnStyles } from "./BarberTimelineColumn.styles";
 import AppointmentCard from "./AppointmentCard";
 
@@ -11,7 +12,7 @@ export default function BarberTimelineColumn({
   startHour = 8,
   endHour = 18,
   minuteHeight = 1.8,
-  isPastDate = false, // Informa se o dia visualizado já passou
+  isPastDate = false,
   breaks = [{ startTime: "12:00", endTime: "13:00", label: "Pausa de Almoço" }],
   appointments = [],
   onSlotClick,
@@ -19,7 +20,11 @@ export default function BarberTimelineColumn({
   onStatusChange,
   onOpenComanda,
   onCancel,
+  onDropAppointment, // 👈 Recebe a ação de soltar card
 }) {
+  // Estado para destacar o slot onde o mouse está passando por cima no arraste
+  const [activeDropTime, setActiveDropTime] = useState(null);
+
   const totalHours = endHour - startHour;
   const totalMinutes = totalHours * 60;
   const columnHeight = totalMinutes * minuteHeight;
@@ -33,15 +38,30 @@ export default function BarberTimelineColumn({
 
   const hoursList = Array.from({ length: totalHours }, (_, i) => startHour + i);
 
-  // Trata o clique no slot vazio respeitando a trava do passado
-  const handleSlotClickInternal = (time) => {
-    if (isPastDate) {
-      alert(
-        `⚠️ AÇÃO BLOQUEADA:\n\nEsta data já passou. Não é permitido criar novos agendamentos no passado.`,
-      );
-      return;
+  // Manipulação de Drop (Soltar Card)
+  const handleDragOver = (e, time) => {
+    if (isPastDate) return;
+    e.preventDefault(); // Permite o drop no navegador
+    e.dataTransfer.dropEffect = "move";
+    if (activeDropTime !== time) {
+      setActiveDropTime(time);
     }
-    if (onSlotClick) onSlotClick(barber.id, time);
+  };
+
+  const handleDrop = (e, targetTime) => {
+    e.preventDefault();
+    setActiveDropTime(null);
+    if (isPastDate) return;
+
+    try {
+      const dataStr = e.dataTransfer.getData("application/json");
+      if (dataStr && onDropAppointment) {
+        const draggedAppointment = JSON.parse(dataStr);
+        onDropAppointment(draggedAppointment, barber.id, targetTime);
+      }
+    } catch (err) {
+      console.error("Erro ao processar reagendamento:", err);
+    }
   };
 
   return (
@@ -62,15 +82,19 @@ export default function BarberTimelineColumn({
         </span>
       </div>
 
-      {/* 2. Grade de Horários */}
+      {/* 2. Grade de Horários com Suporte a Drag & Drop */}
       <div
         className={timelineColumnStyles.timelineBody}
         style={{ height: `${columnHeight}px` }}
+        onDragLeave={() => setActiveDropTime(null)}
       >
         {hoursList.map((hour) => {
           const hourFormatted = `${String(hour).padStart(2, "0")}:00`;
           const halfHourFormatted = `${String(hour).padStart(2, "0")}:30`;
           const slotHeight = 60 * minuteHeight;
+
+          const isFirstHalfActive = activeDropTime === hourFormatted;
+          const isSecondHalfActive = activeDropTime === halfHourFormatted;
 
           return (
             <div
@@ -78,23 +102,34 @@ export default function BarberTimelineColumn({
               style={{ height: `${slotHeight}px` }}
               className="flex flex-col"
             >
+              {/* Slot :00 */}
               <div
                 style={{ height: `${slotHeight / 2}px` }}
-                onClick={() => handleSlotClickInternal(hourFormatted)}
-                className={`${timelineColumnStyles.hourSlot} ${isPastDate ? "cursor-not-allowed opacity-60" : ""}`}
-                title={
-                  isPastDate
-                    ? "Horário passado (bloqueado para novos agendamentos)"
-                    : `Agendar às ${hourFormatted}`
+                onClick={() =>
+                  onSlotClick && onSlotClick(barber.id, hourFormatted)
                 }
+                onDragOver={(e) => handleDragOver(e, hourFormatted)}
+                onDrop={(e) => handleDrop(e, hourFormatted)}
+                className={`
+                  ${timelineColumnStyles.hourSlot}
+                  ${isFirstHalfActive ? "bg-amber-500/25 border-dashed border-amber-500 ring-1 ring-amber-500/50" : ""}
+                `}
               >
                 <span>{hourFormatted}</span>
               </div>
 
+              {/* Slot :30 */}
               <div
                 style={{ height: `${slotHeight / 2}px` }}
-                onClick={() => handleSlotClickInternal(halfHourFormatted)}
-                className={`${timelineColumnStyles.halfHourSlot} ${isPastDate ? "cursor-not-allowed opacity-60" : ""}`}
+                onClick={() =>
+                  onSlotClick && onSlotClick(barber.id, halfHourFormatted)
+                }
+                onDragOver={(e) => handleDragOver(e, halfHourFormatted)}
+                onDrop={(e) => handleDrop(e, halfHourFormatted)}
+                className={`
+                  ${timelineColumnStyles.halfHourSlot}
+                  ${isSecondHalfActive ? "bg-amber-500/25 border-dashed border-amber-500 ring-1 ring-amber-500/50" : ""}
+                `}
               />
             </div>
           );
@@ -123,7 +158,7 @@ export default function BarberTimelineColumn({
           );
         })}
 
-        {/* 4. Cards de Agendamento (Sempre clicáveis para ver detalhes!) */}
+        {/* 4. Cards de Agendamento */}
         <div className={timelineColumnStyles.cardsLayer}>
           {appointments.map((appt) => {
             const startMins = timeToMinutesFromStart(appt.startTime);

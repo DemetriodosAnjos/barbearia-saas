@@ -6,6 +6,7 @@ export default function AppointmentCard({
   appointment = {
     id: "1",
     clientName: "Carlos Eduardo",
+    barberName: "Carlos Silva",
     serviceName: "Corte Degradê + Barboterapia",
     startTime: "14:00",
     endTime: "15:00",
@@ -16,7 +17,7 @@ export default function AppointmentCard({
     isVip: true,
     hasNotes: true,
   },
-  minuteHeight = 2, // 1 minuto = 2px (logo 30 min = 60px, 60 min = 120px)
+  minuteHeight = 2,
   onClick,
   onStatusChange,
   onOpenComanda,
@@ -25,10 +26,10 @@ export default function AppointmentCard({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // Calcula a altura física em pixels proporcional à duração em minutos
-  const cardHeight = Math.max(appointment.durationMinutes * minuteHeight, 60);
+  const canDrag =
+    appointment.status !== "completed" && appointment.status !== "cancelled";
+  const cardHeight = Math.max(appointment.durationMinutes * minuteHeight, 65);
 
-  // Fecha menu de ações ao clicar fora
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -43,25 +44,50 @@ export default function AppointmentCard({
     appointmentCardStyles.variants[appointment.status] ||
     appointmentCardStyles.variants.confirmed;
 
+  const handleDragStart = (e) => {
+    if (!canDrag) return;
+    e.dataTransfer.setData("application/json", JSON.stringify(appointment));
+    e.dataTransfer.effectAllowed = "move";
+  };
+
   return (
     <div
       onClick={onClick}
+      draggable={canDrag}
+      onDragStart={handleDragStart}
       style={{ minHeight: `${cardHeight}px` }}
       className={`
         ${appointmentCardStyles.container}
         ${variantStyle}
         ${appointment.isDelayed ? appointmentCardStyles.delayedWarning : ""}
+        ${canDrag ? "cursor-grab active:cursor-grabbing hover:scale-[1.01]" : "cursor-default"}
       `}
+      title={
+        canDrag
+          ? "Clique para ver detalhes/editar ou arraste para reagendar"
+          : undefined
+      }
     >
-      {/* 1. TOPO: Horário de início/fim e Selo de Status */}
+      {/* TOPO: Horário + Ícone de Arraste + Badge */}
       <div className={appointmentCardStyles.header}>
-        <span className={appointmentCardStyles.timeText}>
-          {appointment.startTime} - {appointment.endTime}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {canDrag && (
+            <span
+              className="text-neutral-500 hover:text-neutral-300 select-none text-xs"
+              title="Arrastar para reagendar"
+            >
+              ⠿
+            </span>
+          )}
+          <span className={appointmentCardStyles.timeText}>
+            {appointment.startTime} - {appointment.endTime}
+          </span>
+        </div>
+
         <Badge status={appointment.status} size="sm" showIcon={false} />
       </div>
 
-      {/* 2. CENTRO: Nome do Cliente e Serviço Solicitado */}
+      {/* CENTRO: Cliente + Barbeiro Responsável + Serviço */}
       <div className="flex-1 my-1">
         <h4 className={appointmentCardStyles.clientName}>
           {appointment.clientName}
@@ -82,24 +108,36 @@ export default function AppointmentCard({
             </span>
           )}
         </h4>
+
+        {/* 👇 NOVO: EXIBIÇÃO DO PROFISSIONAL RESPONSÁVEL NO PRÓPRIO CARD */}
+        {appointment.barberName && (
+          <p className="text-[10px] text-amber-400 font-medium flex items-center gap-1 mt-0.5 truncate">
+            <span>💈</span>
+            <span>{appointment.barberName}</span>
+          </p>
+        )}
+
         <p className={appointmentCardStyles.serviceName}>
           {appointment.serviceName}
         </p>
       </div>
 
-      {/* 3. RODAPÉ: Indicador de Pagamento e Menu de Ações Rápidas */}
+      {/* RODAPÉ: Preço/Pagamento e Ações */}
       <div
         className={appointmentCardStyles.footer}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Status financeiro da comanda */}
-        {appointment.isPaid ? (
-          <span className={appointmentCardStyles.paidBadge}>✓ PAGO</span>
-        ) : (
-          <span className={appointmentCardStyles.pendingBadge}>PENDENTE</span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {appointment.isPaid ? (
+            <span className={appointmentCardStyles.paidBadge}>✓ PAGO</span>
+          ) : (
+            <span className={appointmentCardStyles.pendingBadge}>PENDENTE</span>
+          )}
+          <span className="text-[11px] font-bold font-mono text-neutral-200">
+            R$ {Number(appointment.price || 0).toFixed(0)}
+          </span>
+        </div>
 
-        {/* Botão de 3 Pontinhos para Ações Rápidas */}
         <div className="relative" ref={menuRef}>
           <button
             type="button"
@@ -122,7 +160,6 @@ export default function AppointmentCard({
             </svg>
           </button>
 
-          {/* Menu Contextual Flutuante */}
           {isMenuOpen && (
             <div className={appointmentCardStyles.menuDropdown} role="menu">
               <button

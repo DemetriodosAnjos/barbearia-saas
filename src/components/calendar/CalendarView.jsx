@@ -15,6 +15,7 @@ export default function CalendarView({
   onAppointmentClick,
   onOpenComanda,
   onStatusChange,
+  onDropAppointment,
 }) {
   const [viewMode, setViewMode] = useState("day"); // 'day' | 'week' | 'month'
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -299,6 +300,7 @@ export default function CalendarView({
                   onAppointmentClick={handleCardClick}
                   onOpenComanda={onOpenComanda}
                   onStatusChange={onStatusChange}
+                  onDropAppointment={onDropAppointment}
                 />
               );
             })}
