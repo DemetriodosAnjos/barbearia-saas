@@ -1,17 +1,12 @@
 export const sidebarStyles = {
-  // Fundo escuro com desfoque no celular/tablet (Backdrop)
   backdrop:
     "fixed inset-0 bg-black/80 backdrop-blur-xs z-40 md:hidden transition-opacity duration-300",
 
-  // Drawer: 100% da altura na Web (Sticky) e Gaveta Deslizante no Mobile
   drawer:
     "fixed md:sticky md:top-0 inset-y-0 left-0 z-40 md:z-20 w-72 md:w-64 bg-neutral-900 border-r border-neutral-800 flex flex-col shrink-0 select-none shadow-2xl md:shadow-none transition-transform duration-300 ease-in-out h-full md:h-screen md:min-h-screen",
-
-  // Controle de abertura no celular
   drawerOpen: "translate-x-0",
   drawerClosed: "-translate-x-full md:translate-x-0",
 
-  // Cabeçalho da Sidebar
   header:
     "p-5 border-b border-neutral-800/80 flex items-center justify-between shrink-0",
   brandWrapper: "flex items-center gap-3",
@@ -25,10 +20,9 @@ export const sidebarStyles = {
   closeMobileButton:
     "md:hidden text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors",
 
-  // Lista de Navegação Central (Rola se houver muitos itens)
   nav: "flex-1 px-3 py-4 space-y-1.5 overflow-y-auto",
 
-  // Itens do Menu
+  // Itens normais e itens-pai
   navItem:
     "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-amber-500/40",
   navItemActive:
@@ -41,7 +35,20 @@ export const sidebarStyles = {
   navItemBadge:
     "text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-600 text-white shadow-xs",
 
-  // Rodapé do Usuário Travado na Base da Tela (mt-auto)
+  // 👇 NOVOS ESTILOS PARA SUBMENUS
+  chevronIcon:
+    "w-4 h-4 text-neutral-500 transition-transform duration-200 shrink-0",
+  chevronExpanded: "rotate-180 text-amber-400",
+
+  // Lista com recuo à esquerda e linha divisória sutil
+  submenuList:
+    "pl-6 pr-1 py-1 space-y-1 border-l-2 border-neutral-800/80 ml-5 my-1 animate-in fade-in duration-150",
+  subItem:
+    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer text-left focus:outline-none",
+  subItemActive: "bg-amber-500/15 text-amber-400 font-bold",
+  subItemInactive:
+    "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50",
+
   footer:
     "p-4 border-t border-neutral-800/80 mt-auto flex items-center justify-between bg-neutral-900/60 shrink-0",
   userWrapper: "flex items-center gap-3 text-left overflow-hidden",

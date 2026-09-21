@@ -23,7 +23,7 @@ export const calendarViewStyles = {
 
   // 2. Área da Grade Diária
   gridWrapper:
-    "relative flex-1 flex overflow-x-auto overflow-y-auto max-h-[620px]",
+    "relative flex-1 flex overflow-x-auto overflow-y-auto min-h-[500px]",
 
   // Régua Horária da Esquerda (Time Gutter)
   timeGutter:

@@ -8,8 +8,8 @@ import Modal from "../../components/ui/Modal";
 import Avatar from "../../components/ui/Avatar";
 import TagInput from "../../components/ui/TagInput";
 import WorkShiftSelector from "../../components/services/WorkShiftSelector";
-import Alert from "../../components/ui/Alert";
 
+// Escala padrão para inicialização
 const defaultWeeklySchedule = [
   {
     dayId: "seg",
@@ -87,12 +87,12 @@ const initialBarbers = [
     pixKey: "carlos.silva.pix@gmail.com",
     serviceCommission: 50,
     productCommission: 10,
-    status: "active", // active | vacation | inactive
+    status: "active",
     rating: 4.9,
     reviewCount: 168,
     specialties: ["Degradê Navalhado", "Barboterapia", "Tesoura"],
     notes:
-      "Profissional referência da casa. Prefere produtos com efeito matte e tem preferência por atender no início da tarde.",
+      "Profissional referência da casa. Prefere produtos com efeito matte.",
     schedule: defaultWeeklySchedule,
   },
   {
@@ -109,7 +109,7 @@ const initialBarbers = [
     rating: 4.8,
     reviewCount: 94,
     specialties: ["Pigmentação", "Platinado / Nevou", "Desenhos"],
-    notes: "Especialista nas químicas e platinados de sexta e sábado.",
+    notes: "Especialista em químicas de sexta e sábado.",
     schedule: defaultWeeklySchedule,
   },
   {
@@ -122,21 +122,32 @@ const initialBarbers = [
     pixKey: "tiago.barber@hotmail.com",
     serviceCommission: 45,
     productCommission: 10,
-    status: "vacation", // De férias
+    status: "vacation",
     rating: 4.7,
     reviewCount: 82,
     specialties: ["Corte Clássico", "Barba Alinhada", "Sobrancelha"],
-    notes: "Em férias no momento. Retorno previsto para o dia 25 do mês.",
+    notes: "Em férias no momento.",
     schedule: defaultWeeklySchedule,
   },
 ];
 
-export default function BarbersTeamView({ onBack }) {
-  const [barbers, setBarbers] = useState(initialBarbers);
-  const [maxPlanChairs] = useState(6);
+export default function BarbersTeamView({
+  barbers = [], // 👈 Recebe via props
+  onUpdateBarbers, // 👈 Atualiza o estado global
+  maxPlanChairs = 6,
+  onBack,
+}) {
+  // ========================================================
+  // ESTADOS DO MODAL "+ NOVO BARBEIRO" (COM 2 ABAS)
+  // ========================================================
 
-  // 1. Estados da Modal "+ Novo Barbeiro"
+  // Se não passar por props, garante o valor padrão:
+  const totalChairs = maxPlanChairs || 6;
+
+  // Modais e formulários...
   const [isNewBarberModalOpen, setIsNewBarberModalOpen] = useState(false);
+  const [newBarberActiveTab, setNewBarberActiveTab] = useState("dados"); // 'dados' | 'escala'
+
   const [newBarberForm, setNewBarberForm] = useState({
     name: "",
     displayName: "",
@@ -149,90 +160,28 @@ export default function BarbersTeamView({ onBack }) {
     notes: "",
     specialties: ["Degradê Navalhado", "Barboterapia"],
   });
+  const [newBarberSchedule, setNewBarberSchedule] = useState(
+    defaultWeeklySchedule,
+  );
   const [newBarberErrors, setNewBarberErrors] = useState({});
 
-  // 2. Estados da Modal de DETALHES & EDIÇÃO DO BARBEIRO
+  // Estados do Modal de Detalhes & Edição
   const [selectedBarberForDetails, setSelectedBarberForDetails] =
     useState(null);
-  const [isEditMode, setIsEditMode] = useState(false); // false = Leitura, true = Editando
+  const [isEditMode, setIsEditMode] = useState(false);
   const [editFormData, setEditFormData] = useState({});
 
-  // 3. Estados da Modal de Escala de Trabalho
+  // Estados do Modal de Escala Individual
   const [barberForScheduleEdit, setBarberForScheduleEdit] = useState(null);
   const [tempSchedule, setTempSchedule] = useState([]);
 
-  // Cadeiras ativas no plano (barbeiros inativos liberam vaga!)
   const activeChairsCount = barbers.filter(
     (b) => b.status !== "inactive",
   ).length;
 
-  // ========================================================
-  // AÇÕES DO MODAL DE DETALHES / EDIÇÃO
-  // ========================================================
-  const handleOpenDetails = (barber) => {
-    setSelectedBarberForDetails(barber);
-    setIsEditMode(false);
-    setEditFormData({ ...barber });
-  };
-
-  const handleSaveEditBarber = () => {
-    setBarbers((prev) =>
-      prev.map((b) => (b.id === editFormData.id ? { ...editFormData } : b)),
-    );
-    setSelectedBarberForDetails({ ...editFormData });
-    setIsEditMode(false);
-    alert(
-      `✅ Dados do profissional "${editFormData.name}" atualizados com sucesso!`,
-    );
-  };
-
-  // Alterar Status diretamente no Detalhes (Ativo | Férias | Inativo)
-  const handleChangeStatus = (barberId, newStatus) => {
-    setBarbers((prev) =>
-      prev.map((b) => (b.id === barberId ? { ...b, status: newStatus } : b)),
-    );
-    if (selectedBarberForDetails && selectedBarberForDetails.id === barberId) {
-      setSelectedBarberForDetails((prev) => ({ ...prev, status: newStatus }));
-      setEditFormData((prev) => ({ ...prev, status: newStatus }));
-    }
-  };
-
-  // Salvar Novo Barbeiro
-  const handleSaveNewBarber = () => {
-    const errs = {};
-    if (!newBarberForm.name.trim()) errs.name = "Informe o nome completo.";
-    if (!newBarberForm.displayName.trim())
-      errs.displayName = "Informe o apelido de exibição.";
-    if (!newBarberForm.phone || newBarberForm.phone.length < 14)
-      errs.phone = "Informe o WhatsApp com DDD.";
-
-    if (Object.keys(errs).length > 0) {
-      setNewBarberErrors(errs);
-      return;
-    }
-
-    const created = {
-      id: `barber-${Date.now()}`,
-      name: newBarberForm.name,
-      displayName: newBarberForm.displayName,
-      role: newBarberForm.role,
-      email:
-        newBarberForm.email ||
-        `${newBarberForm.displayName.toLowerCase().replace(/\s+/g, "")}@vintageclub.com`,
-      phone: newBarberForm.phone,
-      pixKey: newBarberForm.pixKey || newBarberForm.phone,
-      serviceCommission: Number(newBarberForm.serviceCommission || 50),
-      productCommission: Number(newBarberForm.productCommission || 10),
-      notes: newBarberForm.notes || "",
-      status: "active",
-      rating: 5.0,
-      reviewCount: 1,
-      specialties: newBarberForm.specialties,
-      schedule: defaultWeeklySchedule,
-    };
-
-    setBarbers((prev) => [...prev, created]);
-    setIsNewBarberModalOpen(false);
+  // Abrir Modal de Cadastro Zerado
+  const handleOpenNewBarberModal = () => {
+    setNewBarberActiveTab("dados");
     setNewBarberForm({
       name: "",
       displayName: "",
@@ -245,20 +194,95 @@ export default function BarbersTeamView({ onBack }) {
       notes: "",
       specialties: ["Degradê Navalhado", "Barboterapia"],
     });
+    setNewBarberSchedule(defaultWeeklySchedule);
     setNewBarberErrors({});
-    alert(`💈 Barbeiro "${created.name}" incluído na equipe com sucesso!`);
+    setIsNewBarberModalOpen(true);
   };
 
-  // Salvar Escala de Trabalho
+  // Salvar Novo Barbeiro
+  const handleSaveNewBarber = () => {
+    const errs = {};
+    if (!newBarberForm.name.trim())
+      errs.name = "Informe o nome completo do documento.";
+    if (!newBarberForm.displayName.trim())
+      errs.displayName = "Informe o apelido / nome de exibição.";
+    if (!newBarberForm.phone || newBarberForm.phone.length < 14)
+      errs.phone = "Informe o WhatsApp com DDD.";
+
+    if (Object.keys(errs).length > 0) {
+      setNewBarberErrors(errs);
+      setNewBarberActiveTab("dados");
+      return;
+    }
+
+    const created = {
+      id: `barber-${Date.now()}`,
+      name: newBarberForm.name.trim(),
+      displayName: newBarberForm.displayName.trim(),
+      role: newBarberForm.role,
+      email:
+        newBarberForm.email ||
+        `${newBarberForm.displayName.toLowerCase().replace(/\s+/g, "")}@vintageclub.com`,
+      phone: newBarberForm.phone,
+      pixKey: newBarberForm.pixKey || newBarberForm.phone,
+      serviceCommission: Number(newBarberForm.serviceCommission || 50),
+      productCommission: Number(newBarberForm.productCommission || 10),
+      notes: newBarberForm.notes || "",
+      status: "active",
+      rating: 5.0,
+      reviewCount: 1,
+      specialties: newBarberForm.specialties || [],
+      schedule: newBarberSchedule,
+    };
+
+    // 👇 AQUI ESTAVA FALTANDO: Declara o novo array com o barbeiro incluído
+    const updatedTeam = [...barbers, created];
+
+    if (onUpdateBarbers) {
+      onUpdateBarbers(updatedTeam);
+    }
+
+    setIsNewBarberModalOpen(false);
+    alert(`💈 Barbeiro "${created.name}" cadastrado com sucesso!`);
+  };
+
+  // Detalhes & Edição
+  const handleOpenDetails = (barber) => {
+    setSelectedBarberForDetails(barber);
+    setIsEditMode(false);
+    setEditFormData({ ...barber });
+  };
+
+  // Salvar Edição do Barbeiro
+  const handleSaveEditBarber = () => {
+    const updatedTeam = barbers.map((b) =>
+      b.id === editFormData.id ? { ...editFormData } : b,
+    );
+
+    if (onUpdateBarbers) {
+      onUpdateBarbers(updatedTeam);
+    }
+
+    setSelectedBarberForDetails({ ...editFormData });
+    setIsEditMode(false);
+    alert(
+      `✅ Dados do profissional "${editFormData.name}" atualizados com sucesso!`,
+    );
+  };
+
+  // Escala individual rápida
   const handleSaveBarberSchedule = () => {
     if (!barberForScheduleEdit) return;
-    setBarbers((prev) =>
-      prev.map((b) =>
-        b.id === barberForScheduleEdit.id
-          ? { ...b, schedule: tempSchedule }
-          : b,
-      ),
+
+    // Atualiza a escala do barbeiro no array oficial
+    const updatedTeam = barbers.map((b) =>
+      b.id === barberForScheduleEdit.id ? { ...b, schedule: tempSchedule } : b,
     );
+
+    if (onUpdateBarbers) {
+      onUpdateBarbers(updatedTeam);
+    }
+
     alert(
       `✅ Escala e almoço de ${barberForScheduleEdit.name} salvos com sucesso!`,
     );
@@ -275,8 +299,8 @@ export default function BarbersTeamView({ onBack }) {
             <span>Equipe de Barbeiros & Profissionais</span>
           </h1>
           <p className={teamStyles.subtitle}>
-            Clique no card do barbeiro para ver a ficha completa, editar dados
-            ou consultar observações.
+            Cadastre os membros da equipe, comissões individuais, especialidades
+            e escalas semanais de trabalho.
           </p>
         </div>
 
@@ -284,13 +308,13 @@ export default function BarbersTeamView({ onBack }) {
           <div className={teamStyles.capacityBadge}>
             <span>🪑</span>
             <span>
-              {activeChairsCount} de {maxPlanChairs} cadeiras ocupadas
+              {activeChairsCount} de {totalChairs} cadeiras ocupadas
             </span>
           </div>
 
           <Button
             variant="primary"
-            onClick={() => setIsNewBarberModalOpen(true)}
+            onClick={handleOpenNewBarberModal}
             className="text-xs py-2.5 px-4 font-bold shadow-md bg-amber-600 hover:bg-amber-500"
           >
             <span>+</span> Novo Barbeiro
@@ -308,7 +332,7 @@ export default function BarbersTeamView({ onBack }) {
         </div>
       </div>
 
-      {/* 2. GRADE DE CARDS DOS BARBEIROS (CLICÁVEIS!) */}
+      {/* 2. GRADE DE CARDS DOS BARBEIROS */}
       <div className={teamStyles.teamGrid}>
         {barbers.map((barber) => {
           const isInactive = barber.status === "inactive";
@@ -323,7 +347,6 @@ export default function BarbersTeamView({ onBack }) {
                 ${isInactive ? "opacity-40 bg-neutral-950 border-neutral-900" : isVacation ? "opacity-75 bg-neutral-900/60 border-neutral-800" : ""}
               `}
             >
-              {/* Topo do Card */}
               <div className={teamStyles.cardHeader}>
                 <div className={teamStyles.profileInfo}>
                   <Avatar
@@ -350,7 +373,6 @@ export default function BarbersTeamView({ onBack }) {
                   </div>
                 </div>
 
-                {/* Selo dos 3 Estados (Ativo / Férias / Inativo) */}
                 <span
                   className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
                     isInactive
@@ -368,7 +390,6 @@ export default function BarbersTeamView({ onBack }) {
                 </span>
               </div>
 
-              {/* Avaliação e Contato */}
               <div className="flex items-center justify-between text-xs text-neutral-400">
                 <span className="flex items-center gap-1 text-amber-400 font-bold">
                   ★ {barber.rating}{" "}
@@ -379,7 +400,6 @@ export default function BarbersTeamView({ onBack }) {
                 <span className="font-mono text-[11px]">{barber.phone}</span>
               </div>
 
-              {/* Comissões */}
               <div className={teamStyles.commissionBox}>
                 <div className={teamStyles.commissionItem}>
                   <span className={teamStyles.commissionLabel}>
@@ -400,7 +420,6 @@ export default function BarbersTeamView({ onBack }) {
                 </div>
               </div>
 
-              {/* Especialidades */}
               <div className="space-y-1 text-left">
                 <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
                   Especialidades:
@@ -417,7 +436,6 @@ export default function BarbersTeamView({ onBack }) {
                 </div>
               </div>
 
-              {/* Rodapé do Card */}
               <div
                 className={teamStyles.actionsFooter}
                 onClick={(e) => e.stopPropagation()}
@@ -440,8 +458,273 @@ export default function BarbersTeamView({ onBack }) {
       </div>
 
       {/* ======================================================== */}
-      {/* MODAL 1: DETALHES (READ-ONLY) E EDIÇÃO DO PROFISSIONAL   */}
+      {/* MODAL 1: CADASTRAR NOVO BARBEIRO (COM 2 ABAS!)          */}
       {/* ======================================================== */}
+      <Modal
+        isOpen={isNewBarberModalOpen}
+        size="xl" // Espaçoso para caber a escala confortavelmente!
+        onClose={() => setIsNewBarberModalOpen(false)}
+        title="💈 Cadastrar Novo Barbeiro na Equipe"
+        footer={
+          <div className="w-full flex items-center justify-between gap-3">
+            <span className="text-[11px] text-neutral-500">
+              {newBarberActiveTab === "dados"
+                ? "Configure os dados e comissões antes de salvar."
+                : "Defina a escala semanal e os intervalos de almoço."}
+            </span>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setIsNewBarberModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+
+              {newBarberActiveTab === "dados" ? (
+                <Button
+                  variant="primary"
+                  onClick={() => setNewBarberActiveTab("escala")}
+                  className="bg-amber-600 hover:bg-amber-500"
+                >
+                  Avançar para Escala de Horários ➔
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={() => setNewBarberActiveTab("dados")}
+                >
+                  ← Voltar para Dados
+                </Button>
+              )}
+
+              <Button
+                variant="primary"
+                onClick={handleSaveNewBarber}
+                className="bg-emerald-600 hover:bg-emerald-500 font-bold"
+              >
+                Salvar e Incluir Barbeiro
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-left max-h-[75vh] overflow-y-auto pr-1">
+          {/* BARRA SELETORA DAS 2 ABAS DO MODAL */}
+          <div className="flex items-center gap-2 p-1.5 bg-neutral-950 border border-neutral-800 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => setNewBarberActiveTab("dados")}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                newBarberActiveTab === "dados"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-950/50"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <span>👤</span>
+              <span>Aba 1: Dados & Comissões</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setNewBarberActiveTab("escala")}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                newBarberActiveTab === "escala"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-950/50"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <span>⏰</span>
+              <span>Aba 2: Escala de Horários & Almoço</span>
+            </button>
+          </div>
+
+          {/* ==================================================== */}
+          {/* ABA 1: DADOS DO PROFISSIONAL & COMISSÕES            */}
+          {/* ==================================================== */}
+          {newBarberActiveTab === "dados" && (
+            <div className="space-y-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Nome Completo (Documento)"
+                  placeholder="Ex: Carlos Eduardo Santos"
+                  value={newBarberForm.name}
+                  onChange={(e) => {
+                    setNewBarberForm({
+                      ...newBarberForm,
+                      name: e.target.value,
+                    });
+                    if (newBarberErrors.name)
+                      setNewBarberErrors((prev) => ({ ...prev, name: null }));
+                  }}
+                  error={newBarberErrors.name}
+                />
+
+                <Input
+                  label="Nome de Exibição (Apelido na Cadeira)"
+                  placeholder="Ex: Carlos Navalha"
+                  value={newBarberForm.displayName}
+                  onChange={(e) => {
+                    setNewBarberForm({
+                      ...newBarberForm,
+                      displayName: e.target.value,
+                    });
+                    if (newBarberErrors.displayName)
+                      setNewBarberErrors((prev) => ({
+                        ...prev,
+                        displayName: null,
+                      }));
+                  }}
+                  error={newBarberErrors.displayName}
+                  helperText="Como o cliente verá no agendamento online."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="WhatsApp do Barbeiro"
+                  mask="phone"
+                  placeholder="(11) 99999-9999"
+                  value={newBarberForm.phone}
+                  onChange={(e) => {
+                    setNewBarberForm({
+                      ...newBarberForm,
+                      phone: e.target.value,
+                    });
+                    if (newBarberErrors.phone)
+                      setNewBarberErrors((prev) => ({ ...prev, phone: null }));
+                  }}
+                  error={newBarberErrors.phone}
+                />
+
+                <Input
+                  label="Chave PIX (Para repasse de comissões)"
+                  placeholder="CPF, E-mail ou Telefone"
+                  value={newBarberForm.pixKey}
+                  onChange={(e) =>
+                    setNewBarberForm({
+                      ...newBarberForm,
+                      pixKey: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Select
+                  label="Cargo / Nível"
+                  value={newBarberForm.role}
+                  onChange={(e) =>
+                    setNewBarberForm({ ...newBarberForm, role: e.target.value })
+                  }
+                  options={[
+                    {
+                      value: "Barbeiro Profissional",
+                      label: "Barbeiro Profissional",
+                    },
+                    { value: "Master Barber", label: "Master Barber" },
+                    {
+                      value: "Especialista em Degradê",
+                      label: "Especialista em Degradê",
+                    },
+                    {
+                      value: "Barbeiro Tradicional",
+                      label: "Barbeiro Tradicional",
+                    },
+                    {
+                      value: "Barbeiro Júnior / Aprendiz",
+                      label: "Barbeiro Júnior",
+                    },
+                  ]}
+                />
+
+                <Input
+                  label="Comissão Serviços (%)"
+                  type="number"
+                  value={newBarberForm.serviceCommission}
+                  onChange={(e) =>
+                    setNewBarberForm({
+                      ...newBarberForm,
+                      serviceCommission: e.target.value,
+                    })
+                  }
+                  helperText="Ex: 50 para 50%"
+                />
+
+                <Input
+                  label="Comissão Produtos (%)"
+                  type="number"
+                  value={newBarberForm.productCommission}
+                  onChange={(e) =>
+                    setNewBarberForm({
+                      ...newBarberForm,
+                      productCommission: e.target.value,
+                    })
+                  }
+                  helperText="Ex: 10 para 10%"
+                />
+              </div>
+
+              <TagInput
+                label="Especialidades de Atendimento"
+                tags={newBarberForm.specialties}
+                onChange={(newTags) =>
+                  setNewBarberForm({ ...newBarberForm, specialties: newTags })
+                }
+                placeholder="Adicionar especialidade + TAB"
+                suggestions={[
+                  "Degradê Navalhado",
+                  "Barboterapia",
+                  "Platinado / Nevou",
+                  "Tesoura Clássica",
+                  "Sobrancelha",
+                  "Pigmentação",
+                  "Corte Infantil",
+                ]}
+              />
+
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-bold text-neutral-300">
+                  Observações Internas (Opcional - Privado do Dono)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Anotações sobre contrato, preferências de folga ou detalhes do profissional..."
+                  value={newBarberForm.notes}
+                  onChange={(e) =>
+                    setNewBarberForm({
+                      ...newBarberForm,
+                      notes: e.target.value,
+                    })
+                  }
+                  className="w-full p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 leading-relaxed"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* ABA 2: ESCALA DE HORÁRIOS & ALMOÇO DO NOVO BARBEIRO */}
+          {/* ==================================================== */}
+          {newBarberActiveTab === "escala" && (
+            <div className="space-y-4 pt-1">
+              <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs text-neutral-400 leading-relaxed">
+                ⏰ Defina os dias de trabalho, expediente e horário de almoço
+                individual para este barbeiro. O sistema bloqueará agendamentos
+                automaticamente no intervalo de almoço.
+              </div>
+
+              {/* Componente WorkShiftSelector integrado na Aba 2 */}
+              <WorkShiftSelector
+                schedule={newBarberSchedule}
+                onChange={setNewBarberSchedule}
+              />
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* MODAL DE DETALHES & EDIÇÃO */}
       <Modal
         isOpen={!!selectedBarberForDetails}
         size="lg"
@@ -481,12 +764,8 @@ export default function BarbersTeamView({ onBack }) {
       >
         {selectedBarberForDetails && (
           <div className="space-y-4 text-left max-h-[75vh] overflow-y-auto pr-1">
-            {/* ==================================================== */}
-            {/* MODO 1: VISUALIZAÇÃO (LEITURA / NÃO EDITÁVEL)        */}
-            {/* ==================================================== */}
             {!isEditMode ? (
               <div className="space-y-4">
-                {/* 1. STATUS ESTÁTICO (NÃO CLICÁVEL) */}
                 <div className="p-3.5 bg-neutral-950/80 border border-neutral-800 rounded-2xl flex items-center justify-between">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-neutral-500 block">
@@ -496,8 +775,6 @@ export default function BarbersTeamView({ onBack }) {
                       Situação atual de trabalho na barbearia
                     </p>
                   </div>
-
-                  {/* Badge Estático conforme o status */}
                   <span
                     className={`text-xs font-bold px-3 py-1 rounded-xl border select-none ${
                       selectedBarberForDetails.status === "active"
@@ -515,7 +792,6 @@ export default function BarbersTeamView({ onBack }) {
                   </span>
                 </div>
 
-                {/* Dados Pessoais */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
                   <div>
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
@@ -527,7 +803,7 @@ export default function BarbersTeamView({ onBack }) {
                   </div>
                   <div>
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Nome de Exibição (Na Cadeira):
+                      Nome de Exibição:
                     </span>
                     <strong className="text-amber-400 text-sm">
                       "{selectedBarberForDetails.displayName}"
@@ -535,7 +811,6 @@ export default function BarbersTeamView({ onBack }) {
                   </div>
                 </div>
 
-                {/* Contato, Chave Pix e Cargo */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
                   <div>
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
@@ -547,7 +822,7 @@ export default function BarbersTeamView({ onBack }) {
                   </div>
                   <div>
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Chave PIX (Comissões):
+                      Chave PIX:
                     </span>
                     <span className="text-emerald-400 font-mono font-bold">
                       {selectedBarberForDetails.pixKey}
@@ -563,7 +838,6 @@ export default function BarbersTeamView({ onBack }) {
                   </div>
                 </div>
 
-                {/* Comissões */}
                 <div className="grid grid-cols-2 gap-3 p-3.5 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
                   <div>
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
@@ -583,10 +857,9 @@ export default function BarbersTeamView({ onBack }) {
                   </div>
                 </div>
 
-                {/* Especialidades */}
                 <div className="p-3.5 bg-neutral-950/70 border border-neutral-800 rounded-2xl space-y-1.5 text-xs">
                   <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                    Especialidades de Atendimento:
+                    Especialidades:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedBarberForDetails.specialties.map((spec, i) => (
@@ -600,33 +873,23 @@ export default function BarbersTeamView({ onBack }) {
                   </div>
                 </div>
 
-                {/* Observações Internas */}
-                <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-1 text-xs">
-                  <span className="text-amber-400 font-bold block text-[10px] uppercase tracking-wider">
-                    📝 Observações Internas da Barbearia (Privado do Dono)
-                  </span>
-                  <p className="text-neutral-300 leading-relaxed italic">
-                    {selectedBarberForDetails.notes ||
-                      "Nenhuma observação cadastrada para este profissional."}
-                  </p>
-                </div>
+                {selectedBarberForDetails.notes && (
+                  <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-1 text-xs">
+                    <span className="text-amber-400 font-bold block text-[10px] uppercase">
+                      📝 Observações Internas:
+                    </span>
+                    <p className="text-neutral-300 italic">
+                      {selectedBarberForDetails.notes}
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
-              /* ==================================================== */
-              /* MODO 2: EDIÇÃO (AQUI OS BOTÕES DE STATUS SÃO CLICÁVEIS) */
-              /* ==================================================== */
               <div className="space-y-4">
-                {/* 1. SELETOR CLICÁVEL DE STATUS (APENAS EM MODO EDIÇÃO) */}
                 <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-2xl space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-neutral-300">
-                      Alterar Status Operacional
-                    </label>
-                    <span className="text-[10px] text-neutral-500">
-                      Inativos liberam vaga de cadeira no plano
-                    </span>
-                  </div>
-
+                  <label className="text-xs font-bold text-neutral-300">
+                    Alterar Status Operacional
+                  </label>
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
@@ -635,13 +898,12 @@ export default function BarbersTeamView({ onBack }) {
                       }
                       className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                         editFormData.status === "active"
-                          ? "bg-emerald-600 text-white border-emerald-500 shadow-md scale-[1.02]"
-                          : "bg-neutral-900 text-neutral-400 border-neutral-800 hover:text-white"
+                          ? "bg-emerald-600 text-white border-emerald-500 shadow-md"
+                          : "bg-neutral-900 text-neutral-400 border-neutral-800"
                       }`}
                     >
                       ✓ Ativo
                     </button>
-
                     <button
                       type="button"
                       onClick={() =>
@@ -649,13 +911,12 @@ export default function BarbersTeamView({ onBack }) {
                       }
                       className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                         editFormData.status === "vacation"
-                          ? "bg-amber-600 text-white border-amber-500 shadow-md scale-[1.02]"
-                          : "bg-neutral-900 text-neutral-400 border-neutral-800 hover:text-white"
+                          ? "bg-amber-600 text-white border-amber-500 shadow-md"
+                          : "bg-neutral-900 text-neutral-400 border-neutral-800"
                       }`}
                     >
                       Férias / Folga
                     </button>
-
                     <button
                       type="button"
                       onClick={() =>
@@ -663,19 +924,18 @@ export default function BarbersTeamView({ onBack }) {
                       }
                       className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                         editFormData.status === "inactive"
-                          ? "bg-red-600 text-white border-red-500 shadow-md scale-[1.02]"
-                          : "bg-neutral-900 text-neutral-400 border-neutral-800 hover:text-red-300"
+                          ? "bg-red-600 text-white border-red-500 shadow-md"
+                          : "bg-neutral-900 text-neutral-400 border-neutral-800"
                       }`}
                     >
-                      Inativo (Desligado)
+                      Inativo
                     </button>
                   </div>
                 </div>
 
-                {/* Campos Editáveis */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Input
-                    label="Nome de Exibição (Apelido na Cadeira)"
+                    label="Nome de Exibição"
                     value={editFormData.displayName}
                     onChange={(e) =>
                       setEditFormData({
@@ -685,7 +945,7 @@ export default function BarbersTeamView({ onBack }) {
                     }
                   />
                   <Input
-                    label="WhatsApp do Barbeiro"
+                    label="WhatsApp"
                     mask="phone"
                     value={editFormData.phone}
                     onChange={(e) =>
@@ -699,7 +959,7 @@ export default function BarbersTeamView({ onBack }) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Input
-                    label="Chave PIX (Para repasse de comissões)"
+                    label="Chave PIX"
                     value={editFormData.pixKey}
                     onChange={(e) =>
                       setEditFormData({
@@ -709,7 +969,7 @@ export default function BarbersTeamView({ onBack }) {
                     }
                   />
                   <Select
-                    label="Cargo / Nível"
+                    label="Cargo"
                     value={editFormData.role}
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, role: e.target.value })
@@ -727,10 +987,6 @@ export default function BarbersTeamView({ onBack }) {
                       {
                         value: "Barbeiro Tradicional",
                         label: "Barbeiro Tradicional",
-                      },
-                      {
-                        value: "Barbeiro Júnior / Aprendiz",
-                        label: "Barbeiro Júnior",
                       },
                     ]}
                   />
@@ -761,43 +1017,20 @@ export default function BarbersTeamView({ onBack }) {
                   />
                 </div>
 
-                {/* Especialidades com TagInput */}
                 <TagInput
-                  label="Especialidades de Atendimento"
+                  label="Especialidades"
                   tags={editFormData.specialties || []}
                   onChange={(newTags) =>
                     setEditFormData({ ...editFormData, specialties: newTags })
                   }
-                  placeholder="Adicionar especialidade + TAB"
                 />
-
-                {/* Observações Internas */}
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-bold text-neutral-300">
-                    Observações Internas (Privado do Dono)
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Anotações sobre contrato, folgas ou histórico do profissional..."
-                    value={editFormData.notes || ""}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        notes: e.target.value,
-                      })
-                    }
-                    className="w-full p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 leading-relaxed"
-                  />
-                </div>
               </div>
             )}
           </div>
         )}
       </Modal>
 
-      {/* ======================================================== */}
-      {/* MODAL 3: CONFIGURAR ESCALA & ALMOÇO DO BARBEIRO         */}
-      {/* ======================================================== */}
+      {/* MODAL DE ESCALA RÁPIDA */}
       <Modal
         isOpen={!!barberForScheduleEdit}
         size="xl"
@@ -818,12 +1051,6 @@ export default function BarbersTeamView({ onBack }) {
         }
       >
         <div className="space-y-4 text-left">
-          <Alert variant="info" title="Configuração Individual de Turnos">
-            Os horários definidos aqui serão respeitados na linha do tempo da{" "}
-            <strong>Agenda</strong>. Durante o intervalo de almoço, o sistema
-            bloqueará agendamentos automaticamente para este profissional.
-          </Alert>
-
           <WorkShiftSelector
             schedule={tempSchedule}
             onChange={setTempSchedule}

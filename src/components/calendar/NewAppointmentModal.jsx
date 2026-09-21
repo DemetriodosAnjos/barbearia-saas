@@ -8,7 +8,7 @@ export default function NewAppointmentModal({
   isOpen = false,
   onClose,
   onSaveAppointment,
-  onAddService, // 👈 Recebe a função para salvar na fonte única central
+  onAddService,
   barbers = [],
   services = [],
   prefilledBarberId = "",
@@ -32,7 +32,7 @@ export default function NewAppointmentModal({
   const [quickServicePrice, setQuickServicePrice] = useState("");
   const [quickServiceDuration, setQuickServiceDuration] = useState("30");
 
-  // Sincroniza os dados pré-preenchidos ao abrir o modal (ex: clique no slot da agenda)
+  // Sincroniza os dados pré-preenchidos ao abrir o modal
   useEffect(() => {
     if (isOpen) {
       if (prefilledBarberId) setSelectedBarberId(prefilledBarberId);
@@ -70,46 +70,69 @@ export default function NewAppointmentModal({
       description: "Serviço cadastrado durante o agendamento.",
     };
 
-    // 1. Salva no Catálogo Central do Salão
     if (onAddService) {
       onAddService(newService);
     }
 
-    // 2. Já seleciona o novo serviço automaticamente no agendamento!
     setSelectedServiceId(newService.id);
-
-    // 3. Limpa e fecha a janelinha
     setQuickServiceName("");
     setQuickServicePrice("");
     setIsQuickServiceModalOpen(false);
   };
 
-  // AÇÃO: Confirmar Agendamento
+  // GERAÇÃO DINÂMICA DE HORÁRIOS (08:00 até 18:30)
+  const generateTimeOptions = (start = 8, end = 19) => {
+    const options = [];
+    for (let h = start; h < end; h++) {
+      const hh = String(h).padStart(2, "0");
+      options.push({ value: `${hh}:00`, label: `${hh}:00h` });
+      options.push({ value: `${hh}:30`, label: `${hh}:30h` });
+    }
+    return options;
+  };
+
+  // AÇÃO: Confirmar e Salvar Agendamento
   const handleSave = () => {
     const errs = {};
-    if (!clientName.trim()) errs.clientName = "Informe o nome do cliente.";
-    if (!clientPhone || clientPhone.length < 14)
-      errs.clientPhone = "Informe um WhatsApp válido com DDD.";
+    if (!clientName.trim()) {
+      errs.clientName = "Informe o nome do cliente.";
+    }
+    if (!clientPhone || clientPhone.replace(/\D/g, "").length < 10) {
+      errs.clientPhone = "Informe um telefone/WhatsApp com DDD.";
+    }
 
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
 
+    const duration = activeService ? Number(activeService.durationMinutes) : 30;
+
+    // Calcula o endTime somando a duração ao startTime
+    const [startH, startM] = (bookingTime || "09:00").split(":").map(Number);
+    const totalEndMinutes = startH * 60 + startM + duration;
+    const endH = Math.floor(totalEndMinutes / 60);
+    const endM = totalEndMinutes % 60;
+    const calculatedEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+
+    const resolvedBarberId =
+      selectedBarberId || (barbers[0] ? barbers[0].id : "");
+
     const newAppointment = {
       id: `apt-${Date.now()}`,
-      clientName,
+      clientName: clientName.trim(),
       clientPhone,
-      barberId:
-        selectedBarberId || (barbers[0] ? barbers[0].id : "barber-carlos"),
-      barberName: activeBarber ? activeBarber.name : "Barbeiro",
-      serviceId: selectedServiceId || (services[0] ? services[0].id : "s1"),
+      barberId: resolvedBarberId,
+      barberName: activeBarber ? activeBarber.name : "Profissional",
+      serviceId: selectedServiceId || (services[0] ? services[0].id : ""),
       serviceName: activeService ? activeService.name : "Corte",
-      price: activeService ? activeService.price : 50,
-      durationMinutes: activeService ? activeService.durationMinutes : 30,
+      price: activeService ? Number(activeService.price) : 50,
+      durationMinutes: duration,
       date: bookingDate,
       startTime: bookingTime,
+      endTime: calculatedEndTime,
       status: "confirmed",
+      isPaid: false,
       notes,
     };
 
@@ -117,6 +140,7 @@ export default function NewAppointmentModal({
       onSaveAppointment(newAppointment);
     }
 
+    // Limpa os estados locais e fecha
     setClientName("");
     setClientPhone("");
     setNotes("");
@@ -220,26 +244,12 @@ export default function NewAppointmentModal({
               onChange={(e) => setBookingDate(e.target.value)}
             />
 
+            {/* ✅ COMO DEVE FICAR: */}
             <Select
               label="Horário de Início"
               value={bookingTime}
               onChange={(e) => setBookingTime(e.target.value)}
-              options={[
-                { value: "08:30", label: "08:30h" },
-                { value: "09:00", label: "09:00h" },
-                { value: "09:30", label: "09:30h" },
-                { value: "10:00", label: "10:00h" },
-                { value: "10:30", label: "10:30h" },
-                { value: "11:00", label: "11:00h" },
-                { value: "11:30", label: "11:30h" },
-                { value: "14:00", label: "14:00h" },
-                { value: "14:30", label: "14:30h" },
-                { value: "15:00", label: "15:00h" },
-                { value: "15:30", label: "15:30h" },
-                { value: "16:00", label: "16:00h" },
-                { value: "17:00", label: "17:00h" },
-                { value: "18:00", label: "18:00h" },
-              ]}
+              options={generateTimeOptions(8, 19)}
             />
           </div>
 

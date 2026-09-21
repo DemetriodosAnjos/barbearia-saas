@@ -10,56 +10,9 @@ import BarbershopSettingsView from "./BarbershopSettingsView";
 import UserProfileView from "./UserProfileView";
 import SupportView from "./SupportView";
 import ReferralProgramView from "./ReferralProgramView";
-
-// Catálogo Central Oficial de Serviços da Barbearia
-const initialSharedServices = [
-  {
-    id: "s1",
-    name: "Corte Degradê Navalhado",
-    description:
-      "Acabamento de precisão na navalha, lavagem refrescante e pomada matte inclusa.",
-    category: "Cabelo",
-    durationMinutes: 40,
-    price: 55,
-    commissionPercent: 50,
-    onlineBooking: true,
-    tag: "Mais Pedido ⭐",
-  },
-  {
-    id: "s2",
-    name: "Barboterapia Tradicional",
-    description:
-      "Toalha quente com óleos essenciais, massagem facial e alinhamento na lâmina.",
-    category: "Barba",
-    durationMinutes: 30,
-    price: 45,
-    commissionPercent: 50,
-    onlineBooking: true,
-  },
-  {
-    id: "s3",
-    name: "Combo VIP: Cabelo + Barba",
-    description:
-      "Experiência completa com direito a cerveja artesanal ou café cortesia.",
-    category: "Combos",
-    durationMinutes: 70,
-    price: 90,
-    commissionPercent: 45,
-    onlineBooking: true,
-    tag: "15% OFF",
-  },
-  {
-    id: "s4",
-    name: "Corte na Tesoura Clássico",
-    description:
-      "Corte tradicional totalmente executado na tesoura com alinhamento de fios.",
-    category: "Cabelo",
-    durationMinutes: 60,
-    price: 50,
-    commissionPercent: 50,
-    onlineBooking: true,
-  },
-];
+import ClientsDirectoryView from "./ClientsDirectoryView";
+import CashierPosView from "./CashierPosView";
+import FinancialDashboardView from "./FinancialDashboardView";
 
 export default function BarbershopDashboard({
   tenant = {
@@ -68,46 +21,51 @@ export default function BarbershopDashboard({
     slug: "vintage-club",
     trialDaysLeft: 6,
   },
+  // 👇 TODAS AS PROPRIEDADES AGORA SÃO RECEBIDAS E CONSUMIDAS!
+  barbers = [],
+  onUpdateBarbers,
+  appointments = [],
+  onUpdateAppointments,
+  clients = [],
+  onUpdateClients,
+  comandas = [],
+  onUpdateComandas,
+  services = [],
+  onAddService,
   onLogout,
 }) {
   const [activeMenuTab, setActiveMenuTab] = useState("agenda");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [barberPresenceStatus, setBarberPresenceStatus] = useState("available");
 
-  // 👇 FONTE ÚNICA DA VERDADE: O Catálogo Oficial fica centralizado aqui!
-  const [services, setServices] = useState(initialSharedServices);
-
-  // Função para adicionar novo serviço de qualquer lugar do sistema
-  const handleAddNewService = (newService) => {
-    setServices((prev) => [newService, ...prev]);
-  };
-
-  // Atualiza um serviço existente
-  const handleUpdateService = (updatedService) => {
-    setServices((prev) =>
-      prev.map((s) => (s.id === updatedService.id ? updatedService : s)),
-    );
-  };
-
-  // Desativação Segura (Soft Delete): marca active = false
-  const handleDeleteService = (serviceId) => {
-    setServices((prev) =>
-      prev.map((s) => (s.id === serviceId ? { ...s, active: false } : s)),
-    );
-  };
-
   const barbershopMenuItems = [
     {
       id: "agenda",
       label: "Agenda de Atendimentos",
       icon: "📅",
-      badge: "3 hoje",
+      badge: `${appointments.length} hoje`,
     },
     { id: "servicos", label: "Serviços & Produtos", icon: "✂️" },
     { id: "profissionais", label: "Equipe de Barbeiros", icon: "💈" },
-    { id: "clientes", label: "Clientes & Prontuário", icon: "👥" },
-    { id: "caixa", label: "Frente de Caixa (PDV)", icon: "🧾" },
-    { id: "financeiro", label: "Relatórios Financeiros", icon: "💰" },
+    {
+      id: "clientes",
+      label: "Clientes & Prontuário",
+      icon: "👥",
+      badge: `${clients.length}`,
+    },
+    {
+      id: "financeiro_group",
+      label: "Financeiro",
+      icon: "💰",
+      children: [
+        { id: "caixa", label: "Frente de Caixa (PDV)", icon: "🧾" },
+        {
+          id: "dashboard_financeiro",
+          label: "Dashboard & Big Numbers",
+          icon: "📊",
+        },
+      ],
+    },
     {
       id: "indicacoes",
       label: "Indique & Ganhe 50%",
@@ -124,6 +82,7 @@ export default function BarbershopDashboard({
       />
 
       <div className={barbershopStyles.layoutBody}>
+        {/* SIDEBAR */}
         <Sidebar
           tenantName={tenant.name}
           tenantPlan={tenant.plan}
@@ -136,15 +95,16 @@ export default function BarbershopDashboard({
           onLogout={onLogout}
         />
 
+        {/* ÁREA CENTRAL */}
         <div className="flex-1 flex flex-col min-w-0">
           <Navbar
             variant="admin"
             breadcrumbs={["Painel da Barbearia", activeMenuTab.toUpperCase()]}
             barberStatus={barberPresenceStatus}
             onStatusChange={setBarberPresenceStatus}
-            notificationsCount={3}
+            notificationsCount={appointments.length}
             onMenuClick={() => setIsMobileSidebarOpen(true)}
-            onQuickAction={() => setActiveMenuTab("servicos")}
+            onQuickAction={() => setActiveMenuTab("agenda")}
             onProfileClick={() => setActiveMenuTab("perfil")}
             onSettingsClick={() => setActiveMenuTab("configuracoes")}
             onSupportClick={() => setActiveMenuTab("suporte")}
@@ -152,26 +112,65 @@ export default function BarbershopDashboard({
           />
 
           <main className={barbershopStyles.mainContent}>
-            {/* 1. AGENDA: Recebe os serviços e a função de cadastrar novo on-the-fly */}
+            {/* 1. AGENDA: Consome 'appointments' e 'onUpdateAppointments' */}
             {activeMenuTab === "agenda" && (
               <ScheduleView
+                barbers={barbers}
+                appointments={appointments}
+                onUpdateAppointments={onUpdateAppointments}
                 services={services}
-                onAddService={handleAddNewService}
+                onAddService={onAddService}
                 onNavigateToCashier={() => setActiveMenuTab("caixa")}
               />
             )}
 
-            {/* 2. SERVIÇOS & PRODUTOS: Consome a mesma lista compartilhada! */}
+            {/* 2. SERVIÇOS & PRODUTOS */}
             {activeMenuTab === "servicos" && (
               <ServicesAndProductsView
                 services={services}
-                onAddService={handleAddNewService}
-                onUpdateService={handleUpdateService}
-                onDeleteService={handleDeleteService}
+                onAddService={onAddService}
               />
             )}
 
-            {/* Telas complementares */}
+            {/* 3. EQUIPE DE BARBEIROS: Atualiza a lista oficial */}
+            {activeMenuTab === "profissionais" && (
+              <BarbersTeamView
+                barbers={barbers}
+                onUpdateBarbers={onUpdateBarbers}
+                onBack={() => setActiveMenuTab("agenda")}
+              />
+            )}
+
+            {/* 4. CLIENTES: Consome 'clients' e 'onUpdateClients' */}
+            {activeMenuTab === "clientes" && (
+              <ClientsDirectoryView
+                clientsList={clients}
+                onUpdateClients={onUpdateClients}
+                onNavigateToBooking={() => setActiveMenuTab("agenda")}
+                onBack={() => setActiveMenuTab("agenda")}
+              />
+            )}
+
+            {/* 5. FRENTE DE CAIXA (PDV): Consome 'comandas' e 'onUpdateComandas' */}
+            {activeMenuTab === "caixa" && (
+              <CashierPosView
+                sharedComandas={comandas}
+                onUpdateComandas={onUpdateComandas}
+                onBack={() => setActiveMenuTab("agenda")}
+              />
+            )}
+
+            {/* 6. DASHBOARD FINANCEIRO */}
+            {activeMenuTab === "dashboard_financeiro" && (
+              <FinancialDashboardView
+                onBack={() => setActiveMenuTab("caixa")}
+              />
+            )}
+
+            {/* Telas secundárias */}
+            {activeMenuTab === "indicacoes" && (
+              <ReferralProgramView onBack={() => setActiveMenuTab("agenda")} />
+            )}
             {activeMenuTab === "perfil" && (
               <UserProfileView onBack={() => setActiveMenuTab("agenda")} />
             )}
@@ -182,12 +181,6 @@ export default function BarbershopDashboard({
             )}
             {activeMenuTab === "suporte" && (
               <SupportView onBack={() => setActiveMenuTab("agenda")} />
-            )}
-            {activeMenuTab === "indicacoes" && (
-              <ReferralProgramView onBack={() => setActiveMenuTab("agenda")} />
-            )}
-            {activeMenuTab === "profissionais" && (
-              <BarbersTeamView onBack={() => setActiveMenuTab("agenda")} />
             )}
           </main>
         </div>

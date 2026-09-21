@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { sidebarStyles } from "./Sidebar.styles";
 
 export default function Sidebar({
@@ -11,9 +12,28 @@ export default function Sidebar({
   user = { name: "Pedro Silva", role: "Proprietário / Admin" },
   onLogout,
 }) {
+  // Estado para controlar quais submenus estão abertos (Acordeão)
+  const [expandedMenus, setExpandedMenus] = useState({});
+
+  // 1. AUTO-EXPANSÃO INTELIGENTE: Se o activeItem for um filho, abre o pai sozinho!
+  useEffect(() => {
+    items.forEach((item) => {
+      if (item.children && item.children.some((c) => c.id === activeItem)) {
+        setExpandedMenus((prev) => ({ ...prev, [item.id]: true }));
+      }
+    });
+  }, [activeItem, items]);
+
+  const toggleSubmenu = (menuId) => {
+    setExpandedMenus((prev) => ({
+      ...prev,
+      [menuId]: !prev[menuId],
+    }));
+  };
+
   return (
     <>
-      {/* Backdrop para fechar ao tocar fora no mobile */}
+      {/* Backdrop no celular */}
       {isOpen && (
         <div
           className={sidebarStyles.backdrop}
@@ -22,7 +42,6 @@ export default function Sidebar({
         />
       )}
 
-      {/* Gaveta da Sidebar */}
       <aside
         className={`
           ${sidebarStyles.drawer}
@@ -31,7 +50,7 @@ export default function Sidebar({
         role="navigation"
         aria-label="Menu principal"
       >
-        {/* Cabeçalho da Marca / Barbearia */}
+        {/* Cabeçalho */}
         <div className={sidebarStyles.header}>
           <div className={sidebarStyles.brandWrapper}>
             <div className={sidebarStyles.brandLogo}>💈</div>
@@ -41,7 +60,6 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* Botão de Fechar no Celular */}
           <button
             type="button"
             onClick={onClose}
@@ -64,21 +82,100 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Links de Navegação */}
+        {/* NAVEGAÇÃO COM SUPORTE A SUBMENUS */}
         <nav className={sidebarStyles.nav}>
           {items.map((item) => {
-            const isActive = activeItem === item.id;
+            const hasChildren = item.children && item.children.length > 0;
+            const isParentOfActive =
+              hasChildren && item.children.some((c) => c.id === activeItem);
+            const isExpanded = Boolean(expandedMenus[item.id]);
+            const isDirectActive = activeItem === item.id;
+
+            // ==========================================
+            // CENÁRIO 1: ITEM COM SUBMENU (ACORDEÃO)
+            // ==========================================
+            if (hasChildren) {
+              return (
+                <div key={item.id} className="space-y-1">
+                  {/* Botão Pai que expande/recolhe */}
+                  <button
+                    type="button"
+                    onClick={() => toggleSubmenu(item.id)}
+                    className={`
+                      ${sidebarStyles.navItem}
+                      ${isParentOfActive ? "text-amber-400 font-semibold" : sidebarStyles.navItemInactive}
+                    `}
+                  >
+                    <span className={sidebarStyles.navItemIcon}>
+                      {item.icon}
+                    </span>
+                    <span className={sidebarStyles.navItemLabel}>
+                      {item.label}
+                    </span>
+
+                    {/* Seta Chevron que gira 180 graus */}
+                    <svg
+                      className={`
+                        ${sidebarStyles.chevronIcon}
+                        ${isExpanded ? sidebarStyles.chevronExpanded : ""}
+                      `}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2.2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* Lista de Filhos Recuada */}
+                  {isExpanded && (
+                    <div className={sidebarStyles.submenuList}>
+                      {item.children.map((child) => {
+                        const isChildActive = activeItem === child.id;
+
+                        return (
+                          <button
+                            key={child.id}
+                            type="button"
+                            onClick={() => {
+                              if (onSelect) onSelect(child.id);
+                              if (onClose) onClose();
+                            }}
+                            className={`
+                              ${sidebarStyles.subItem}
+                              ${isChildActive ? sidebarStyles.subItemActive : sidebarStyles.subItemInactive}
+                            `}
+                          >
+                            <span className="text-sm">{child.icon}</span>
+                            <span className="truncate">{child.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // ==========================================
+            // CENÁRIO 2: ITEM NORMAL DE CLIQUE ÚNICO
+            // ==========================================
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => {
                   if (onSelect) onSelect(item.id);
-                  if (onClose) onClose(); // Fecha a gaveta no celular ao selecionar
+                  if (onClose) onClose();
                 }}
                 className={`
                   ${sidebarStyles.navItem}
-                  ${isActive ? sidebarStyles.navItemActive : sidebarStyles.navItemInactive}
+                  ${isDirectActive ? sidebarStyles.navItemActive : sidebarStyles.navItemInactive}
                 `}
               >
                 <span className={sidebarStyles.navItemIcon}>{item.icon}</span>
@@ -93,7 +190,7 @@ export default function Sidebar({
           })}
         </nav>
 
-        {/* Rodapé: Barbeiro / Dono Conectado */}
+        {/* Rodapé do Usuário */}
         <div className={sidebarStyles.footer}>
           <div className={sidebarStyles.userWrapper}>
             <div className={sidebarStyles.userAvatar}>
@@ -105,7 +202,6 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* Botão de Sair (Logout) */}
           <button
             type="button"
             onClick={onLogout}

@@ -23,12 +23,12 @@ export const timelineColumnStyles = {
 
   // Bloco de Pausa / Almoço (Faixas diagonais)
   breakBlock:
-    "absolute inset-x-2 rounded-xl border border-neutral-800 bg-[repeating-linear-gradient(45deg,rgba(38,38,38,0.4),rgba(38,38,38,0.4)_10px,rgba(23,23,23,0.6)_10px,rgba(23,23,23,0.6)_20px)] flex items-center justify-center p-2 z-10 select-none",
+    "absolute inset-x-2 rounded-xl border border-neutral-800 ... z-10 select-none",
   breakText:
     "text-[11px] font-semibold text-neutral-400 tracking-wide flex items-center gap-1.5 bg-neutral-900/90 px-3 py-1 rounded-md border border-neutral-700/60 shadow-xs",
 
   // Camada onde os cards de agendamento são posicionados
-  cardsLayer: "absolute inset-0 px-2 pointer-events-none",
+  cardsLayer: "absolute inset-0 px-2 pointer-events-none z-20",
   cardWrapper:
     "absolute inset-x-2 pointer-events-auto transition-all duration-150",
 };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { scheduleStyles } from "./ScheduleView.styles";
 import CalendarView from "../../components/calendar/CalendarView";
 import NewAppointmentModal from "../../components/calendar/NewAppointmentModal";
@@ -8,113 +8,48 @@ import Badge from "../../components/ui/Badge";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 
-// Barbeiros da Barbearia
-const initialBarbers = [
+// Catálogo Padrão de Serviços caso não venha por props
+const defaultServices = [
+  { id: "s1", name: "Corte Degradê Navalhado", price: 55, durationMinutes: 60 },
   {
-    id: "barber-carlos",
-    name: "Carlos Silva",
-    role: "Master Barber",
-    avatar: "CS",
-    breaks: [{ startTime: "12:00", endTime: "13:00", label: "Almoço Carlos" }],
-  },
-  {
-    id: "barber-marcos",
-    name: "Marcos Vinicius",
-    role: "Especialista Degradê",
-    avatar: "MV",
-    breaks: [{ startTime: "13:00", endTime: "14:00", label: "Almoço Marcos" }],
-  },
-  {
-    id: "barber-tiago",
-    name: "Tiago Santos",
-    role: "Barba & Navalha",
-    avatar: "TS",
-    breaks: [{ startTime: "12:30", endTime: "13:30", label: "Almoço Tiago" }],
-  },
-];
-
-const initialAppointments = [
-  {
-    id: "apt-1",
-    barberId: "barber-carlos",
-    barberName: "Carlos Silva",
-    clientName: "Rodrigo Faro",
-    clientPhone: "(11) 98765-4321",
-    serviceId: "s1",
-    serviceName: "Corte Degradê Navalhado",
-    startTime: "09:00",
-    endTime: "10:00",
-    durationMinutes: 60,
-    price: 55,
-    status: "confirmed",
-    isPaid: true,
-    isVip: true,
-    hasNotes: false,
-    notes: "",
-  },
-  {
-    id: "apt-2",
-    barberId: "barber-carlos",
-    barberName: "Carlos Silva",
-    clientName: "Guilherme Boulos",
-    clientPhone: "(11) 97654-3210",
-    serviceId: "s2",
-    serviceName: "Barboterapia Tradicional",
-    startTime: "10:15",
-    endTime: "11:00",
-    durationMinutes: 45,
+    id: "s2",
+    name: "Barboterapia Tradicional",
     price: 45,
-    status: "in_progress",
-    isPaid: false,
-    isDelayed: false,
-    hasNotes: true,
-    notes: "Pele sensível no pescoço. Usar toalha bem quente.",
+    durationMinutes: 45,
   },
   {
-    id: "apt-3",
-    barberId: "barber-carlos",
-    barberName: "Carlos Silva",
-    clientName: "Thiago Ventura",
-    clientPhone: "(11) 99887-7665",
-    serviceId: "s3",
-    serviceName: "Combo VIP: Cabelo + Barba",
-    startTime: "11:00",
-    endTime: "12:00",
-    durationMinutes: 60,
+    id: "s3",
+    name: "Combo VIP: Cabelo + Barba",
     price: 90,
-    status: "in_progress",
-    isPaid: true,
-    isVip: true,
-    hasNotes: true,
-    notes: "Prefere café expresso sem açúcar.",
+    durationMinutes: 70,
   },
   {
-    id: "apt-4",
-    barberId: "barber-marcos",
-    barberName: "Marcos Vinicius",
-    clientName: "Lucas Lima",
-    clientPhone: "(11) 91122-3344",
-    serviceId: "s4",
-    serviceName: "Corte na Tesoura Clássico",
-    startTime: "08:30",
-    endTime: "09:30",
-    durationMinutes: 60,
+    id: "s4",
+    name: "Corte na Tesoura Clássico",
     price: 50,
-    status: "confirmed",
-    isPaid: false,
-    isVip: false,
-    notes: "",
+    durationMinutes: 60,
   },
 ];
 
 export default function ScheduleView({
-  services = [],
+  barbers = [],
+  appointments = [],
+  onUpdateAppointments,
+  services = defaultServices,
   onAddService,
   onNavigateToCashier,
   onBack,
 }) {
-  const [barbers] = useState(initialBarbers);
-  const [appointments, setAppointments] = useState(initialAppointments);
+  // Filtra apenas barbeiros que não foram excluídos/inativados para a grade
+  const activeBarbers = barbers.filter((b) => b.status !== "inactive");
+
+  // Estado reativo da lista de agendamentos (atualizado em tempo real)
+  const [currentAppointments, setCurrentAppointments] = useState(appointments);
+
+  // Sincroniza se a prop externa mudar
+  useEffect(() => {
+    setCurrentAppointments(appointments);
+  }, [appointments]);
 
   // Modais de Criação e Detalhes
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -134,16 +69,15 @@ export default function ScheduleView({
     notes: "",
   });
 
-  // Modal de Confirmação de Alteração
   const [isConfirmEditModalOpen, setIsConfirmEditModalOpen] = useState(false);
 
-  // Modal de Cadastro Rápido de Serviço On-the-Fly
+  // Modal de Serviço Rápido On-The-Fly
   const [isQuickServiceModalOpen, setIsQuickServiceModalOpen] = useState(false);
   const [quickServiceName, setQuickServiceName] = useState("");
   const [quickServicePrice, setQuickServicePrice] = useState("");
   const [quickServiceDuration, setQuickServiceDuration] = useState("30");
 
-  // Abertura do Modal de Detalhes
+  // 1. Abertura do Modal de Detalhes
   const handleOpenDetails = (appt) => {
     setSelectedAppointment(appt);
     setIsEditingAppointment(false);
@@ -156,21 +90,18 @@ export default function ScheduleView({
     });
   };
 
-  // Clique no botão "Salvar Alterações" -> Abre confirmação
-  const handleRequestSaveEdit = () => {
-    setIsConfirmEditModalOpen(true);
-  };
-
-  // Confirmação final no modal "Sim, pode alterar!"
+  // 2. Salvar Edição do Agendamento
   const handleConfirmSaveEdit = () => {
-    const selectedBarber =
-      barbers.find((b) => b.id === editForm.barberId) || barbers[0];
+    const selectedBarber = activeBarbers.find(
+      (b) => b.id === editForm.barberId,
+    ) ||
+      activeBarbers[0] || { id: "barber-carlos", name: "Barbeiro" };
     const selectedService = services.find((s) => s.id === editForm.serviceId) ||
       services[0] || { durationMinutes: 40, price: 55, name: "Serviço" };
 
     const [startH, startM] = editForm.startTime.split(":").map(Number);
     const totalMinutes =
-      startH * 60 + startM + (selectedService.durationMinutes || 40);
+      startH * 60 + startM + (Number(selectedService.durationMinutes) || 40);
     const endH = Math.floor(totalMinutes / 60);
     const endM = totalMinutes % 60;
     const newEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
@@ -181,7 +112,7 @@ export default function ScheduleView({
       barberName: selectedBarber.name,
       serviceId: selectedService.id,
       serviceName: selectedService.name,
-      durationMinutes: selectedService.durationMinutes,
+      durationMinutes: Number(selectedService.durationMinutes) || 40,
       startTime: editForm.startTime,
       endTime: newEndTime,
       price: Number(editForm.price || selectedService.price),
@@ -189,16 +120,21 @@ export default function ScheduleView({
       hasNotes: Boolean(editForm.notes),
     };
 
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === updatedAppt.id ? updatedAppt : a)),
+    const updatedList = currentAppointments.map((a) =>
+      a.id === updatedAppt.id ? updatedAppt : a,
     );
+
+    setCurrentAppointments(updatedList);
+    if (onUpdateAppointments) {
+      onUpdateAppointments(updatedList);
+    }
 
     setSelectedAppointment(updatedAppt);
     setIsEditingAppointment(false);
     setIsConfirmEditModalOpen(false);
   };
 
-  // 👇 CADASTRO RÁPIDO DE SERVIÇO CORRIGIDO E LIMPO
+  // 3. Salvar Novo Serviço Criado na Hora
   const handleSaveQuickService = () => {
     if (!quickServiceName.trim() || !quickServicePrice) {
       alert("Informe o nome e o preço do novo serviço.");
@@ -208,97 +144,93 @@ export default function ScheduleView({
     const newService = {
       id: `s-${Date.now()}`,
       name: quickServiceName.trim(),
-      price: Number(quickServicePrice),
+      category: "Cabelo",
       durationMinutes: Number(quickServiceDuration),
+      price: Number(quickServicePrice),
       commissionPercent: 50,
       onlineBooking: true,
       description: "Serviço cadastrado durante o agendamento.",
     };
 
-    // 1. Salva na Fonte Única Central (BarbershopDashboard)
-    if (onAddService) {
-      onAddService(newService);
-    }
+    if (onAddService) onAddService(newService);
 
-    // 2. Já seleciona ele automaticamente no agendamento em edição
     setEditForm((prev) => ({
       ...prev,
       serviceId: newService.id,
       price: String(newService.price),
     }));
 
-    // 3. Limpa e fecha a modal
     setQuickServiceName("");
     setQuickServicePrice("");
     setIsQuickServiceModalOpen(false);
   };
 
-  // Clique no Horário Vazio
-  const handleSlotClick = (barberId, time) => {
-    setPrefilledBarberId(barberId);
-    setPrefilledTime(time);
-    setIsNewModalOpen(true);
-  };
-
-  // Salvar Novo Agendamento
+  // 4. Salvar Novo Agendamento (Refatorado e Blindado)
   const handleSaveNewAppointment = (newAppt) => {
-    const [startH, startM] = newAppt.startTime.split(":").map(Number);
-    const totalMinutes = startH * 60 + startM + newAppt.durationMinutes;
-    const endH = Math.floor(totalMinutes / 60);
-    const endM = totalMinutes % 60;
-    const computedEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+    let computedEndTime = newAppt.endTime;
+
+    if (!computedEndTime && newAppt.startTime) {
+      const [startH, startM] = newAppt.startTime.split(":").map(Number);
+      const totalMinutes =
+        startH * 60 + startM + (Number(newAppt.durationMinutes) || 40);
+      const endH = Math.floor(totalMinutes / 60);
+      const endM = totalMinutes % 60;
+      computedEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+    }
 
     const appointmentToAdd = {
+      id: newAppt.id || `apt-${Date.now()}`,
       ...newAppt,
-      endTime: computedEndTime,
-      isPaid: false,
-      isVip: false,
+      endTime: computedEndTime || "10:00",
+      isPaid: Boolean(newAppt.isPaid),
+      isVip: Boolean(newAppt.isVip),
+      status: newAppt.status || "confirmed",
       hasNotes: Boolean(newAppt.notes),
     };
 
-    setAppointments((prev) => [...prev, appointmentToAdd]);
+    const updatedList = [...currentAppointments, appointmentToAdd];
+    setCurrentAppointments(updatedList);
+
+    if (onUpdateAppointments) {
+      onUpdateAppointments(updatedList);
+    }
+
     setIsNewModalOpen(false);
   };
 
-  // Alterar Status
+  // 5. Alterar Status (Ex: Iniciar Atendimento / Concluir)
   const handleStatusChange = (appointmentId, newStatus) => {
-    setAppointments((prev) =>
-      prev.map((a) =>
-        a.id === appointmentId ? { ...a, status: newStatus } : a,
-      ),
+    const updatedList = currentAppointments.map((a) =>
+      a.id === appointmentId ? { ...a, status: newStatus } : a,
     );
+
+    setCurrentAppointments(updatedList);
+    if (onUpdateAppointments) {
+      onUpdateAppointments(updatedList);
+    }
+
     if (selectedAppointment && selectedAppointment.id === appointmentId) {
       setSelectedAppointment((prev) => ({ ...prev, status: newStatus }));
     }
   };
 
-  // Finalizar Atendimento
-  const handleFinishAppointment = (appt) => {
-    handleStatusChange(appt.id, "completed");
-    setSelectedAppointment(null);
-    if (appt.isPaid) {
-      alert(
-        `✅ ATENDIMENTO CONCLUÍDO!\n\n• Cliente: ${appt.clientName}\n• Quitado e finalizado com sucesso!`,
-      );
-    } else {
-      alert(
-        `🧾 ATENDIMENTO CONCLUÍDO (PAGAMENTO PENDENTE):\n\n• Cliente: ${appt.clientName}\n• Valor: R$ ${Number(appt.price).toFixed(2)}\n• Encaminhe o cliente para o caixa.`,
-      );
-    }
-  };
-
-  // Confirmar Cancelamento
+  // 6. Confirmar Cancelamento
   const handleConfirmCancellation = () => {
     if (!appointmentToCancel) return;
-    setAppointments((prev) =>
-      prev.map((a) =>
-        a.id === appointmentToCancel.id ? { ...a, status: "cancelled" } : a,
-      ),
+
+    const updatedList = currentAppointments.map((a) =>
+      a.id === appointmentToCancel.id ? { ...a, status: "cancelled" } : a,
     );
+
+    setCurrentAppointments(updatedList);
+    if (onUpdateAppointments) {
+      onUpdateAppointments(updatedList);
+    }
+
     setAppointmentToCancel(null);
   };
 
-  // Drag & Drop
+  // 7. Arrastar e Soltar (Drag & Drop)
   const handleDropAppointment = (
     draggedAppt,
     targetBarberId,
@@ -310,11 +242,13 @@ export default function ScheduleView({
     };
 
     const newStartMins = timeToMins(targetStartTime);
-    const newEndMins = newStartMins + draggedAppt.durationMinutes;
+    const newEndMins =
+      newStartMins + (Number(draggedAppt.durationMinutes) || 40);
     const endH = Math.floor(newEndMins / 60);
     const endM = newEndMins % 60;
     const targetEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
-    const targetBarber = barbers.find((b) => b.id === targetBarberId);
+
+    const targetBarber = activeBarbers.find((b) => b.id === targetBarberId);
     const targetBarberName = targetBarber ? targetBarber.name : "Barbeiro";
 
     // Conflito de Almoço
@@ -332,8 +266,8 @@ export default function ScheduleView({
       return;
     }
 
-    // Conflito de Horário
-    const hasConflict = appointments.some((a) => {
+    // Conflito com outro agendamento
+    const hasConflict = currentAppointments.some((a) => {
       if (a.id === draggedAppt.id) return false;
       if (a.barberId !== targetBarberId) return false;
       if (a.status === "cancelled") return false;
@@ -350,29 +284,53 @@ export default function ScheduleView({
       return;
     }
 
-    setAppointments((prev) =>
-      prev.map((a) =>
-        a.id === draggedAppt.id
-          ? {
-              ...a,
-              barberId: targetBarberId,
-              barberName: targetBarberName,
-              startTime: targetStartTime,
-              endTime: targetEndTime,
-            }
-          : a,
-      ),
+    const updatedList = currentAppointments.map((a) =>
+      a.id === draggedAppt.id
+        ? {
+            ...a,
+            barberId: targetBarberId,
+            barberName: targetBarberName,
+            startTime: targetStartTime,
+            endTime: targetEndTime,
+          }
+        : a,
     );
+
+    setCurrentAppointments(updatedList);
+    if (onUpdateAppointments) {
+      onUpdateAppointments(updatedList);
+    }
   };
 
-  const totalTodayAppointments = appointments.filter(
+  const handleSlotClick = (barberId, time) => {
+    setPrefilledBarberId(barberId);
+    setPrefilledTime(time);
+    setIsNewModalOpen(true);
+  };
+
+  const handleFinishAppointment = (appt) => {
+    handleStatusChange(appt.id, "completed");
+    setSelectedAppointment(null);
+    if (appt.isPaid) {
+      alert(
+        `✅ ATENDIMENTO CONCLUÍDO!\n\n• Cliente: ${appt.clientName}\n• Quitado e finalizado com sucesso!`,
+      );
+    } else {
+      alert(
+        `🧾 ATENDIMENTO CONCLUÍDO (PAGAMENTO PENDENTE):\n\n• Cliente: ${appt.clientName}\n• Valor: R$ ${Number(appt.price).toFixed(2)}\n• Encaminhe o cliente para o caixa.`,
+      );
+    }
+  };
+
+  // Métricas do Topo em tempo real
+  const totalTodayAppointments = currentAppointments.filter(
     (a) => a.status !== "cancelled",
   ).length;
-  const totalEstimatedRevenue = appointments
+  const totalEstimatedRevenue = currentAppointments
     .filter((a) => a.status !== "cancelled")
     .reduce((acc, a) => acc + Number(a.price || 0), 0);
 
-  const previewBarber = barbers.find((b) => b.id === editForm.barberId);
+  const previewBarber = activeBarbers.find((b) => b.id === editForm.barberId);
   const previewService = services.find((s) => s.id === editForm.serviceId);
 
   return (
@@ -409,18 +367,6 @@ export default function ScheduleView({
             </div>
           </div>
 
-          <Button
-            variant="primary"
-            onClick={() => {
-              setPrefilledBarberId(barbers[0]?.id || "");
-              setPrefilledTime("09:00");
-              setIsNewModalOpen(true);
-            }}
-            className="text-xs py-2.5 px-4 font-bold shadow-md bg-amber-600 hover:bg-amber-500 shrink-0"
-          >
-            <span>+</span> Novo Agendamento
-          </Button>
-
           {onBack && (
             <Button
               variant="secondary"
@@ -435,13 +381,17 @@ export default function ScheduleView({
 
       {/* 2. GRADE DA LINHA DO TEMPO */}
       <CalendarView
-        barbers={barbers}
-        appointments={appointments}
+        barbers={activeBarbers}
+        appointments={currentAppointments}
         startHour={8}
         endHour={19}
         minuteHeight={1.8}
         onSlotClick={handleSlotClick}
-        onNewAppointmentClick={() => setIsNewModalOpen(true)}
+        onNewAppointmentClick={() => {
+          setPrefilledBarberId(activeBarbers[0]?.id || "");
+          setPrefilledTime("09:00");
+          setIsNewModalOpen(true);
+        }}
         onAppointmentClick={(appt) => handleOpenDetails(appt)}
         onOpenComanda={(id) => {
           if (onNavigateToCashier) onNavigateToCashier(id);
@@ -451,7 +401,7 @@ export default function ScheduleView({
         onDropAppointment={handleDropAppointment}
       />
 
-      {/* MODAL 1: DETALHES & EDIÇÃO COMPLETA DO AGENDAMENTO */}
+      {/* MODAL 1: DETALHES & EDIÇÃO */}
       <Modal
         isOpen={!!selectedAppointment}
         onClose={() => {
@@ -474,7 +424,10 @@ export default function ScheduleView({
                   >
                     Cancelar Edição
                   </Button>
-                  <Button variant="primary" onClick={handleRequestSaveEdit}>
+                  <Button
+                    variant="primary"
+                    onClick={() => setIsConfirmEditModalOpen(true)}
+                  >
                     Salvar Alterações
                   </Button>
                 </>
@@ -558,7 +511,6 @@ export default function ScheduleView({
         {selectedAppointment && (
           <div className="space-y-4 text-left">
             {!isEditingAppointment ? (
-              /* MODO LEITURA */
               <div className="space-y-4">
                 <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-2xl flex justify-between items-center">
                   <div>
@@ -582,16 +534,16 @@ export default function ScheduleView({
                 <div className="grid grid-cols-2 gap-3 p-3.5 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
                   <div>
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Barbeiro Designado:
+                      Barbeiro:
                     </span>
-                    <strong className="text-amber-400 text-sm flex items-center gap-1.5 mt-0.5">
+                    <strong className="text-amber-400 text-sm flex items-center gap-1 mt-0.5">
                       <span>💈</span>
                       <span>{selectedAppointment.barberName}</span>
                     </strong>
                   </div>
                   <div>
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Serviço Solicitado:
+                      Serviço:
                     </span>
                     <strong className="text-white text-sm block mt-0.5">
                       {selectedAppointment.serviceName}
@@ -637,49 +589,32 @@ export default function ScheduleView({
                       : "⚠️ Pendente"}
                   </span>
                 </div>
-
-                {selectedAppointment.notes && (
-                  <div className="p-3 bg-amber-950/20 border border-amber-500/30 rounded-xl text-xs space-y-1">
-                    <span className="text-amber-400 font-bold text-[10px] uppercase">
-                      Observações:
-                    </span>
-                    <p className="text-neutral-300 italic">
-                      {selectedAppointment.notes}
-                    </p>
-                  </div>
-                )}
               </div>
             ) : (
-              /* MODO EDIÇÃO */
               <div className="space-y-4">
                 <Select
-                  label="Profissional Responsável (Permitir Troca)"
+                  label="Profissional Responsável"
                   value={editForm.barberId}
                   onChange={(e) =>
                     setEditForm({ ...editForm, barberId: e.target.value })
                   }
-                  options={barbers.map((b) => ({
+                  options={activeBarbers.map((b) => ({
                     value: b.id,
                     label: `${b.name} (${b.role})`,
                   }))}
-                  helperText="Ao alterar o profissional, o card migrará para a coluna dele."
                 />
 
-                {/* CAMPO DE SERVIÇO COM CADASTRO ON-THE-FLY */}
                 <div className="space-y-1.5 text-left">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-neutral-300">
                       Serviço Solicitado
                     </label>
-
                     <button
                       type="button"
                       onClick={() => setIsQuickServiceModalOpen(true)}
                       className="text-xs font-bold text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
-                      title="Cadastrar um novo serviço diretamente no catálogo"
                     >
-                      <span>+</span>
-                      <span>Cadastrar Novo Serviço</span>
+                      <span>+</span> Cadastrar Novo Serviço
                     </button>
                   </div>
 
@@ -697,7 +632,7 @@ export default function ScheduleView({
                     }}
                     options={services.map((s) => ({
                       value: s.id,
-                      label: `${s.name} (${s.durationMinutes} min - Padrão R$ ${s.price})`,
+                      label: `${s.name} (${s.durationMinutes} min - R$ ${s.price})`,
                     }))}
                   />
                 </div>
@@ -719,25 +654,15 @@ export default function ScheduleView({
                     onChange={(e) =>
                       setEditForm({ ...editForm, price: e.target.value })
                     }
-                    helperText="Customizável com desconto ou acréscimo."
                   />
                 </div>
-
-                <Input
-                  label="Observações do Atendimento"
-                  placeholder="Ex: Cliente tem alergia a lâmina, corte na tesoura..."
-                  value={editForm.notes}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, notes: e.target.value })
-                  }
-                />
               </div>
             )}
           </div>
         )}
       </Modal>
 
-      {/* MODAL 2: CONFIRMAÇÃO DE ALTERAÇÃO */}
+      {/* MODAL CONFIRMAR ALTERAÇÃO */}
       <Modal
         isOpen={isConfirmEditModalOpen}
         size="sm"
@@ -757,47 +682,36 @@ export default function ScheduleView({
           </>
         }
       >
-        <div className="space-y-3 text-left">
-          <p className="text-xs text-neutral-200 leading-relaxed">
-            Tem certeza de que deseja realizar essas alterações no agendamento
-            de{" "}
-            <strong className="text-white">
-              {selectedAppointment?.clientName}
-            </strong>
-            ?
+        <div className="space-y-3 text-left text-xs text-neutral-300">
+          <p>
+            Deseja salvar as alterações de{" "}
+            <strong>{selectedAppointment?.clientName}</strong>?
           </p>
-
-          <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs space-y-1.5 text-neutral-300">
-            <div className="flex justify-between">
-              <span className="text-neutral-500">Profissional:</span>
+          <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-1">
+            <p>
+              Profissional:{" "}
               <strong className="text-amber-400">{previewBarber?.name}</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-500">Serviço:</span>
+            </p>
+            <p>
+              Serviço:{" "}
               <strong className="text-white">{previewService?.name}</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-500">Horário:</span>
-              <span className="font-mono text-white font-bold">
-                {editForm.startTime}h
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-neutral-500">Novo Valor:</span>
-              <span className="font-mono text-emerald-400 font-bold">
+            </p>
+            <p>
+              Novo Valor:{" "}
+              <strong className="text-emerald-400">
                 R$ {Number(editForm.price).toFixed(2)}
-              </span>
-            </div>
+              </strong>
+            </p>
           </div>
         </div>
       </Modal>
 
-      {/* MODAL 3: CADASTRO RÁPIDO DE SERVIÇO ON-THE-FLY */}
+      {/* MODAL SERVIÇO ON-THE-FLY */}
       <Modal
         isOpen={isQuickServiceModalOpen}
         size="sm"
         onClose={() => setIsQuickServiceModalOpen(false)}
-        title="Cadastrar Novo Serviço no Catálogo"
+        title="Cadastrar Novo Serviço"
         footer={
           <>
             <Button
@@ -812,44 +726,35 @@ export default function ScheduleView({
           </>
         }
       >
-        <div className="space-y-4 text-left">
-          <p className="text-xs text-neutral-400">
-            O serviço será incluído no catálogo do salão e selecionado neste
-            agendamento.
-          </p>
-
+        <div className="space-y-3 text-left">
           <Input
             label="Nome do Serviço"
-            placeholder="Ex: Hidratação de Barba Express"
+            placeholder="Ex: Hidratação Ouro"
             value={quickServiceName}
             onChange={(e) => setQuickServiceName(e.target.value)}
           />
-
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Preço de Venda (R$)"
+              label="Preço (R$)"
               type="number"
-              placeholder="35.00"
               value={quickServicePrice}
               onChange={(e) => setQuickServicePrice(e.target.value)}
             />
-
             <Select
-              label="Duração Estimada"
+              label="Duração"
               value={quickServiceDuration}
               onChange={(e) => setQuickServiceDuration(e.target.value)}
               options={[
-                { value: "15", label: "15 min" },
-                { value: "30", label: "30 min (Padrão)" },
+                { value: "30", label: "30 min" },
                 { value: "45", label: "45 min" },
-                { value: "60", label: "1 hora" },
+                { value: "60", label: "1h" },
               ]}
             />
           </div>
         </div>
       </Modal>
 
-      {/* MODAL 4: CONFIRMAÇÃO DE CANCELAMENTO */}
+      {/* MODAL CANCELAMENTO */}
       <Modal
         isOpen={!!appointmentToCancel}
         size="sm"
@@ -861,7 +766,7 @@ export default function ScheduleView({
               variant="secondary"
               onClick={() => setAppointmentToCancel(null)}
             >
-              Não, manter horário
+              Não, manter
             </Button>
             <Button variant="danger" onClick={handleConfirmCancellation}>
               Sim, pode cancelar!
@@ -869,32 +774,20 @@ export default function ScheduleView({
           </>
         }
       >
-        <div className="space-y-3 text-left">
-          <p className="text-xs text-neutral-200 leading-relaxed">
-            Tem certeza de que deseja cancelar o atendimento de{" "}
-            <strong className="text-white">
-              {appointmentToCancel?.clientName}
-            </strong>
-            ?
-          </p>
-          <div className="p-3 bg-red-950/30 border border-red-800/50 rounded-xl text-xs text-red-300">
-            O horário das{" "}
-            <strong>
-              {appointmentToCancel?.startTime} às {appointmentToCancel?.endTime}
-            </strong>{" "}
-            será liberado na grade do barbeiro.
-          </div>
+        <div className="text-xs text-neutral-300">
+          Tem certeza de que deseja cancelar o atendimento de{" "}
+          <strong>{appointmentToCancel?.clientName}</strong>? O horário será
+          liberado na agenda.
         </div>
       </Modal>
 
-      {/* MODAL 5: NOVO AGENDAMENTO */}
+      {/* MODAL NOVO AGENDAMENTO (CORRIGIDO: VARIÁVEIS CONECTADAS) */}
       <NewAppointmentModal
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
         onSaveAppointment={handleSaveNewAppointment}
-        barbers={barbers}
+        barbers={activeBarbers.length > 0 ? activeBarbers : barbers}
         services={services}
-        onAddService={onAddService}
         prefilledBarberId={prefilledBarberId}
         prefilledTime={prefilledTime}
       />

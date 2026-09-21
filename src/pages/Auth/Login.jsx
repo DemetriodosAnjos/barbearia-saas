@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
 import { loginStyles } from "./Login.styles";
 import Logo from "../../components/ui/Logo";
 import Input from "../../components/ui/Input";
@@ -26,13 +27,25 @@ export default function Login({
   const [authError, setAuthError] = useState("");
 
   // 4. Estados da Modal de Recuperação de Senha
+  // Estados da Recuperação de Senha por Código
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+
+  const [forgotStep, setForgotStep] = useState("email"); // 'email' | 'code' | 'success'
   const [forgotEmail, setForgotEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotSuccess, setForgotSuccess] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.add("dark");
+  }, []);
 
   // Validação do Formulário de Login
   const validateForm = () => {
+    // 1. Limpa erros globais de autenticação anteriores
+    setAuthError("");
+
     const errs = {};
     if (!email.trim() || !email.includes("@")) {
       errs.email = "Insira um endereço de e-mail válido.";
@@ -48,58 +61,91 @@ export default function Login({
   };
 
   // Submissão do Login
-  const handleLogin = (e) => {
-    e.preventDefault();
-    setAuthError("");
+  const handleLogin = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
 
+    // Executa a validação dos campos
     if (!validateForm()) return;
 
     setIsLoading(true);
+    setAuthError("");
 
-    // Simulação de autenticação segura
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
 
-      // Simulação de erro caso digite uma senha errada específica para teste
-      if (password === "123456") {
-        setAuthError("E-mail ou senha incorretos. Verifique suas credenciais.");
+      if (error) {
+        // Mensagens amigáveis em português para erros comuns
+        if (error.message.includes("Invalid login credentials")) {
+          setAuthError("E-mail ou senha incorretos.");
+        } else if (error.message.includes("Email not confirmed")) {
+          setAuthError("Por favor, confirme seu e-mail antes de acessar.");
+        } else {
+          setAuthError(error.message);
+        }
         return;
       }
 
-      // Sucesso na autenticação
-      const sessionData = {
-        email,
-        role: userRole,
-        name: userRole === "owner" ? "Carlos Silva (Dono)" : "Marcos Barbeiro",
-        token: "jwt-token-simulado-xyz-123",
-        rememberMe,
-      };
-
-      alert(
-        `🔐 LOGIN REALIZADO COM SUCESSO!\n\n` +
-          `• Usuário: ${sessionData.name}\n` +
-          `• Perfil: ${userRole === "owner" ? "Proprietário / Administrador" : "Barbeiro / Colaborador"}\n` +
-          `• Redirecionando para o Painel Operacional correspondente...`,
-      );
-
+      // Sucesso!
       if (onLoginSuccess) {
-        onLoginSuccess(sessionData);
+        onLoginSuccess(data.user);
       }
-    }, 1500);
+    } catch (err) {
+      console.error("Erro inesperado no login:", err);
+      setAuthError("Falha na conexão com o servidor. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Envio da Recuperação de Senha
-  const handleSendPasswordReset = () => {
-    if (!forgotEmail.includes("@")) {
+  // 1. Enviar Código de 6 Dígitos para o E-mail
+  const handleSendVerificationCode = () => {
+    if (!forgotEmail.trim() || !forgotEmail.includes("@")) {
       alert("Por favor, informe um e-mail válido para recuperação.");
       return;
     }
 
     setForgotLoading(true);
+
+    // Simulação de envio do código para o e-mail
     setTimeout(() => {
       setForgotLoading(false);
-      setForgotSuccess(true);
-    }, 1500);
+      setForgotStep("code"); // Avança para a tela de digitar o código + nova senha
+      alert(
+        `Código de verificação enviado para ${forgotEmail}! (Dica de teste: use qualquer código de 6 dígitos, ex: 123456)`,
+      );
+    }, 1200);
+  };
+
+  // 2. Validar Código e Redefinir a Nova Senha
+  const handleConfirmNewPassword = () => {
+    if (!verificationCode || verificationCode.length < 6) {
+      alert("Informe o código de verificação de 6 dígitos.");
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      alert("A nova senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      alert("A confirmação de senha não confere com a nova senha.");
+      return;
+    }
+
+    setForgotLoading(true);
+
+    // Simulação da gravação da nova senha no servidor
+    setTimeout(() => {
+      setForgotLoading(false);
+      setForgotStep("success"); // Avança para a tela de sucesso
+      setVerificationCode("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    }, 1200);
   };
 
   return (
@@ -195,10 +241,10 @@ export default function Login({
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                if (errors.email)
+                if (errors?.email)
                   setErrors((prev) => ({ ...prev, email: null }));
               }}
-              error={errors.email}
+              error={errors?.email}
             />
 
             {/* Senha com Botão de Revelar */}
@@ -211,10 +257,10 @@ export default function Login({
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  if (errors.password)
+                  if (errors?.password)
                     setErrors((prev) => ({ ...prev, password: null }));
                 }}
-                error={errors.password}
+                error={errors?.password}
               />
 
               <button
@@ -224,7 +270,7 @@ export default function Login({
                 title={showPassword ? "Ocultar senha" : "Ver senha"}
                 tabIndex={-1}
               >
-                {showPassword ? "👁️‍🗨️" : "👁️"}
+                {showPassword ? "👁️🗨️" : "👁️"}
               </button>
             </div>
 
@@ -240,11 +286,12 @@ export default function Login({
                 <span>Lembrar de mim</span>
               </label>
 
+              {/* 👇 CORREÇÃO: Usa setForgotStep("email") em vez de setForgotSuccess */}
               <button
                 type="button"
                 onClick={() => {
                   setIsForgotModalOpen(true);
-                  setForgotSuccess(false);
+                  setForgotStep("email");
                 }}
                 className={loginStyles.forgotPasswordLink}
               >
@@ -252,7 +299,7 @@ export default function Login({
               </button>
             </div>
 
-            {/* Botão de Entrar */}
+            {/* Botão de Entrar Conectado ao isLoading */}
             <Button
               type="submit"
               variant="primary"
@@ -266,22 +313,28 @@ export default function Login({
 
         {/* 3. RODAPÉ: Link para Criar Barbearia (Onboarding) */}
         <p className={loginStyles.footerLink}>
-          Sua barbearia ainda não usa o sistema?
-          <span onClick={onGoToSignup} className={loginStyles.signupHighlight}>
+          Sua barbearia ainda não usa o sistema?{" "}
+          <span
+            onClick={() => onGoToSignup && onGoToSignup()}
+            className={loginStyles.signupHighlight}
+          >
             Criar conta grátis
           </span>
         </p>
       </div>
 
       {/* ======================================================== */}
-      {/* MODAL DE RECUPERAÇÃO DE SENHA */}
+      {/* MODAL DE RECUPERAÇÃO DE SENHA (FLUXO POR CÓDIGO)         */}
       {/* ======================================================== */}
       <Modal
         isOpen={isForgotModalOpen}
-        onClose={() => setIsForgotModalOpen(false)}
+        onClose={() => {
+          setIsForgotModalOpen(false);
+          setForgotStep("email");
+        }}
         title="Recuperação de Senha"
         footer={
-          !forgotSuccess && (
+          forgotStep === "email" ? (
             <>
               <Button
                 variant="secondary"
@@ -292,40 +345,37 @@ export default function Login({
               <Button
                 variant="primary"
                 isLoading={forgotLoading}
-                onClick={handleSendPasswordReset}
+                onClick={handleSendVerificationCode}
               >
-                Enviar Link de Redefinição
+                Enviar Código de Verificação
               </Button>
             </>
-          )
+          ) : forgotStep === "code" ? (
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setForgotStep("email")}
+              >
+                ← Voltar
+              </Button>
+              <Button
+                variant="primary"
+                isLoading={forgotLoading}
+                onClick={handleConfirmNewPassword}
+              >
+                Redefinir Senha
+              </Button>
+            </>
+          ) : null
         }
       >
-        {forgotSuccess ? (
-          <div className="space-y-4 text-center py-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mx-auto">
-              ✓
-            </div>
-            <h4 className="text-sm font-bold text-white">
-              E-mail de recuperação enviado!
-            </h4>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Enviamos as instruções e o link seguro para redefinir sua senha
-              para <strong className="text-white">{forgotEmail}</strong>.
-              Verifique sua caixa de entrada e a pasta de spam.
-            </p>
-            <Button
-              variant="primary"
-              className="w-full mt-2"
-              onClick={() => setIsForgotModalOpen(false)}
-            >
-              Voltar ao Login
-            </Button>
-          </div>
-        ) : (
+        {/* ETAPA 1: SOLICITAÇÃO DO E-MAIL */}
+        {forgotStep === "email" && (
           <div className="space-y-3 text-left">
             <p className="text-xs text-neutral-400 leading-relaxed">
-              Informe o e-mail cadastrado na sua barbearia. Enviaremos um link
-              temporário para você criar uma nova senha.
+              Informe o e-mail cadastrado na sua barbearia. Enviaremos um{" "}
+              <strong className="text-neutral-200">código de 6 dígitos</strong>{" "}
+              para você redefinir sua senha com segurança.
             </p>
             <Input
               label="E-mail Cadastrado"
@@ -334,6 +384,81 @@ export default function Login({
               value={forgotEmail}
               onChange={(e) => setForgotEmail(e.target.value)}
             />
+          </div>
+        )}
+
+        {/* ETAPA 2: DIGITAÇÃO DO CÓDIGO + NOVA SENHA */}
+        {forgotStep === "code" && (
+          <div className="space-y-4 text-left">
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300">
+              Código de 6 dígitos enviado para{" "}
+              <strong className="text-white">{forgotEmail}</strong>.
+            </div>
+
+            <Input
+              label="Código de Verificação"
+              placeholder="Ex: 849201"
+              maxLength={6}
+              className="font-mono text-center tracking-widest text-lg font-bold"
+              value={verificationCode}
+              onChange={(e) =>
+                setVerificationCode(e.target.value.replace(/\D/g, ""))
+              }
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Nova Senha"
+                type="password"
+                placeholder="Mínimo 8 caracteres"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <Input
+                label="Confirmar Nova Senha"
+                type="password"
+                placeholder="Repita a nova senha"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-between items-center text-xs pt-1">
+              <span className="text-neutral-500">Não recebeu o e-mail?</span>
+              <button
+                type="button"
+                onClick={handleSendVerificationCode}
+                className="text-amber-400 font-bold hover:underline cursor-pointer"
+              >
+                Reenviar Código
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ETAPA 3: SUCESSO */}
+        {forgotStep === "success" && (
+          <div className="space-y-4 text-center py-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mx-auto">
+              ✓
+            </div>
+            <h4 className="text-sm font-bold text-white">
+              Senha redefinida com sucesso!
+            </h4>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Sua nova senha já está ativa. Você pode acessar o painel agora
+              mesmo.
+            </p>
+            <Button
+              variant="primary"
+              className="w-full mt-2"
+              onClick={() => {
+                setIsForgotModalOpen(false);
+                setForgotStep("email");
+              }}
+            >
+              Acessar Minha Conta
+            </Button>
           </div>
         )}
       </Modal>

@@ -29,11 +29,20 @@ export default function BarberTimelineColumn({
   const totalMinutes = totalHours * 60;
   const columnHeight = totalMinutes * minuteHeight;
 
+  // ✅ FUNÇÃO CORRIGIDA COM SUPORTE A 24H E VALIDAÇÃO:
   const timeToMinutesFromStart = (timeString) => {
-    const [hours, minutes] = timeString.split(":").map(Number);
-    const totalMins = hours * 60 + minutes;
+    if (!timeString || typeof timeString !== "string") return 0;
+
+    let [hours, minutes] = timeString.split(":").map(Number);
+
+    // Se vier no formato 12h após o meio-dia (ex: 01:00 até 06:00 correspondendo a 13h-18h)
+    if (hours >= 1 && hours <= 6) {
+      hours += 12;
+    }
+
+    const totalMins = hours * 60 + (minutes || 0);
     const startMins = startHour * 60;
-    return totalMins - startMins;
+    return Math.max(0, totalMins - startMins);
   };
 
   const hoursList = Array.from({ length: totalHours }, (_, i) => startHour + i);

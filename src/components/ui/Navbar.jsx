@@ -248,14 +248,6 @@ export default function Navbar({
             )}
           </div>
 
-          <Button
-            variant="primary"
-            onClick={onQuickAction}
-            className="hidden lg:inline-flex text-xs py-1.5 px-3"
-          >
-            <span>+</span> Novo Agendamento
-          </Button>
-
           <ThemeToggle className="hidden sm:inline-flex" />
 
           {/* Notificações */}
