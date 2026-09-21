@@ -25,25 +25,24 @@ export default function App() {
   const [loadingData, setLoadingData] = useState(true);
   const [connectionError, setConnectionError] = useState(null);
 
-  // Função central de busca dos dados reais no Supabase
+  // [Função useCallback: memoriza a busca para evitar recriação na memória e loops]
   const loadDataFromSupabase = useCallback(async () => {
     try {
       setLoadingData(true);
       setConnectionError(null);
 
-      // 1. Busca Serviços, Barbeiros e Agendamentos em paralelo
+      // 1. Método Promise.all: busca serviços, barbeiros e agendamentos simultaneamente
       const [servicesRes, barbersRes, appointmentsRes] = await Promise.all([
         supabase.from("services").select("*").order("name"),
         supabase.from("barbers").select("*").order("name"),
         supabase.from("appointments").select("*").order("start_time"),
       ]);
 
-      // Verifica se houve erro de banco ou rede em alguma das tabelas
       if (servicesRes.error) throw servicesRes.error;
       if (barbersRes.error) throw barbersRes.error;
       if (appointmentsRes.error) throw appointmentsRes.error;
 
-      // 2. Normaliza os Serviços (garantindo durationMinutes camelCase)
+      // 2. Normalização tolerante de Serviços (camelCase e snake_case)
       const formattedServices = (servicesRes.data || []).map((s) => ({
         id: s.id,
         name: s.name,
@@ -53,13 +52,14 @@ export default function App() {
         active: s.active ?? true,
       }));
 
-      // 3. Normaliza os Barbeiros (garantindo displayName e reviewCount)
+      // 3. Normalização tolerante de Barbeiros
       const formattedBarbers = (barbersRes.data || []).map((b) => ({
         id: b.id,
         name: b.name,
         displayName: b.display_name || b.name,
         role: b.role || "Barbeiro",
-        avatar: b.avatar || b.name.substring(0, 2).toUpperCase(),
+        avatar:
+          b.avatar || (b.name ? b.name.substring(0, 2).toUpperCase() : "💈"),
         rating: Number(b.rating) || 5.0,
         reviewCount: b.review_count || 0,
         status: b.status || "active",
@@ -67,7 +67,7 @@ export default function App() {
         breaks: b.breaks || [],
       }));
 
-      // 4. Normaliza os Agendamentos (garantindo startTime, isPaid, etc)
+      // 4. Normalização tolerante de Agendamentos
       const formattedAppointments = (appointmentsRes.data || []).map((a) => ({
         id: a.id,
         barberId: a.barber_id || a.barberId,
@@ -84,7 +84,7 @@ export default function App() {
         isVip: a.is_vip ?? a.isVip ?? false,
       }));
 
-      // Atualiza o estado real
+      // Atualização dos estados reais
       setServices(formattedServices);
       setBarbers(formattedBarbers);
       setAppointments(formattedAppointments);
@@ -98,7 +98,7 @@ export default function App() {
     }
   }, []);
 
-  // Dispara a busca assim que o app é iniciado
+  // [Efeito de ciclo de vida: dispara a busca apenas na montagem com dependência estável]
   useEffect(() => {
     loadDataFromSupabase();
   }, [loadDataFromSupabase]);

@@ -26,16 +26,17 @@ export default function Login({
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
-  // 4. Estados da Modal de Recuperação de Senha
-  // Estados da Recuperação de Senha por Código
+  // 4. Estados da Modal de Recuperação de Senha com Supabase Auth
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
-
   const [forgotStep, setForgotStep] = useState("email"); // 'email' | 'code' | 'success'
   const [forgotEmail, setForgotEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
+
+  // [Novo estado para exibir erros nativos dentro do modal sem usar alert do navegador]
+  const [forgotError, setForgotError] = useState("");
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
@@ -100,52 +101,119 @@ export default function Login({
     }
   };
 
-  // 1. Enviar Código de 6 Dígitos para o E-mail
-  const handleSendVerificationCode = () => {
+  // [Função assíncrona: envia código OTP real via Supabase Auth com tratamento try/catch completo]
+  const handleSendVerificationCode = async () => {
+    setForgotError("");
+
     if (!forgotEmail.trim() || !forgotEmail.includes("@")) {
-      alert("Por favor, informe um e-mail válido para recuperação.");
+      setForgotError("Por favor, informe um e-mail válido para recuperação.");
       return;
     }
 
     setForgotLoading(true);
 
-    // Simulação de envio do código para o e-mail
-    setTimeout(() => {
-      setForgotLoading(false);
-      setForgotStep("code"); // Avança para a tela de digitar o código + nova senha
-      alert(
-        `Código de verificação enviado para ${forgotEmail}! (Dica de teste: use qualquer código de 6 dígitos, ex: 123456)`,
+    try {
+      // Método Supabase: dispara o envio do código de 6 dígitos para o e-mail do usuário
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        forgotEmail.trim(),
+        {
+          redirectTo: window.location.origin,
+        },
       );
-    }, 1200);
+
+      if (error) {
+        setForgotError(
+          error.message || "Erro ao enviar código de recuperação.",
+        );
+        return;
+      }
+
+      // Avança para a etapa de inserção do código e nova senha
+      setForgotStep("code");
+    } catch (err) {
+      console.error("Erro no envio do código:", err);
+      setForgotError("Falha na comunicação com o servidor de autenticação.");
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
-  // 2. Validar Código e Redefinir a Nova Senha
-  const handleConfirmNewPassword = () => {
+  // [Função assíncrona: valida OTP no Supabase e atualiza a senha de forma definitiva]
+  const handleConfirmNewPassword = async () => {
+    setForgotError("");
+
     if (!verificationCode || verificationCode.length < 6) {
-      alert("Informe o código de verificação de 6 dígitos.");
+      setForgotError(
+        "Informe o código de verificação de 6 dígitos recebido por e-mail.",
+      );
       return;
     }
 
     if (!newPassword || newPassword.length < 6) {
-      alert("A nova senha deve ter no mínimo 6 caracteres.");
+      setForgotError("A nova senha deve ter no mínimo 6 caracteres.");
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      alert("A confirmação de senha não confere com a nova senha.");
+      setForgotError("A confirmação de senha não confere com a nova senha.");
       return;
     }
 
     setForgotLoading(true);
 
-    // Simulação da gravação da nova senha no servidor
-    setTimeout(() => {
-      setForgotLoading(false);
-      setForgotStep("success"); // Avança para a tela de sucesso
+    try {
+      // Método 1: validação do OTP de recuperação no Supabase
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: forgotEmail.trim(),
+        token: verificationCode.trim(),
+        type: "recovery",
+      });
+
+      if (verifyError) {
+        setForgotError("Código de verificação inválido ou expirado.");
+        return;
+      }
+
+      // Método 2: atualização imediata da nova senha no usuário autenticado
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        setForgotError(
+          updateError.message || "Erro ao redefinir a nova senha.",
+        );
+        return;
+      }
+
+      // Conclusão com sucesso
+      setForgotStep("success");
       setVerificationCode("");
       setNewPassword("");
       setConfirmNewPassword("");
-    }, 1200);
+    } catch (err) {
+      console.error("Erro ao redefinir senha:", err);
+      setForgotError("Erro inesperado ao salvar a nova senha.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // [Função assíncrona: aciona o provedor OAuth do Google oficial do Supabase]
+  const handleGoogleLogin = async () => {
+    setAuthError("");
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) setAuthError(error.message);
+    } catch (err) {
+      console.error("Erro no login Google:", err);
+      setAuthError("Não foi possível conectar com o Google no momento.");
+    }
   };
 
   return (
@@ -178,7 +246,7 @@ export default function Login({
           </button>
         </div>
 
-        {/* 2. CARD PRINCIPAL DE LOGIN COM LOGO 32x32px CENTRALIZADO */}
+        {/* 2. CARD PRINCIPAL DE LOGIN COM LOGO CENTRALIZADO */}
         <div className={loginStyles.cardForm}>
           {/* Cabeçalho Interno Centralizado */}
           <div className={loginStyles.cardHeaderCentered}>
@@ -202,10 +270,10 @@ export default function Login({
             </Alert>
           )}
 
-          {/* Botão de Acesso Rápido com Google */}
+          {/* Botão de Acesso Rápido com Google (Supabase OAuth) */}
           <button
             type="button"
-            onClick={() => alert("Simulação de Login Rápido com Google!")}
+            onClick={handleGoogleLogin}
             className={loginStyles.googleButton}
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -286,12 +354,13 @@ export default function Login({
                 <span>Lembrar de mim</span>
               </label>
 
-              {/* 👇 CORREÇÃO: Usa setForgotStep("email") em vez de setForgotSuccess */}
+              {/* [Disparo do Modal de Recuperação de Senha] */}
               <button
                 type="button"
                 onClick={() => {
-                  setIsForgotModalOpen(true);
+                  setForgotError("");
                   setForgotStep("email");
+                  setIsForgotModalOpen(true);
                 }}
                 className={loginStyles.forgotPasswordLink}
               >
@@ -324,21 +393,30 @@ export default function Login({
       </div>
 
       {/* ======================================================== */}
-      {/* MODAL DE RECUPERAÇÃO DE SENHA (FLUXO POR CÓDIGO)         */}
+      {/* MODAL DE RECUPERAÇÃO DE SENHA (FLUXO SUPABASE OTP)       */}
       {/* ======================================================== */}
       <Modal
         isOpen={isForgotModalOpen}
         onClose={() => {
           setIsForgotModalOpen(false);
           setForgotStep("email");
+          setForgotError("");
+          setVerificationCode("");
+          setNewPassword("");
+          setConfirmNewPassword("");
         }}
-        title="Recuperação de Senha"
+        title={
+          forgotStep === "success" ? "Senha Atualizada" : "Recuperação de Senha"
+        }
         footer={
           forgotStep === "email" ? (
             <>
               <Button
                 variant="secondary"
-                onClick={() => setIsForgotModalOpen(false)}
+                onClick={() => {
+                  setIsForgotModalOpen(false);
+                  setForgotError("");
+                }}
               >
                 Cancelar
               </Button>
@@ -354,7 +432,11 @@ export default function Login({
             <>
               <Button
                 variant="secondary"
-                onClick={() => setForgotStep("email")}
+                disabled={forgotLoading}
+                onClick={() => {
+                  setForgotError("");
+                  setForgotStep("email");
+                }}
               >
                 ← Voltar
               </Button>
@@ -369,9 +451,24 @@ export default function Login({
           ) : null
         }
       >
+        {/* [Feedback de erro nativo do Supabase Auth no topo do modal] */}
+        {forgotError && (
+          <div className="mb-4">
+            <Alert variant="error" title="Atenção">
+              {forgotError}
+            </Alert>
+          </div>
+        )}
+
         {/* ETAPA 1: SOLICITAÇÃO DO E-MAIL */}
         {forgotStep === "email" && (
-          <div className="space-y-3 text-left">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendVerificationCode();
+            }}
+            className="space-y-4 text-left"
+          >
             <p className="text-xs text-neutral-400 leading-relaxed">
               Informe o e-mail cadastrado na sua barbearia. Enviaremos um{" "}
               <strong className="text-neutral-200">código de 6 dígitos</strong>{" "}
@@ -380,46 +477,66 @@ export default function Login({
             <Input
               label="E-mail Cadastrado"
               type="email"
+              autoFocus
+              autoComplete="email"
               placeholder="seuemail@barbearia.com"
               value={forgotEmail}
-              onChange={(e) => setForgotEmail(e.target.value)}
+              onChange={(e) => {
+                setForgotEmail(e.target.value);
+                if (forgotError) setForgotError("");
+              }}
             />
-          </div>
+          </form>
         )}
 
         {/* ETAPA 2: DIGITAÇÃO DO CÓDIGO + NOVA SENHA */}
         {forgotStep === "code" && (
-          <div className="space-y-4 text-left">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleConfirmNewPassword();
+            }}
+            className="space-y-4 text-left"
+          >
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300">
-              Código de 6 dígitos enviado para{" "}
-              <strong className="text-white">{forgotEmail}</strong>.
+              Código de verificação enviado para{" "}
+              <strong className="text-white">{forgotEmail}</strong>. Verifique
+              sua caixa de entrada e spam.
             </div>
 
             <Input
-              label="Código de Verificação"
-              placeholder="Ex: 849201"
+              label="Código de Verificação (6 dígitos)"
+              placeholder="000000"
               maxLength={6}
+              autoFocus
               className="font-mono text-center tracking-widest text-lg font-bold"
               value={verificationCode}
-              onChange={(e) =>
-                setVerificationCode(e.target.value.replace(/\D/g, ""))
-              }
+              onChange={(e) => {
+                setVerificationCode(e.target.value.replace(/\D/g, ""));
+                if (forgotError) setForgotError("");
+              }}
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 label="Nova Senha"
                 type="password"
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Mínimo 6 caracteres"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  if (forgotError) setForgotError("");
+                }}
               />
               <Input
                 label="Confirmar Nova Senha"
                 type="password"
                 placeholder="Repita a nova senha"
                 value={confirmNewPassword}
-                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmNewPassword(e.target.value);
+                  if (forgotError) setForgotError("");
+                }}
               />
             </div>
 
@@ -427,37 +544,41 @@ export default function Login({
               <span className="text-neutral-500">Não recebeu o e-mail?</span>
               <button
                 type="button"
+                disabled={forgotLoading}
                 onClick={handleSendVerificationCode}
-                className="text-amber-400 font-bold hover:underline cursor-pointer"
+                className="text-amber-400 font-bold hover:underline cursor-pointer disabled:opacity-50"
               >
                 Reenviar Código
               </button>
             </div>
-          </div>
+          </form>
         )}
 
         {/* ETAPA 3: SUCESSO */}
         {forgotStep === "success" && (
-          <div className="space-y-4 text-center py-3">
+          <div className="space-y-4 text-center py-4">
             <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mx-auto">
               ✓
             </div>
-            <h4 className="text-sm font-bold text-white">
-              Senha redefinida com sucesso!
-            </h4>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Sua nova senha já está ativa. Você pode acessar o painel agora
-              mesmo.
-            </p>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-white">
+                Senha redefinida com sucesso!
+              </h4>
+              <p className="text-xs text-neutral-400 leading-relaxed max-w-xs mx-auto">
+                Sua credencial foi atualizada no Supabase. Você já pode fazer
+                login com sua nova senha.
+              </p>
+            </div>
             <Button
               variant="primary"
-              className="w-full mt-2"
+              className="w-full mt-2 font-bold"
               onClick={() => {
                 setIsForgotModalOpen(false);
                 setForgotStep("email");
+                setForgotError("");
               }}
             >
-              Acessar Minha Conta
+              Fazer Login Agora →
             </Button>
           </div>
         )}
