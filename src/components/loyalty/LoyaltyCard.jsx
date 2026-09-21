@@ -3,18 +3,22 @@ import Button from "../ui/Button";
 
 export default function LoyaltyCard({
   totalStampsRequired = 10,
-  currentStamps = 7,
+  currentStamps = 0, // Inicia em zero para clientes novos (sem mock)
   rewardDescription = "1 Corte de Cabelo Grátis",
-  expirationDate = "15/12/2026",
-  clientName = "Rodrigo Faro",
+  expirationDate = null,
+  clientName = "Cliente",
   onRedeem,
   className = "",
 }) {
-  const isCompleted = currentStamps >= totalStampsRequired;
-  const stampsRemaining = Math.max(0, totalStampsRequired - currentStamps);
+  // Constantes e Cálculos: proteção numérica e cálculo real de progresso
+  const safeCurrentStamps = Number(currentStamps || 0);
+  const safeTotalRequired = Math.max(1, Number(totalStampsRequired || 10));
+
+  const isCompleted = safeCurrentStamps >= safeTotalRequired;
+  const stampsRemaining = Math.max(0, safeTotalRequired - safeCurrentStamps);
   const progressPercent = Math.min(
     100,
-    (currentStamps / totalStampsRequired) * 100,
+    (safeCurrentStamps / safeTotalRequired) * 100,
   );
 
   const cardStyle = isCompleted
@@ -33,14 +37,14 @@ export default function LoyaltyCard({
           </div>
         </div>
 
-        {/* Selo indicativo de status */}
+        {/* Selo indicativo de status com valores reais */}
         {isCompleted ? (
           <span className={loyaltyStyles.rewardBadgeReady}>
             🎁 Prêmio Disponível!
           </span>
         ) : (
           <span className={loyaltyStyles.rewardBadgePending}>
-            {currentStamps} de {totalStampsRequired} selos
+            {safeCurrentStamps} de {safeTotalRequired} selos
           </span>
         )}
       </div>
@@ -129,9 +133,15 @@ export default function LoyaltyCard({
               {rewardDescription}
             </strong>
           </p>
-          <p className={loyaltyStyles.expirationText}>
-            Selos válidos até: {expirationDate}
-          </p>
+          {expirationDate ? (
+            <p className={loyaltyStyles.expirationText}>
+              Selos válidos até: {expirationDate}
+            </p>
+          ) : (
+            <p className={loyaltyStyles.expirationText}>
+              Selos sem data de expiração (acumulativos)
+            </p>
+          )}
         </div>
 
         {/* Botão de Resgate liberado apenas com 100% dos selos */}

@@ -2,48 +2,63 @@ import { subscriptionStyles } from "./SubscriptionBadge.styles";
 import Button from "../ui/Button";
 
 export default function SubscriptionBadge({
-  subscription = {
-    planName: "Clube VIP Barba & Cabelo",
-    monthlyPrice: 119.9,
-    status: "active", // 'active' | 'overdue' | 'cancelled'
-    quotaType: "limited", // 'limited' ou 'unlimited'
-    totalQuota: 4,
-    usedQuota: 2,
-    renewalDate: "15/10/2026",
-  },
+  subscription = null, // Sem mock: por padrão o cliente não possui plano até ser contratado
   variant = "badge", // 'badge' (compacto) ou 'card' (detalhado)
   onManage,
   onSettleDebt,
   className = "",
 }) {
-  const isOverdue = subscription.status === "overdue";
-  const isCancelled = subscription.status === "cancelled";
-  const isUnlimited = subscription.quotaType === "unlimited";
+  // 1. Defesa: Se o cliente não possuir clube de assinatura ativo, não renderiza nada na tela
+  if (!subscription) return null;
 
+  // 2. Normalização Segura: suporta tanto camelCase (React) quanto snake_case (Supabase)
+  const planName =
+    subscription.planName || subscription.plan_name || "Assinatura";
+  const monthlyPrice = Number(
+    subscription.monthlyPrice || subscription.monthly_price || 0,
+  );
+  const status = subscription.status || "active";
+  const quotaType =
+    subscription.quotaType || subscription.quota_type || "limited";
+  const totalQuota = Number(
+    subscription.totalQuota || subscription.total_quota || 0,
+  );
+  const usedQuota = Number(
+    subscription.usedQuota || subscription.used_quota || 0,
+  );
+  const renewalDate =
+    subscription.renewalDate || subscription.renewal_date || "—";
+
+  const isOverdue = status === "overdue";
+  const isCancelled = status === "cancelled";
+  const isUnlimited = quotaType === "unlimited";
+
+  // Variáveis: cálculo protegido contra divisão por zero
   const remainingQuota = isUnlimited
     ? "Ilimitado"
-    : Math.max(0, subscription.totalQuota - subscription.usedQuota);
+    : Math.max(0, totalQuota - usedQuota);
 
   const quotaPercent = isUnlimited
     ? 100
-    : Math.min(100, (subscription.usedQuota / subscription.totalQuota) * 100);
+    : totalQuota > 0
+      ? Math.min(100, (usedQuota / totalQuota) * 100)
+      : 0;
 
-  // Status visual amigável
+  // Objeto de Status visual amigável
   const statusLabels = {
     active: { label: "Plano Ativo", dot: "bg-emerald-400" },
     overdue: { label: "Pagamento Pendente ⚠️", dot: "bg-amber-400" },
     cancelled: { label: "Cancelado", dot: "bg-neutral-500" },
   };
 
-  const currentStatus =
-    statusLabels[subscription.status] || statusLabels.active;
+  const currentStatus = statusLabels[status] || statusLabels.active;
 
   // ==========================================
   // 1. RENDERIZAÇÃO COMPACTA (PÍLULA / BADGE)
   // ==========================================
   if (variant === "badge") {
     const badgeColor =
-      subscriptionStyles.statusBadge[subscription.status] ||
+      subscriptionStyles.statusBadge[status] ||
       subscriptionStyles.statusBadge.active;
 
     return (
@@ -51,7 +66,7 @@ export default function SubscriptionBadge({
         className={`${subscriptionStyles.badgeBase} ${badgeColor} ${className}`}
       >
         <span className={`w-2 h-2 rounded-full ${currentStatus.dot}`} />
-        <span>{subscription.planName}</span>
+        <span>{planName}</span>
         <span className="opacity-60">•</span>
         <span className="font-mono">
           {isUnlimited ? "∞ Ilimitado" : `${remainingQuota} restantes`}
@@ -63,8 +78,9 @@ export default function SubscriptionBadge({
   // ==========================================
   // 2. RENDERIZAÇÃO DETALHADA (CARD / WIDGET)
   // ==========================================
+
   const cardColor =
-    subscriptionStyles.cardStatus[subscription.status] ||
+    subscriptionStyles.cardStatus[status] ||
     subscriptionStyles.cardStatus.active;
 
   return (
@@ -76,10 +92,10 @@ export default function SubscriptionBadge({
         <div>
           <h4 className={subscriptionStyles.planName}>
             <span>👑</span>
-            <span>{subscription.planName}</span>
+            <span>{planName}</span>
           </h4>
           <p className={subscriptionStyles.planPrice}>
-            R$ {Number(subscription.monthlyPrice).toFixed(2).replace(".", ",")}
+            R$ {monthlyPrice.toFixed(2).replace(".", ",")}
             /mês
           </p>
         </div>
@@ -115,7 +131,7 @@ export default function SubscriptionBadge({
           <span className="font-bold text-neutral-100 font-mono">
             {isUnlimited
               ? "Cortes Ilimitados 🌟"
-              : `${subscription.usedQuota} de ${subscription.totalQuota} cortes utilizados`}
+              : `${usedQuota} de ${totalQuota} cortes utilizados`}
           </span>
         </div>
 
@@ -133,9 +149,7 @@ export default function SubscriptionBadge({
       <div className={subscriptionStyles.cardFooter}>
         <div>
           <span>Renovação: </span>
-          <span className={subscriptionStyles.renewalDate}>
-            {subscription.renewalDate}
-          </span>
+          <span className={subscriptionStyles.renewalDate}>{renewalDate}</span>
         </div>
 
         {isOverdue ? (

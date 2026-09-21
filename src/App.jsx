@@ -1,119 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "./lib/supabase";
 import DesignSystem from "./pages/DesignSystem";
 import OnboardingWizard from "./pages/Onboarding/OnboardingWizard";
 import Login from "./pages/Auth/Login";
 import SuperAdminDashboard from "./pages/SuperAdmin/SuperAdminDashboard";
 import BarbershopDashboard from "./pages/BarbershopAdmin/BarbershopDashboard";
 import ClientBookingView from "./pages/ClientBooking/ClientBookingView";
-
-// 1. Catálogo Oficial de Serviços Compartilhado
-const initialSharedServices = [
-  {
-    id: "s1",
-    name: "Corte Degradê Navalhado",
-    category: "Cabelo",
-    durationMinutes: 40,
-    price: 55,
-    active: true,
-  },
-  {
-    id: "s2",
-    name: "Barboterapia Tradicional",
-    category: "Barba",
-    durationMinutes: 30,
-    price: 45,
-    active: true,
-  },
-  {
-    id: "s3",
-    name: "Combo VIP: Cabelo + Barba",
-    category: "Combos",
-    durationMinutes: 70,
-    price: 90,
-    active: true,
-  },
-  {
-    id: "s4",
-    name: "Corte na Tesoura Clássico",
-    category: "Cabelo",
-    durationMinutes: 60,
-    price: 50,
-    active: true,
-  },
-];
-
-// 👇 2. EQUIPE OFICIAL DE BARBEIROS COMPARTILHADA (FONTE ÚNICA DA VERDADE)
-const initialSharedBarbers = [
-  {
-    id: "barber-carlos",
-    name: "Carlos Silva",
-    displayName: "Carlos Navalha",
-    role: "Master Barber",
-    avatar: "CS",
-    rating: 4.9,
-    reviewCount: 168,
-    status: "active", // Ativo -> Aparece para o cliente!
-    specialties: ["Degradê Navalhado", "Barboterapia", "Tesoura"],
-    breaks: [{ startTime: "12:00", endTime: "13:00", label: "Almoço Carlos" }],
-  },
-  {
-    id: "barber-marcos",
-    name: "Marcos Vinicius",
-    displayName: "Marquinhos",
-    role: "Especialista Degradê",
-    avatar: "MV",
-    rating: 4.8,
-    reviewCount: 94,
-    status: "active", // Ativo -> Aparece para o cliente!
-    specialties: ["Pigmentação", "Platinado / Nevou"],
-    breaks: [{ startTime: "13:00", endTime: "14:00", label: "Almoço Marcos" }],
-  },
-  {
-    id: "barber-tiago",
-    name: "Tiago Santos",
-    displayName: "Tiago Barbeiro",
-    role: "Barba & Navalha",
-    avatar: "TS",
-    rating: 4.7,
-    reviewCount: 82,
-    status: "vacation", // 👈 FÉRIAS: Não deve aparecer no app do cliente!
-    specialties: ["Corte Clássico", "Barba Alinhada"],
-    breaks: [{ startTime: "12:30", endTime: "13:30", label: "Almoço Tiago" }],
-  },
-];
-
-// Agendamentos Compartilhados
-const initialSharedAppointments = [
-  {
-    id: "apt-1",
-    barberId: "barber-carlos",
-    barberName: "Carlos Silva",
-    clientName: "Rodrigo Faro",
-    clientPhone: "(11) 98765-4321",
-    serviceName: "Corte Degradê Navalhado",
-    startTime: "09:00",
-    endTime: "10:00",
-    durationMinutes: 60,
-    price: 55,
-    status: "confirmed",
-    isPaid: true,
-    isVip: true,
-  },
-  {
-    id: "apt-2",
-    barberId: "barber-carlos",
-    barberName: "Carlos Silva",
-    clientName: "Guilherme Boulos",
-    clientPhone: "(11) 97654-3210",
-    serviceName: "Barboterapia Tradicional",
-    startTime: "10:15",
-    endTime: "11:00",
-    durationMinutes: 45,
-    price: 45,
-    status: "in_progress",
-    isPaid: false,
-  },
-];
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -126,10 +18,90 @@ export default function App() {
     urlScreen || (urlBarber ? "login" : "login"),
   );
 
-  // Estados Centrais do SaaS
-  const [appointments, setAppointments] = useState(initialSharedAppointments);
-  const [services, setServices] = useState(initialSharedServices);
-  const [barbers, setBarbers] = useState(initialSharedBarbers); // 👈 Equipe viva centralizada!
+  // Estados Centrais do SaaS (Iniciam 100% vazios, sem dados fictícios)
+  const [services, setServices] = useState([]);
+  const [barbers, setBarbers] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [connectionError, setConnectionError] = useState(null);
+
+  // Função central de busca dos dados reais no Supabase
+  const loadDataFromSupabase = useCallback(async () => {
+    try {
+      setLoadingData(true);
+      setConnectionError(null);
+
+      // 1. Busca Serviços, Barbeiros e Agendamentos em paralelo
+      const [servicesRes, barbersRes, appointmentsRes] = await Promise.all([
+        supabase.from("services").select("*").order("name"),
+        supabase.from("barbers").select("*").order("name"),
+        supabase.from("appointments").select("*").order("start_time"),
+      ]);
+
+      // Verifica se houve erro de banco ou rede em alguma das tabelas
+      if (servicesRes.error) throw servicesRes.error;
+      if (barbersRes.error) throw barbersRes.error;
+      if (appointmentsRes.error) throw appointmentsRes.error;
+
+      // 2. Normaliza os Serviços (garantindo durationMinutes camelCase)
+      const formattedServices = (servicesRes.data || []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        category: s.category || "Cabelo",
+        durationMinutes: s.duration_minutes || s.durationMinutes || 30,
+        price: Number(s.price) || 0,
+        active: s.active ?? true,
+      }));
+
+      // 3. Normaliza os Barbeiros (garantindo displayName e reviewCount)
+      const formattedBarbers = (barbersRes.data || []).map((b) => ({
+        id: b.id,
+        name: b.name,
+        displayName: b.display_name || b.name,
+        role: b.role || "Barbeiro",
+        avatar: b.avatar || b.name.substring(0, 2).toUpperCase(),
+        rating: Number(b.rating) || 5.0,
+        reviewCount: b.review_count || 0,
+        status: b.status || "active",
+        specialties: b.specialties || [],
+        breaks: b.breaks || [],
+      }));
+
+      // 4. Normaliza os Agendamentos (garantindo startTime, isPaid, etc)
+      const formattedAppointments = (appointmentsRes.data || []).map((a) => ({
+        id: a.id,
+        barberId: a.barber_id || a.barberId,
+        barberName: a.barber_name || a.barberName,
+        clientName: a.client_name || a.clientName,
+        clientPhone: a.client_phone || a.clientPhone,
+        serviceName: a.service_name || a.serviceName,
+        startTime: a.start_time || a.startTime,
+        endTime: a.end_time || a.endTime,
+        durationMinutes: a.duration_minutes || a.durationMinutes || 30,
+        price: Number(a.price) || 0,
+        status: a.status || "confirmed",
+        isPaid: a.is_paid ?? a.isPaid ?? false,
+        isVip: a.is_vip ?? a.isVip ?? false,
+      }));
+
+      // Atualiza o estado real
+      setServices(formattedServices);
+      setBarbers(formattedBarbers);
+      setAppointments(formattedAppointments);
+    } catch (error) {
+      console.error("Erro ao sincronizar com o Supabase:", error);
+      setConnectionError(
+        "Não foi possível conectar ao banco de dados. Verifique sua conexão com a internet.",
+      );
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
+  // Dispara a busca assim que o app é iniciado
+  useEffect(() => {
+    loadDataFromSupabase();
+  }, [loadDataFromSupabase]);
 
   // Pipeline de Agendamento do Cliente
   const handleClientBookingFinished = (bookingData) => {
@@ -159,6 +131,39 @@ export default function App() {
         `👉 O corte já está posicionado na coluna de ${bookingData.barberName} no Painel da Barbearia!`,
     );
   };
+
+  // 1. Tela de Carregamento Suave
+  if (loadingData) {
+    return (
+      <div className="min-h-screen w-full bg-neutral-950 flex flex-col items-center justify-center gap-3">
+        <div className="w-9 h-9 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+        <p className="text-xs font-semibold text-neutral-400">
+          Sincronizando barbearia com a nuvem...
+        </p>
+      </div>
+    );
+  }
+
+  // 2. Tela de Erro de Conexão com Botão "Tentar Novamente"
+  if (connectionError) {
+    return (
+      <div className="min-h-screen w-full bg-neutral-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center text-xl mb-4">
+          ⚠️
+        </div>
+        <h3 className="text-base font-bold text-white mb-1">Erro de Conexão</h3>
+        <p className="text-xs text-neutral-400 max-w-sm mb-5 leading-relaxed">
+          {connectionError}
+        </p>
+        <button
+          onClick={loadDataFromSupabase}
+          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs rounded-xl shadow-lg transition-all"
+        >
+          Tentar Novamente ↻
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>

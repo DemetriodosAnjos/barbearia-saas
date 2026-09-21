@@ -3,25 +3,26 @@ import { timelineColumnStyles } from "./BarberTimelineColumn.styles";
 import AppointmentCard from "./AppointmentCard";
 
 export default function BarberTimelineColumn({
-  barber = {
-    id: "barber-1",
-    name: "Carlos Silva",
-    role: "Master Barber",
-    avatar: "CS",
-  },
+  barber,
   startHour = 8,
   endHour = 18,
   minuteHeight = 1.8,
   isPastDate = false,
-  breaks = [{ startTime: "12:00", endTime: "13:00", label: "Pausa de Almoço" }],
+  breaks,
   appointments = [],
   onSlotClick,
   onAppointmentClick,
   onStatusChange,
   onOpenComanda,
   onCancel,
-  onDropAppointment, // 👈 Recebe a ação de soltar card
+  onDropAppointment,
 }) {
+  // 1. Defesa: se não houver barbeiro selecionado, não renderiza a coluna
+  if (!barber) return null;
+
+  // 2. Prioriza as pausas reais cadastradas no Supabase (coluna JSONB 'breaks')
+  const actualBreaks = breaks || barber.breaks || [];
+
   // Estado para destacar o slot onde o mouse está passando por cima no arraste
   const [activeDropTime, setActiveDropTime] = useState(null);
 
@@ -144,10 +145,14 @@ export default function BarberTimelineColumn({
           );
         })}
 
-        {/* 3. Pausa de Almoço */}
-        {breaks.map((pause, idx) => {
-          const startMins = timeToMinutesFromStart(pause.startTime);
-          const endMins = timeToMinutesFromStart(pause.endTime);
+        {/* 3. Pausas e Intervalos Reais daquele Barbeiro */}
+        {actualBreaks.map((pause, idx) => {
+          const startTime = pause.startTime || pause.start_time;
+          const endTime = pause.endTime || pause.end_time;
+          const label = pause.label || "Intervalo";
+
+          const startMins = timeToMinutesFromStart(startTime);
+          const endMins = timeToMinutesFromStart(endTime);
           const top = startMins * minuteHeight;
           const height = (endMins - startMins) * minuteHeight;
 
@@ -160,7 +165,7 @@ export default function BarberTimelineColumn({
               <div className={timelineColumnStyles.breakText}>
                 <span>☕</span>
                 <span>
-                  {pause.label} ({pause.startTime} - {pause.endTime})
+                  {label} ({startTime} - {endTime})
                 </span>
               </div>
             </div>
@@ -170,7 +175,8 @@ export default function BarberTimelineColumn({
         {/* 4. Cards de Agendamento */}
         <div className={timelineColumnStyles.cardsLayer}>
           {appointments.map((appt) => {
-            const startMins = timeToMinutesFromStart(appt.startTime);
+            const startTime = appt.startTime || appt.start_time;
+            const startMins = timeToMinutesFromStart(startTime);
             const top = startMins * minuteHeight;
 
             return (

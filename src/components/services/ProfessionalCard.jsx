@@ -1,23 +1,41 @@
 import { professionalCardStyles } from "./ProfessionalCard.styles";
 
 export default function ProfessionalCard({
-  professional = {
-    id: "prof-1",
-    name: "Carlos Silva",
-    role: "Master Barber",
-    avatar: "CS",
-    rating: 4.9,
-    reviewCount: 142,
-    specialties: ["Degradê", "Barboterapia", "Navalha"],
-    nextAvailableSlot: "Hoje às 14:30",
-    isAvailable: true,
-    isAnyProfessional: false, // Caso seja a opção "Qualquer Profissional"
-  },
+  // [Remoção do mock fixo de Carlos Silva e inicialização defensiva como objeto vazio]
+  professional = {},
   isSelected = false,
   onSelect,
   disabled = false,
   className = "",
 }) {
+  // [Defesa: se o objeto for nulo, não quebra a interface da listagem]
+  if (!professional) return null;
+
+  // [Normalização defensiva de chaves suportando Supabase (snake_case) e React (camelCase)]
+  const name = professional.name || professional.display_name || "Profissional";
+  const role = professional.role || "Barbeiro";
+  const isAny = Boolean(
+    professional.isAnyProfessional || professional.is_any_professional,
+  );
+  const avatar =
+    professional.avatar || (name ? name.slice(0, 2).toUpperCase() : "💈");
+  const rating =
+    professional.rating !== undefined && professional.rating !== null
+      ? Number(professional.rating)
+      : null;
+  const reviewCount = professional.reviewCount ?? professional.review_count;
+  const specialties = Array.isArray(professional.specialties)
+    ? professional.specialties
+    : [];
+  const isAvailable =
+    professional.isAvailable ??
+    (professional.status !== "unavailable" && professional.status !== "off");
+  const nextSlot =
+    professional.nextAvailableSlot ||
+    professional.next_available_slot ||
+    "Disponível Hoje";
+
+  // [Variáveis: cálculo do estado visual de seleção e bloqueio do card]
   const currentState = disabled
     ? professionalCardStyles.states.disabled
     : isSelected
@@ -42,49 +60,48 @@ export default function ProfessionalCard({
       {/* 1. CABEÇALHO: Avatar, Nome, Cargo e Nota de Avaliação */}
       <div className={professionalCardStyles.header}>
         <div className={professionalCardStyles.profileGroup}>
-          {/* Avatar com foto/iniciais ou ícone de dados aleatórios */}
+          {/* [Avatar com iniciais seguras ou ícone dinâmico] */}
           <div
             className={
-              professional.isAnyProfessional
+              isAny
                 ? professionalCardStyles.avatarAny
                 : professionalCardStyles.avatar
             }
           >
-            {professional.isAnyProfessional
-              ? "🎲"
-              : professional.avatar ||
-                professional.name.slice(0, 2).toUpperCase()}
+            {isAny ? "🎲" : avatar}
           </div>
 
           <div className={professionalCardStyles.nameWrapper}>
-            <h3 className={professionalCardStyles.name}>{professional.name}</h3>
-            <p className={professionalCardStyles.role}>{professional.role}</p>
+            {/* [Exibição do nome e cargo reais do profissional cadastrado] */}
+            <h3 className={professionalCardStyles.name}>{name}</h3>
+            <p className={professionalCardStyles.role}>{role}</p>
           </div>
         </div>
 
-        {/* Avaliação por Estrelas (oculta se for "Qualquer Profissional") */}
-        {!professional.isAnyProfessional && professional.rating && (
+        {/* [Avaliação real por estrelas suportando review_count do Supabase] */}
+        {!isAny && rating !== null && (
           <div
             className={professionalCardStyles.ratingBadge}
-            title={`Nota ${professional.rating} de 5.0`}
+            title={`Nota ${rating.toFixed(1)} de 5.0`}
           >
             <span className={professionalCardStyles.starIcon}>★</span>
             <span className={professionalCardStyles.ratingScore}>
-              {professional.rating.toFixed(1)}
+              {rating.toFixed(1)}
             </span>
-            {professional.reviewCount && (
+            {reviewCount !== undefined && reviewCount !== null && (
               <span className={professionalCardStyles.reviewCount}>
-                ({professional.reviewCount})
+                ({reviewCount})
               </span>
             )}
           </div>
         )}
       </div>
 
-      {/* 2. CENTRO: Pílulas de Especialidades */}
-      {professional.specialties && professional.specialties.length > 0 && (
+      {/* 2. CENTRO: Pílulas de Especialidades Reais */}
+      {specialties.length > 0 && (
         <div className={professionalCardStyles.specialtiesWrapper}>
-          {professional.specialties.map((spec, idx) => (
+          {/* [Array map: renderização das especialidades reais do barbeiro] */}
+          {specialties.map((spec, idx) => (
             <span key={idx} className={professionalCardStyles.specialtyTag}>
               {spec}
             </span>
@@ -94,11 +111,11 @@ export default function ProfessionalCard({
 
       {/* 3. RODAPÉ: Próximo Horário Vago e Botão de Ação */}
       <div className={professionalCardStyles.footer}>
-        {/* Status de Disponibilidade */}
-        {professional.isAvailable ? (
+        {/* [Status de Disponibilidade real da agenda do profissional] */}
+        {isAvailable ? (
           <div className={professionalCardStyles.nextSlotText}>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>{professional.nextAvailableSlot || "Disponível Hoje"}</span>
+            <span>{nextSlot}</span>
           </div>
         ) : (
           <div className={professionalCardStyles.nextSlotOff}>

@@ -4,17 +4,26 @@ import Button from "../ui/Button";
 import Input from "../ui/Input";
 
 export default function PaymentMethodSelector({
-  totalAmount = 177, // Valor total da comanda
-  client = {
-    name: "Rodrigo Faro",
-    cpf: "123.456.789-00",
-    hasSubscription: true,
-    subscriptionPlan: "Clube do Barba VIP",
-  },
+  // [Remoção do total fixo de R$ 177, assumindo zero como base segura]
+  totalAmount = 0,
+  // [Remoção do mock de Rodrigo Faro e CPF fictício]
+  client = {},
   onFinishPayment,
   onCancel,
   className = "",
 }) {
+  // [Normalização defensiva dos dados reais do cliente e verificação real de plano ativo]
+  const clientName = client?.name || client?.client_name || "Cliente no Balcão";
+  const clientCpf = client?.cpf || client?.document || null;
+  const hasSubscription = Boolean(
+    client?.hasSubscription || client?.subscription,
+  );
+  const subscriptionPlan =
+    client?.subscriptionPlan ||
+    client?.subscription?.plan_name ||
+    client?.subscription?.planName ||
+    "Plano de Assinatura";
+
   const [activeMethod, setActiveMethod] = useState("pix"); // pix | card | cash | subscription | credit_account (fiado)
 
   // Lista dos pagamentos adicionados (para suportar Split Payment)
@@ -305,14 +314,15 @@ export default function PaymentMethodSelector({
               <div className={paymentStyles.panelTitle}>
                 <span>👑 Benefício do Plano de Assinatura</span>
               </div>
-              {client.hasSubscription ? (
+              {/* [Validação real se o cliente possui assinatura cadastrada no banco] */}
+              {hasSubscription ? (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
                   <p className="text-xs text-amber-300 font-bold">
-                    Plano Ativo: {client.subscriptionPlan}
+                    Plano Ativo: {subscriptionPlan}
                   </p>
                   <p className="text-[11px] text-neutral-300">
-                    O cliente possui direito a cortes ilimitados. Deseja abater
-                    o valor do corte na comanda?
+                    O cliente possui direito aos benefícios do plano. Deseja
+                    abater o saldo com o crédito da assinatura?
                   </p>
                   <Button
                     variant="primary"
@@ -326,7 +336,7 @@ export default function PaymentMethodSelector({
                 </div>
               ) : (
                 <p className="text-xs text-neutral-400">
-                  Este cliente não possui plano de assinatura ativo.
+                  Este cliente não possui plano de assinatura ativo no sistema.
                 </p>
               )}
             </div>
@@ -343,12 +353,15 @@ export default function PaymentMethodSelector({
                   Lançar Saldo Devedor para o Cliente
                 </p>
                 <p className="text-[11px] text-neutral-400">
-                  Cliente: <strong className="text-white">{client.name}</strong>{" "}
-                  • CPF: {client.cpf}
+                  {/* [Exibição do nome e documento real do cliente vinculado à comanda] */}
+                  Cliente: <strong className="text-white">{clientName}</strong>
+                  {clientCpf
+                    ? ` • CPF: ${clientCpf}`
+                    : " • (Sem CPF registrado)"}
                 </p>
                 <p className="text-[10px] text-neutral-500">
-                  O valor pendente será lançado no histórico do cliente para
-                  cobrança no final do mês.
+                  O valor pendente será lançado no saldo devedor do cliente para
+                  acerto posterior no caixa.
                 </p>
                 <Button
                   variant="danger"

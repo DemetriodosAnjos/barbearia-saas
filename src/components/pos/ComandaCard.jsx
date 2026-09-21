@@ -2,46 +2,8 @@ import { comandaStyles } from "./ComandaCard.styles";
 import Button from "../ui/Button";
 
 export default function ComandaCard({
-  comanda = {
-    id: "CMD-1042",
-    clientName: "Rodrigo Faro",
-    clientPhone: "(11) 98765-4321",
-    barberName: "Carlos Silva",
-    status: "open", // 'open' | 'pending_payment' | 'paid'
-    openedAt: "14:15",
-    services: [
-      {
-        id: "s1",
-        name: "Corte Degradê Navalhado",
-        price: 55,
-        barberCommission: 27.5,
-      },
-      {
-        id: "s2",
-        name: "Barboterapia Tradicional",
-        price: 45,
-        barberCommission: 22.5,
-      },
-    ],
-    products: [
-      {
-        id: "p1",
-        name: "Cerveja IPA Artesanal",
-        quantity: 2,
-        unitPrice: 16,
-        total: 32,
-        sellerCommission: 3.2,
-      },
-      {
-        id: "p2",
-        name: "Pomada Matte (50g)",
-        quantity: 1,
-        unitPrice: 45,
-        total: 45,
-        sellerCommission: 4.5,
-      },
-    ],
-  },
+  // [Remoção do mock estático de Rodrigo Faro / Cerveja e suporte a objeto real ou vazio]
+  comanda = {},
   onAddItem,
   onRemoveService,
   onRemoveProduct,
@@ -49,29 +11,60 @@ export default function ComandaCard({
   onStatusChange,
   className = "",
 }) {
-  // 1. Cálculos de Subtotais
-  const totalServices = (comanda.services || []).reduce(
-    (acc, s) => acc + Number(s.price),
+  // [Proteção defensiva e normalização de chaves do Supabase (snake_case e camelCase)]
+  const servicesList = Array.isArray(comanda?.services) ? comanda.services : [];
+  const productsList = Array.isArray(comanda?.products) ? comanda.products : [];
+
+  const clientName =
+    comanda?.clientName || comanda?.client_name || "Cliente sem Identificação";
+  const clientPhone = comanda?.clientPhone || comanda?.client_phone || "";
+  const barberName =
+    comanda?.barberName || comanda?.barber_name || "Barbeiro da Casa";
+  const openedAt = comanda?.openedAt || comanda?.opened_at || "Recém-aberta";
+  const comandaId = comanda?.id || "NOVA";
+
+  // [Método reduce: cálculo defensivo de subtotais de serviços e produtos reais]
+  const totalServices = servicesList.reduce(
+    (acc, s) => acc + Number(s.price || 0),
     0,
   );
-  const totalProducts = (comanda.products || []).reduce(
-    (acc, p) => acc + Number(p.total),
+
+  const totalProducts = productsList.reduce(
+    (acc, p) =>
+      acc +
+      Number(
+        p.total ||
+          Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+      ),
     0,
   );
+
   const totalComanda = totalServices + totalProducts;
 
-  // 2. Cálculo de Rateio de Comissões
+  // [Método reduce: cálculo em tempo real das comissões de profissionais]
   const totalBarberCommission =
-    (comanda.services || []).reduce(
-      (acc, s) => acc + Number(s.barberCommission || 0),
+    servicesList.reduce(
+      (acc, s) =>
+        acc +
+        Number(
+          s.barberCommission ||
+            s.barber_commission ||
+            Number(s.price || 0) * 0.5,
+        ),
       0,
     ) +
-    (comanda.products || []).reduce(
-      (acc, p) => acc + Number(p.sellerCommission || 0),
+    productsList.reduce(
+      (acc, p) =>
+        acc +
+        Number(
+          p.sellerCommission ||
+            p.seller_commission ||
+            Number(p.total || 0) * 0.1,
+        ),
       0,
     );
 
-  const totalHouseNet = totalComanda - totalBarberCommission;
+  const totalHouseNet = Math.max(0, totalComanda - totalBarberCommission);
 
   // 3. Estilos de Status
   const statusConfig = {
@@ -99,28 +92,25 @@ export default function ComandaCard({
       {/* 1. CABEÇALHO DA COMANDA */}
       <div className={comandaStyles.header}>
         <div className={comandaStyles.identityWrapper}>
-          <span className={comandaStyles.comandaBadge}>#{comanda.id}</span>
+          {/* [Exibição do identificador real da comanda] */}
+          <span className={comandaStyles.comandaBadge}>#{comandaId}</span>
           <div>
             <h3 className={comandaStyles.clientName}>
-              <span>{comanda.clientName}</span>
-              {comanda.clientPhone && (
+              {/* [Nome e telefone reais vinculados ao cliente da comanda] */}
+              <span>{clientName}</span>
+              {clientPhone && (
                 <span className="text-xs text-neutral-400 font-normal">
-                  ({comanda.clientPhone})
+                  ({clientPhone})
                 </span>
               )}
             </h3>
             <p className={comandaStyles.barberMeta}>
+              {/* [Barbeiro e horário real de abertura da comanda] */}
               Barbeiro Responsável:{" "}
-              <strong className="text-neutral-200">{comanda.barberName}</strong>{" "}
-              • Aberta às {comanda.openedAt}
+              <strong className="text-neutral-200">{barberName}</strong> •
+              Aberta às {openedAt}
             </p>
           </div>
-        </div>
-
-        {/* Status da Comanda */}
-        <div className={`${comandaStyles.statusBadge} ${currentStatus.style}`}>
-          <span className={`w-2 h-2 rounded-full ${currentStatus.dot}`} />
-          <span>{currentStatus.label}</span>
         </div>
       </div>
 
@@ -214,7 +204,8 @@ export default function ComandaCard({
         </div>
 
         <div className={comandaStyles.commissionRow}>
-          <span>Comissão Total do Barbeiro ({comanda.barberName}):</span>
+          {/* [Exibição do barbeiro real que receberá o repasse] */}
+          <span>Comissão Total do Barbeiro ({barberName}):</span>
           <span className={comandaStyles.commissionBarber}>
             + R$ {totalBarberCommission.toFixed(2).replace(".", ",")}
           </span>

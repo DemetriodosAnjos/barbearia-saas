@@ -4,10 +4,13 @@ import Modal from "../ui/Modal";
 import Alert from "../ui/Alert";
 import Spinner from "../ui/Spinner";
 
-export default function TrialBanner({ trialDaysLeft = 6, onSubscribePlan }) {
+export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // 1. Defesa: se trialDaysLeft for null/undefined (ex: assinante ativo ou dados ainda carregando), não renderiza
+  if (trialDaysLeft === undefined || trialDaysLeft === null) return null;
 
   // Estados do Modal de Redirecionamento com Spinner
   const [isRedirectModalOpen, setIsRedirectModalOpen] = useState(false);
@@ -25,6 +28,7 @@ export default function TrialBanner({ trialDaysLeft = 6, onSubscribePlan }) {
       return;
     }
 
+    // Validade dos links 30 dias (substituir por webhook Mercado Pago)
     const paymentLinks = {
       starter: "https://checkout.nubank.com.br/cqOIhHqs1xetkbs",
       pro: "https://checkout.nubank.com.br/c5JntImFeMetkbs",
@@ -118,12 +122,13 @@ export default function TrialBanner({ trialDaysLeft = 6, onSubscribePlan }) {
         isOpen={isModalOpen}
         size="xl"
         onClose={() => {
+          // Método: impede fechamento se o trial estiver expirado, exibindo aviso no próprio layout
           if (!isExpired) {
             setIsModalOpen(false);
             setErrorMessage("");
           } else {
-            alert(
-              "Seu período de testes terminou. Selecione um plano para continuar.",
+            setErrorMessage(
+              "Seu período de teste terminou. Selecione um plano para desbloquear o acesso.",
             );
           }
         }}

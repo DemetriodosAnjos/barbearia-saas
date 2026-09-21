@@ -12,20 +12,27 @@ export default function ServiceMultiSelect({
 }) {
   const [selectedCategory, setSelectedCategory] = useState("all");
 
-  // 1. Extrai categorias únicas dinamicamente a partir dos serviços fornecidos
+  // [Filtro de segurança: exibe apenas serviços ativos para o agendamento do cliente]
+  const activeServices = services.filter((s) => s.active !== false);
+
+  // [Array Set: extração dinâmica de categorias válidas sem valores nulos ou vazios]
+  const validCategories = Array.from(
+    new Set(activeServices.map((s) => s.category).filter(Boolean)),
+  );
+
   const categories = [
     { id: "all", label: "Todos os Serviços" },
-    ...Array.from(new Set(services.map((s) => s.category))).map((cat) => ({
+    ...validCategories.map((cat) => ({
       id: cat,
       label: cat,
     })),
   ];
 
-  // 2. Filtra os serviços pela categoria ativa
+  // [Filtro de serviços ativos pela categoria selecionada]
   const filteredServices =
     selectedCategory === "all"
-      ? services
-      : services.filter((s) => s.category === selectedCategory);
+      ? activeServices
+      : activeServices.filter((s) => s.category === selectedCategory);
 
   // 3. Alterna a seleção de um serviço (Adicionar / Remover)
   const handleToggleSelect = (service) => {
@@ -46,12 +53,14 @@ export default function ServiceMultiSelect({
     if (onChange) onChange([]);
   };
 
-  // 5. Cálculos Matemáticos Automáticos (Tempo Total e Preço Total)
+  // [Método reduce: cálculo real da soma de minutos suportando duration_minutes e durationMinutes]
   const totalDurationMinutes = selectedServices.reduce(
-    (acc, curr) => acc + (curr.durationMinutes || 0),
+    (acc, curr) =>
+      acc + Number(curr.durationMinutes ?? curr.duration_minutes ?? 30),
     0,
   );
 
+  // [Método reduce: cálculo real do valor acumulado dos serviços selecionados]
   const totalPrice = selectedServices.reduce(
     (acc, curr) => acc + (Number(curr.price) || 0),
     0,
@@ -104,8 +113,15 @@ export default function ServiceMultiSelect({
         </div>
       </div>
 
-      {/* 2. GRADE DE SERVIÇOS DISPONÍVEIS */}
+      {/* 2. GRADE DE SERVIÇOS DISPONÍVEIS COM EMPTY STATE */}
       <div className={serviceMultiSelectStyles.servicesGrid}>
+        {/* [Empty State: mensagem de orientação quando não houver serviços cadastrados ou na categoria] */}
+        {filteredServices.length === 0 && (
+          <div className="col-span-full py-12 text-center text-xs text-neutral-500">
+            Nenhum serviço disponível nesta categoria no momento.
+          </div>
+        )}
+
         {filteredServices.map((service) => {
           const isSelected = selectedServices.some((s) => s.id === service.id);
 

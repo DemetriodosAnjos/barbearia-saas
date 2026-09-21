@@ -2,18 +2,8 @@ import { useState } from "react";
 import { posProductStyles } from "./PosProductItem.styles";
 
 export default function PosProductItem({
-  product = {
-    id: "prod-1",
-    name: "Pomada Modeladora Matte",
-    category: "Vitrine",
-    icon: "🧴",
-    costPrice: 20,
-    price: 45,
-    stock: 8,
-    commissionPercent: 10,
-    active: true,
-    variants: [],
-  },
+  // [Remoção do mock estático da Pomada Matte e inicialização como objeto vazio]
+  product = {},
   quantityInComanda = 0,
   onAddToCart,
   onEdit,
@@ -21,20 +11,31 @@ export default function PosProductItem({
   onRestore,
   className = "",
 }) {
+  // [Defesa: se o produto for nulo ou inválido, não quebra a interface]
+  if (!product || !product.name) return null;
+
+  // [Normalização defensiva de colunas do Supabase: stock, active e commission]
   const isInactive = product.active === false;
-  const hasVariants = product.variants && product.variants.length > 0;
+  const hasVariants =
+    Array.isArray(product.variants) && product.variants.length > 0;
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
 
   const activeVariant = hasVariants
     ? product.variants[selectedVariantIndex]
     : null;
-  const currentPrice = activeVariant ? activeVariant.price : product.price;
+  const currentPrice = activeVariant
+    ? Number(activeVariant.price || 0)
+    : Number(product.price || 0);
 
-  const isOutOfStock = product.stock <= 0;
-  const isLowStock = product.stock > 0 && product.stock <= 3;
+  const stockCount = Number(product.stock ?? 0);
+  const isOutOfStock = stockCount <= 0;
+  const isLowStock = stockCount > 0 && stockCount <= 3;
   const isManagementMode = Boolean(onEdit || onDelete || onRestore);
 
-  // 👇 CORREÇÃO: No modo de gestão, não bloqueia ponteiro do mouse
+  const commissionPercent =
+    product.commissionPercent ?? product.commission_percent;
+
+  // CORREÇÃO: No modo de gestão, não bloqueia ponteiro do mouse
   const currentStyle = isInactive
     ? "opacity-60 bg-neutral-950 border-neutral-800"
     : isManagementMode
@@ -114,9 +115,10 @@ export default function PosProductItem({
               .toFixed(2)
               .replace(".", ",")}
           </span>
-          {product.commissionPercent !== undefined && (
+          {/* [Exibição correta da comissão de venda suportando snake_case e camelCase] */}
+          {commissionPercent !== undefined && (
             <span className={posProductStyles.commissionBadge}>
-              +{product.commissionPercent}% comissão
+              +{commissionPercent}% comissão
             </span>
           )}
         </div>
@@ -152,10 +154,23 @@ export default function PosProductItem({
             )}
           </div>
         ) : (
+          /* [Botão: envia o produto com o preço e tamanho da variação escolhida pelo cliente] */
           <button
             type="button"
             disabled={isOutOfStock}
-            onClick={() => onAddToCart && onAddToCart(product)}
+            onClick={() => {
+              if (onAddToCart) {
+                const itemToAdd = activeVariant
+                  ? {
+                      ...product,
+                      price: currentPrice,
+                      variantName: activeVariant.name,
+                      name: `${product.name} (${activeVariant.name})`,
+                    }
+                  : product;
+                onAddToCart(itemToAdd);
+              }
+            }}
             className={posProductStyles.addButton}
           >
             {quantityInComanda > 0 && (

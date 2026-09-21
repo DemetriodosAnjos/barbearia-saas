@@ -1,25 +1,23 @@
 import { statCardStyles } from "./StatCard.styles";
 
 export default function StatCard({
-  title = "Faturamento do Dia",
-  value = "R$ 1.840,00",
-  icon = "💰",
+  title = "Métrica",
+  value = "—", // Fallback neutro e limpo (sem valores inventados)
+  icon = "📊",
   theme = "gold", // 'gold' | 'green' | 'blue' | 'purple'
-  delta = {
-    value: "+14.2%",
-    isPositive: true,
-    comparisonText: "vs. ontem",
-  },
+  delta = null, // Por padrão sem comparativo, a menos que seja passado explicitamente
   isMasked = false, // Modo Privacidade ativado
   className = "",
 }) {
+  // Constante: resolve o estilo do ícone baseado no tema selecionado
   const iconThemeClass =
     statCardStyles.iconThemes[theme] || statCardStyles.iconThemes.gold;
 
+  // Constante: avaliação defensiva de delta com optional chaining (evita erro se delta for null)
   const deltaStyle =
-    delta.isPositive === true
+    delta?.isPositive === true
       ? statCardStyles.deltaPositive
-      : delta.isPositive === false
+      : delta?.isPositive === false
         ? statCardStyles.deltaNegative
         : statCardStyles.deltaNeutral;
 

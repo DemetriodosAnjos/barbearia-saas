@@ -126,11 +126,14 @@ export default function FinancialChart({
           const totalHeightPercent = (itemTotal / maxDayTotal) * 100;
           const isClosed = item.isClosed || itemTotal === 0;
 
-          // Proporção interna do empilhamento
+          // Variáveis: cálculo seguro com fallback zero (evita NaN se o dia não tiver produtos ou serviços)
+          const safeServices = Number(item.services || 0);
+          const safeProducts = Number(item.products || 0);
+
           const servicesHeightPercent =
-            itemTotal > 0 ? (item.services / itemTotal) * 100 : 0;
+            itemTotal > 0 ? (safeServices / itemTotal) * 100 : 0;
           const productsHeightPercent =
-            itemTotal > 0 ? (item.products / itemTotal) * 100 : 0;
+            itemTotal > 0 ? (safeProducts / itemTotal) * 100 : 0;
 
           return (
             <div key={idx} className={chartStyles.barColumn}>

@@ -59,14 +59,15 @@ export default function NewAppointmentModal({
       return;
     }
 
+    // Objeto: cria o serviço compatível tanto com o Supabase (duration_minutes) quanto com o React (durationMinutes)
     const newService = {
       id: `s-${Date.now()}`,
       name: quickServiceName.trim(),
       category: "Cabelo",
       durationMinutes: Number(quickServiceDuration),
+      duration_minutes: Number(quickServiceDuration), // Coluna oficial do Supabase
       price: Number(quickServicePrice),
-      commissionPercent: 50,
-      onlineBooking: true,
+      active: true,
       description: "Serviço cadastrado durante o agendamento.",
     };
 
@@ -106,9 +107,14 @@ export default function NewAppointmentModal({
       return;
     }
 
-    const duration = activeService ? Number(activeService.durationMinutes) : 30;
+    // Leitura tolerante da duração: suporta duration_minutes (Supabase) e durationMinutes (React)
+    const duration = activeService
+      ? Number(
+          activeService.durationMinutes || activeService.duration_minutes || 30,
+        )
+      : 30;
 
-    // Calcula o endTime somando a duração ao startTime
+    // Método: calcula o endTime somando a duração em minutos ao horário de início
     const [startH, startM] = (bookingTime || "09:00").split(":").map(Number);
     const totalEndMinutes = startH * 60 + startM + duration;
     const endH = Math.floor(totalEndMinutes / 60);
@@ -118,22 +124,35 @@ export default function NewAppointmentModal({
     const resolvedBarberId =
       selectedBarberId || (barbers[0] ? barbers[0].id : "");
 
+    // Objeto: monta o payload com chaves duplas (compatibilidade total com a tabela 'appointments' do Supabase)
     const newAppointment = {
       id: `apt-${Date.now()}`,
+      // Propriedades padrão React (camelCase)
       clientName: clientName.trim(),
-      clientPhone,
+      clientPhone: clientPhone.trim(),
       barberId: resolvedBarberId,
-      barberName: activeBarber ? activeBarber.name : "Profissional",
+      barberName: activeBarber ? activeBarber.name : "",
       serviceId: selectedServiceId || (services[0] ? services[0].id : ""),
-      serviceName: activeService ? activeService.name : "Corte",
-      price: activeService ? Number(activeService.price) : 50,
+      serviceName: activeService ? activeService.name : "",
+      price: activeService ? Number(activeService.price || 0) : 0, // Sem mock de R$ 50
       durationMinutes: duration,
       date: bookingDate,
       startTime: bookingTime,
       endTime: calculatedEndTime,
       status: "confirmed",
       isPaid: false,
-      notes,
+      notes: notes.trim(),
+
+      // Propriedades exatas das colunas do PostgreSQL (snake_case do Supabase)
+      client_name: clientName.trim(),
+      client_phone: clientPhone.trim(),
+      barber_id: resolvedBarberId,
+      barber_name: activeBarber ? activeBarber.name : "",
+      service_name: activeService ? activeService.name : "",
+      duration_minutes: duration,
+      start_time: bookingTime,
+      end_time: calculatedEndTime,
+      is_paid: false,
     };
 
     if (onSaveAppointment) {
@@ -258,7 +277,11 @@ export default function NewAppointmentModal({
             <div>
               <span className="text-neutral-400">Tempo de Cadeira:</span>
               <p className="font-bold text-white">
-                ⏱️ {activeService?.durationMinutes || 30} minutos
+                ⏱️{" "}
+                {activeService?.durationMinutes ||
+                  activeService?.duration_minutes ||
+                  30}{" "}
+                minutos
               </p>
             </div>
             <div className="text-right">

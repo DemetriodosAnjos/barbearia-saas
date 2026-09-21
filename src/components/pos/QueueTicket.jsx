@@ -2,26 +2,35 @@ import { queueTicketStyles } from "./QueueTicket.styles";
 import Button from "../ui/Button";
 
 export default function QueueTicket({
-  ticket = {
-    id: "q-101",
-    position: 1,
-    clientName: "Bruno Henrique",
-    serviceName: "Corte Degradê na Máquina",
-    entryTimeAgo: "14 min atrás",
-    estimatedWaitMinutes: 20,
-    priority: "vip", // 'normal' | 'vip' | 'legal'
-    status: "waiting", // 'waiting' | 'called' | 'absent'
-    phone: "(11) 98765-4321",
-  },
+  // [Remoção do mock fixo de Bruno Henrique, inicializando com objeto vazio]
+  ticket = {},
   onCall,
   onStartService,
   onNotifyWhatsapp,
   onMarkAbsent,
   className = "",
 }) {
-  const isCalled = ticket.status === "called";
+  // [Defesa: não renderiza se o ticket for nulo ou sem identificador válido]
+  if (!ticket || (!ticket.id && !ticket.client_name && !ticket.clientName))
+    return null;
+
+  // [Normalização defensiva de variáveis suportando snake_case do Supabase e camelCase]
+  const position = ticket.position ?? 1;
+  const clientName =
+    ticket.clientName || ticket.client_name || "Cliente sem Nome";
+  const serviceName =
+    ticket.serviceName || ticket.service_name || "Atendimento Geral";
+  const priority = ticket.priority || "normal";
+  const status = ticket.status || "waiting";
+  const estimatedWaitMinutes =
+    ticket.estimatedWaitMinutes || ticket.estimated_wait_minutes || 15;
+  const entryTimeAgo =
+    ticket.entryTimeAgo || ticket.entry_time_ago || "Recém-chegado";
+
+  // [Variáveis de controle visual de status de chamada da fila]
+  const isCalled = status === "called";
   const currentStatusStyle =
-    queueTicketStyles.states[ticket.status] || queueTicketStyles.states.waiting;
+    queueTicketStyles.states[status] || queueTicketStyles.states.waiting;
 
   return (
     <div
@@ -30,6 +39,7 @@ export default function QueueTicket({
       {/* 1. CABEÇALHO: Senha, Nome, Serviço e Prioridade */}
       <div className={queueTicketStyles.header}>
         <div className={queueTicketStyles.clientGroup}>
+          {/* [Formatação dinâmica do número da senha com zeros à esquerda] */}
           <div
             className={
               isCalled
@@ -37,32 +47,29 @@ export default function QueueTicket({
                 : queueTicketStyles.ticketNumber
             }
           >
-            #{String(ticket.position).padStart(2, "0")}
+            #{String(position).padStart(2, "0")}
           </div>
 
           <div className={queueTicketStyles.clientInfo}>
-            <h4 className={queueTicketStyles.clientName}>
-              {ticket.clientName}
-            </h4>
-            <p className={queueTicketStyles.serviceRequested}>
-              {ticket.serviceName}
-            </p>
+            {/* [Exibição do nome e serviço reais solicitados pelo cliente] */}
+            <h4 className={queueTicketStyles.clientName}>{clientName}</h4>
+            <p className={queueTicketStyles.serviceRequested}>{serviceName}</p>
           </div>
         </div>
 
-        {/* Badge de Prioridade */}
+        {/* [Renderização condicional do selo de prioridade real da fila] */}
         <div>
-          {ticket.priority === "vip" && (
+          {priority === "vip" && (
             <span className={queueTicketStyles.priorityBadges.vip}>
               👑 Assinante VIP
             </span>
           )}
-          {ticket.priority === "legal" && (
+          {priority === "legal" && (
             <span className={queueTicketStyles.priorityBadges.legal}>
               ♿ Prioridade Legal
             </span>
           )}
-          {ticket.priority === "normal" && (
+          {priority === "normal" && (
             <span className={queueTicketStyles.priorityBadges.normal}>
               Normal
             </span>
@@ -74,10 +81,11 @@ export default function QueueTicket({
       <div className={queueTicketStyles.metaGroup}>
         <div className={queueTicketStyles.metaItem}>
           <span>⏱️</span>
+          {/* [Exibição do tempo estimado de espera calculado pelo sistema] */}
           <span>
             Espera:{" "}
             <strong className={queueTicketStyles.highlightWait}>
-              ~{ticket.estimatedWaitMinutes} min
+              ~{estimatedWaitMinutes} min
             </strong>
           </span>
         </div>
@@ -85,9 +93,8 @@ export default function QueueTicket({
         <span className="text-neutral-600">•</span>
 
         <div className={queueTicketStyles.metaItem}>
-          <span className="text-neutral-400">
-            Chegou: {ticket.entryTimeAgo}
-          </span>
+          {/* [Horário ou tempo relativo real desde a emissão da senha] */}
+          <span className="text-neutral-400">Chegou: {entryTimeAgo}</span>
         </div>
 
         {isCalled && (
@@ -123,8 +130,8 @@ export default function QueueTicket({
           </button>
         </div>
 
-        {/* Ação Primária: Chamar ou Iniciar */}
-        {ticket.status === "waiting" ? (
+        {/* [Ação Primária: Chamar ou Iniciar na Cadeira conforme o status real] */}
+        {status === "waiting" ? (
           <Button
             variant="secondary"
             onClick={() => onCall && onCall(ticket)}

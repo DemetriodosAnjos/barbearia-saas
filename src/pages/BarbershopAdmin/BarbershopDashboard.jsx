@@ -15,13 +15,8 @@ import CashierPosView from "./CashierPosView";
 import FinancialDashboardView from "./FinancialDashboardView";
 
 export default function BarbershopDashboard({
-  tenant = {
-    name: "Barbearia Vintage Club",
-    plan: "Plano Pro Multi-Cadeiras",
-    slug: "vintage-club",
-    trialDaysLeft: 6,
-  },
-  // 👇 TODAS AS PROPRIEDADES AGORA SÃO RECEBIDAS E CONSUMIDAS!
+  tenant, // Objeto real da barbearia vindo do Supabase
+  user, // Objeto do usuário autenticado (Auth Supabase)
   barbers = [],
   onUpdateBarbers,
   appointments = [],
@@ -37,6 +32,14 @@ export default function BarbershopDashboard({
   const [activeMenuTab, setActiveMenuTab] = useState("agenda");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [barberPresenceStatus, setBarberPresenceStatus] = useState("available");
+
+  // Função/Cálculo: resolve os dias reais de trial sem quebrar se trial_ends_at não estiver definido
+  const realDaysLeft = (() => {
+    const trialEnds = tenant?.trial_ends_at || tenant?.trialEndsAt;
+    if (!trialEnds) return tenant?.trialDaysLeft ?? null;
+    const diffTime = new Date(trialEnds).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  })();
 
   const barbershopMenuItems = [
     {
@@ -76,22 +79,28 @@ export default function BarbershopDashboard({
 
   return (
     <div className={barbershopStyles.pageWrapper}>
+      {/* Componente: exibe a contagem real calculada do banco */}
       <TrialBanner
-        trialDaysLeft={tenant.trialDaysLeft}
+        trialDaysLeft={realDaysLeft}
         onSubscribePlan={(plan) => console.log("Plano assinado:", plan)}
       />
 
       <div className={barbershopStyles.layoutBody}>
-        {/* SIDEBAR */}
+        {/* SIDEBAR com dados dinâmicos da barbearia e do usuário logado */}
         <Sidebar
-          tenantName={tenant.name}
-          tenantPlan={tenant.plan}
+          tenantName={tenant?.name || "Minha Barbearia"}
+          tenantPlan={tenant?.subscription_plan || tenant?.plan || "Plano Pro"}
           items={barbershopMenuItems}
           activeItem={activeMenuTab}
           onSelect={setActiveMenuTab}
           isOpen={isMobileSidebarOpen}
           onClose={() => setIsMobileSidebarOpen(false)}
-          user={{ name: "Carlos Silva", role: "Proprietário / Admin" }}
+          user={
+            user || {
+              name: tenant?.name ? `Admin ${tenant.name}` : "Administrador",
+              role: "Proprietário",
+            }
+          }
           onLogout={onLogout}
         />
 

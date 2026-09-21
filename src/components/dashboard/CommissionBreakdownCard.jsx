@@ -2,33 +2,50 @@ import { commissionStyles } from "./CommissionBreakdownCard.styles";
 import Button from "../ui/Button";
 
 export default function CommissionBreakdownCard({
-  barber = {
-    id: "barber-1",
-    name: "Carlos Silva",
-    role: "Master Barber",
-    avatar: "CS",
-  },
-  period = "Semana Atual (01 a 07 de Setembro)",
-  summary = {
-    grossServices: 2400, // Total faturado em cortes
-    serviceCommissionPercent: 50, // 50%
-    servicesCommission: 1200, // 50% de 2400
-
-    grossProducts: 380, // Total faturado em produtos
-    productCommissionPercent: 10, // 10%
-    productsCommission: 38, // 10% de 380
-
-    paymentFeesDeduction: 32.5, // Taxas de cartão rateadas
-    advances: 100, // Vales / Adiantamentos pegos
-
-    netCommissionPayable: 1105.5, // Saldo líquido a pagar
-    isSettled: false, // Se a folha já foi paga
-  },
+  barber,
+  period = "Período Atual",
+  summary = {},
   onSettlePayment,
   onExportReport,
   className = "",
 }) {
-  const isSettled = summary.isSettled;
+  // 1. Defesa: se não houver dados do barbeiro, não renderiza o card
+  if (!barber) return null;
+
+  // 2. Normalização Segura: valores reais ou zero (sem números fictícios)
+  const grossServices = Number(
+    summary.grossServices || summary.gross_services || 0,
+  );
+  const serviceCommissionPercent = Number(
+    summary.serviceCommissionPercent ||
+      summary.service_commission_percent ||
+      barber.commission_percentage ||
+      50,
+  );
+  const servicesCommission = Number(
+    summary.servicesCommission || summary.services_commission || 0,
+  );
+
+  const grossProducts = Number(
+    summary.grossProducts || summary.gross_products || 0,
+  );
+  const productCommissionPercent = Number(
+    summary.productCommissionPercent ||
+      summary.product_commission_percent ||
+      10,
+  );
+  const productsCommission = Number(
+    summary.productsCommission || summary.products_commission || 0,
+  );
+
+  const paymentFeesDeduction = Number(
+    summary.paymentFeesDeduction || summary.payment_fees_deduction || 0,
+  );
+  const advances = Number(summary.advances || 0);
+  const netCommissionPayable = Number(
+    summary.netCommissionPayable || summary.net_commission_payable || 0,
+  );
+  const isSettled = Boolean(summary.isSettled ?? summary.is_settled);
 
   return (
     <div className={`${commissionStyles.container} ${className}`}>
@@ -65,7 +82,7 @@ export default function CommissionBreakdownCard({
             Faturamento em Cortes
           </span>
           <span className={commissionStyles.metricValue}>
-            R$ {Number(summary.grossServices).toFixed(2).replace(".", ",")}
+            R$ {grossServices.toFixed(2).replace(".", ",")}
           </span>
         </div>
 
@@ -74,7 +91,7 @@ export default function CommissionBreakdownCard({
             Vendas de Bar & Vitrine
           </span>
           <span className={commissionStyles.metricValue}>
-            R$ {Number(summary.grossProducts).toFixed(2).replace(".", ",")}
+            R$ {grossProducts.toFixed(2).replace(".", ",")}
           </span>
         </div>
       </div>
@@ -85,13 +102,10 @@ export default function CommissionBreakdownCard({
         <div className={commissionStyles.breakdownRow}>
           <div className={commissionStyles.rowLabel}>
             <span>✂️</span>
-            <span>
-              Comissão de Serviços ({summary.serviceCommissionPercent}%):
-            </span>
+            <span>Comissão de Serviços ({serviceCommissionPercent}%):</span>
           </div>
           <span className={commissionStyles.creditValue}>
-            + R${" "}
-            {Number(summary.servicesCommission).toFixed(2).replace(".", ",")}
+            + R$ {servicesCommission.toFixed(2).replace(".", ",")}
           </span>
         </div>
 
@@ -99,41 +113,35 @@ export default function CommissionBreakdownCard({
         <div className={commissionStyles.breakdownRow}>
           <div className={commissionStyles.rowLabel}>
             <span>🍺</span>
-            <span>
-              Comissão de Produtos ({summary.productCommissionPercent}%):
-            </span>
+            <span>Comissão de Produtos ({productCommissionPercent}%):</span>
           </div>
           <span className={commissionStyles.creditValue}>
-            + R${" "}
-            {Number(summary.productsCommission).toFixed(2).replace(".", ",")}
+            + R$ {productsCommission.toFixed(2).replace(".", ",")}
           </span>
         </div>
 
         {/* Débito: Taxas da Maquininha */}
-        {summary.paymentFeesDeduction > 0 && (
+        {paymentFeesDeduction > 0 && (
           <div className={commissionStyles.breakdownRow}>
             <div className={commissionStyles.rowLabel}>
               <span>💳</span>
               <span>Dedução de Taxas de Cartão/PIX:</span>
             </div>
             <span className={commissionStyles.debitValue}>
-              - R${" "}
-              {Number(summary.paymentFeesDeduction)
-                .toFixed(2)
-                .replace(".", ",")}
+              - R$ {paymentFeesDeduction.toFixed(2).replace(".", ",")}
             </span>
           </div>
         )}
 
         {/* Débito: Vales / Adiantamentos */}
-        {summary.advances > 0 && (
+        {advances > 0 && (
           <div className={commissionStyles.breakdownRow}>
             <div className={commissionStyles.rowLabel}>
               <span>💵</span>
               <span>Vales & Adiantamentos Concedidos:</span>
             </div>
             <span className={commissionStyles.debitValue}>
-              - R$ {Number(summary.advances).toFixed(2).replace(".", ",")}
+              - R$ {advances.toFixed(2).replace(".", ",")}
             </span>
           </div>
         )}
@@ -161,7 +169,7 @@ export default function CommissionBreakdownCard({
               : commissionStyles.netAmount
           }
         >
-          R$ {Number(summary.netCommissionPayable).toFixed(2).replace(".", ",")}
+          R$ {netCommissionPayable.toFixed(2).replace(".", ",")}
         </span>
       </div>
 

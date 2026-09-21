@@ -2,15 +2,87 @@ import { useState } from "react";
 import { workShiftStyles } from "./WorkShiftSelector.styles";
 import Button from "../ui/Button";
 
+// [Estrutura padrão dos 7 dias da semana caso a barbearia/barbeiro ainda não tenha escala no banco]
+const DEFAULT_WEEKLY_SCHEDULE = [
+  {
+    dayId: "seg",
+    label: "Segunda-feira",
+    active: true,
+    start: "09:00",
+    end: "19:00",
+    breakStart: "12:00",
+    breakEnd: "13:00",
+  },
+  {
+    dayId: "ter",
+    label: "Terça-feira",
+    active: true,
+    start: "09:00",
+    end: "19:00",
+    breakStart: "12:00",
+    breakEnd: "13:00",
+  },
+  {
+    dayId: "qua",
+    label: "Quarta-feira",
+    active: true,
+    start: "09:00",
+    end: "19:00",
+    breakStart: "12:00",
+    breakEnd: "13:00",
+  },
+  {
+    dayId: "qui",
+    label: "Quinta-feira",
+    active: true,
+    start: "09:00",
+    end: "19:00",
+    breakStart: "12:00",
+    breakEnd: "13:00",
+  },
+  {
+    dayId: "sex",
+    label: "Sexta-feira",
+    active: true,
+    start: "09:00",
+    end: "19:00",
+    breakStart: "12:00",
+    breakEnd: "13:00",
+  },
+  {
+    dayId: "sab",
+    label: "Sábado",
+    active: true,
+    start: "09:00",
+    end: "18:00",
+    breakStart: "12:00",
+    breakEnd: "13:00",
+  },
+  {
+    dayId: "dom",
+    label: "Domingo",
+    active: false,
+    start: "09:00",
+    end: "14:00",
+    breakStart: "12:00",
+    breakEnd: "13:00",
+  },
+];
+
 export default function WorkShiftSelector({
   schedule = [],
   onChange,
   className = "",
 }) {
+  // [Garante que a lista sempre possua os 7 dias disponíveis para configuração]
+  const currentSchedule =
+    schedule && schedule.length === 7 ? schedule : DEFAULT_WEEKLY_SCHEDULE;
+
   // Estados para o Preenchimento Rápido em Lote
   const [applyWeekdays, setApplyWeekdays] = useState(true); // Seg a Sex
   const [applySaturday, setApplySaturday] = useState(true); // Sábado
   const [applySunday, setApplySunday] = useState(false); // Domingo
+  const [batchFeedbackMessage, setBatchFeedbackMessage] = useState("");
 
   // Horários do modelo padrão do lote
   const [batchStart, setBatchStart] = useState("09:00");
@@ -18,30 +90,32 @@ export default function WorkShiftSelector({
   const [batchBreakStart, setBatchBreakStart] = useState("12:00");
   const [batchBreakEnd, setBatchBreakEnd] = useState("13:00");
 
-  // 1. Alterna o estado de um dia individual (Trabalha / Folga)
+  // [Função: atualiza o estado de folga/trabalho com clonagem imutável do objeto]
   const handleToggleDay = (dayIndex) => {
-    const updated = [...schedule];
-    updated[dayIndex].active = !updated[dayIndex].active;
+    const updated = currentSchedule.map((day, idx) =>
+      idx === dayIndex ? { ...day, active: !day.active } : day,
+    );
     if (onChange) onChange(updated);
   };
 
-  // 2. Atualiza um campo de horário de um dia individual
+  // [Função: atualiza campos de horário de forma imutável]
   const handleTimeChange = (dayIndex, field, value) => {
-    const updated = [...schedule];
-    updated[dayIndex][field] = value;
+    const updated = currentSchedule.map((day, idx) =>
+      idx === dayIndex ? { ...day, [field]: value } : day,
+    );
     if (onChange) onChange(updated);
   };
 
-  // 3. REGRA DE NEGÓCIO: Aplica os horários em lote nos grupos marcados
+  // [Função: aplica horários em lote sem alert() invasivo e com feedback visual nativo]
   const handleApplyBatchSchedule = () => {
     const weekdayIds = ["seg", "ter", "qua", "qui", "sex"];
 
-    const updated = schedule.map((item) => {
-      const isWeekday = weekdayIds.includes(item.dayId);
-      const isSat = item.dayId === "sab";
-      const isSun = item.dayId === "dom";
+    const updated = currentSchedule.map((item) => {
+      const dayKey = item.dayId || item.day_id;
+      const isWeekday = weekdayIds.includes(dayKey);
+      const isSat = dayKey === "sab";
+      const isSun = dayKey === "dom";
 
-      // Verifica se este dia deve receber o horário configurado
       const shouldApply =
         (isWeekday && applyWeekdays) ||
         (isSat && applySaturday) ||
@@ -50,7 +124,7 @@ export default function WorkShiftSelector({
       if (shouldApply) {
         return {
           ...item,
-          active: true, // Ativa o dia automaticamente
+          active: true,
           start: batchStart,
           end: batchEnd,
           breakStart: batchBreakStart,
@@ -63,12 +137,9 @@ export default function WorkShiftSelector({
 
     if (onChange) onChange(updated);
 
-    alert(
-      `✅ HORÁRIOS APLICADOS COM SUCESSO!\n\n` +
-        `• Expediente: ${batchStart} às ${batchEnd}\n` +
-        `• Almoço: ${batchBreakStart} às ${batchBreakEnd}\n\n` +
-        `Aplicado para: ${applyWeekdays ? "Dias Úteis (Seg-Sex) " : ""}${applySaturday ? "Sábado " : ""}${applySunday ? "Domingo" : ""}`,
-    );
+    // [Feedback amigável temporário na própria tela em vez de alert do navegador]
+    setBatchFeedbackMessage("Horários replicados com sucesso!");
+    setTimeout(() => setBatchFeedbackMessage(""), 4000);
   };
 
   // 4. Cálculo da Carga Horária Líquida Semanal
@@ -166,6 +237,15 @@ export default function WorkShiftSelector({
 
         {/* Inputs de Horário do Lote + Botão Aplicar */}
         <div className={workShiftStyles.bulkInputsRow}>
+          {/* [Aviso visual sutil de sucesso ao aplicar lote] */}
+          {batchFeedbackMessage && (
+            <div className="mx-4 mt-2 p-2 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-400 text-xs font-bold text-center animate-fade-in">
+              ✓ {batchFeedbackMessage}
+            </div>
+          )}
+
+          {/* Inputs de Horário do Lote + Botão Aplicar */}
+          <div className={workShiftStyles.bulkInputsRow}></div>
           <div className={workShiftStyles.bulkInputsGroup}>
             {/* Expediente do Lote */}
             <div className={workShiftStyles.timeField}>
@@ -225,9 +305,10 @@ export default function WorkShiftSelector({
         </span>
 
         <div className={workShiftStyles.daysList}>
-          {schedule.map((day, idx) => (
+          {/* [Iteração sobre a escala semanal garantida de 7 dias] */}
+          {currentSchedule.map((day, idx) => (
             <div
-              key={day.dayId}
+              key={day.dayId || day.day_id || idx}
               className={`
                 ${workShiftStyles.dayRow}
                 ${day.active ? workShiftStyles.dayRowActive : workShiftStyles.dayRowOff}

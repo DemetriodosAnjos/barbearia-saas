@@ -145,6 +145,40 @@ export default function CalendarView({
     0,
   ).getDate();
 
+  // =========================================================================
+  // FUNÇÃO AUXILIAR: Cálculo de Métricas Reais por Data (Fonte: Supabase)
+  // Recebe um objeto Date e calcula agendamentos e faturamento real daquele dia
+  // =========================================================================
+  const getDayMetrics = (targetDate) => {
+    // Variável: data formatada em YYYY-MM-DD para bater com a coluna 'date' do banco
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+    const day = String(targetDate.getDate()).padStart(2, "0");
+    const targetDateStr = `${year}-${month}-${day}`;
+
+    // Filtro: filtra o array 'appointments' pela data informada e pelo barbeiro ativo
+    const dayAppts = appointments.filter((appt) => {
+      const apptDate =
+        appt.date || (appt.created_at ? appt.created_at.split("T")[0] : "");
+      const matchesDate = apptDate === targetDateStr;
+
+      const apptBarberId = appt.barberId || appt.barber_id;
+      const matchesBarber =
+        selectedBarberFilter === "all" || apptBarberId === selectedBarberFilter;
+
+      return matchesDate && matchesBarber;
+    });
+
+    // Método reduce: soma o faturamento real dos agendamentos confirmados/pagos
+    const count = dayAppts.length;
+    const revenue = dayAppts.reduce(
+      (sum, appt) => sum + Number(appt.price || 0),
+      0,
+    );
+
+    return { count, revenue };
+  };
+
   return (
     <div className={calendarViewStyles.container}>
       {/* 1. BARRA SUPERIOR DE CONTROLES */}
@@ -277,9 +311,10 @@ export default function CalendarView({
               </div>
             )}
 
+            {/* Renderização das colunas dos barbeiros com dados 100% reais do Supabase */}
             {filteredBarbers.map((barber) => {
               const barberAppts = appointments.filter(
-                (a) => a.barberId === barber.id,
+                (a) => (a.barberId || a.barber_id) === barber.id,
               );
 
               return (
@@ -290,11 +325,7 @@ export default function CalendarView({
                   endHour={endHour}
                   minuteHeight={minuteHeight}
                   isPastDate={isCurrentViewPast}
-                  breaks={
-                    barber.breaks || [
-                      { startTime: "12:00", endTime: "13:00", label: "Almoço" },
-                    ]
-                  }
+                  breaks={barber.breaks || []}
                   appointments={barberAppts}
                   onSlotClick={onSlotClick}
                   onAppointmentClick={handleCardClick}
@@ -365,21 +396,33 @@ export default function CalendarView({
                     </p>
                   </div>
 
-                  {/* Resumo de Agendamentos e Faturamento */}
-                  <div className="pt-3 border-t border-neutral-800/80 space-y-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-neutral-400">Atendimentos:</span>
-                      <strong className="text-amber-400 font-bold">
-                        {past ? "6 feitos" : "8 livres"}
-                      </strong>
-                    </div>
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-neutral-500">Estimativa:</span>
-                      <span className="text-emerald-400 font-semibold">
-                        {past ? "R$ 480" : "R$ 640"}
-                      </span>
-                    </div>
-                  </div>
+                  {/* Resumo Real com Base no Supabase */}
+                  {(() => {
+                    const { count, revenue } = getDayMetrics(dayDate);
+
+                    return (
+                      <div className="pt-3 border-t border-neutral-800/80 space-y-1">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-neutral-400">
+                            Atendimentos:
+                          </span>
+                          <strong className="text-amber-400 font-bold">
+                            {count > 0
+                              ? `${count} ${past ? "realizado(s)" : "agendado(s)"}`
+                              : "Nenhum"}
+                          </strong>
+                        </div>
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-neutral-500">
+                            {past ? "Faturado:" : "Previsto:"}
+                          </span>
+                          <span className="text-emerald-400 font-semibold font-mono">
+                            R$ {revenue.toFixed(0)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -431,14 +474,25 @@ export default function CalendarView({
                     )}
                   </div>
 
-                  <div className="space-y-0.5 mt-2">
-                    <p className="text-[10px] text-amber-400/90 font-semibold">
-                      {past ? "4 realizados" : "6 agendados"}
-                    </p>
-                    <p className="text-[9px] text-neutral-500">
-                      {past ? "R$ 320 faturado" : "R$ 480 previsto"}
-                    </p>
-                  </div>
+                  {/* Métricas Reais do Dia no Mês */}
+                  {(() => {
+                    const { count, revenue } = getDayMetrics(dayDate);
+
+                    return (
+                      <div className="space-y-0.5 mt-2">
+                        <p className="text-[10px] text-amber-400/90 font-semibold">
+                          {count > 0
+                            ? `${count} ${past ? "realizado(s)" : "agendado(s)"}`
+                            : "Livre"}
+                        </p>
+                        <p className="text-[9px] text-neutral-500 font-mono">
+                          {revenue > 0
+                            ? `R$ ${revenue.toFixed(0)} ${past ? "faturado" : "previsto"}`
+                            : "Sem faturamento"}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
