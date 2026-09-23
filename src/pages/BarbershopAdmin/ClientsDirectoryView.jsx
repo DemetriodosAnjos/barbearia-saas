@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// [Import: cliente Supabase para cadastro e sincronização real de clientes]
+import { supabase } from "../../lib/supabase";
 import { clientsStyles } from "./ClientsDirectoryView.styles";
 import StatCard from "../../components/dashboard/StatCard";
 import Table from "../../components/ui/Table";
@@ -11,118 +13,25 @@ import Select from "../../components/ui/Select";
 import Alert from "../../components/ui/Alert";
 import ClientHistoryTimeline from "../../components/loyalty/ClientHistoryTimeline";
 
-// Base de Clientes com parametrização de frequência de retorno
-const initialClientsList = [
-  {
-    id: "cli-1",
-    name: "Rodrigo Faro",
-    phone: "(11) 98765-4321",
-    cpf: "123.456.789-00",
-    birthDate: "1983-10-20",
-    isVip: true,
-    status: "active",
-    lastVisitDate: "28/08/2026",
-    daysSinceLastVisit: 15, // Cortou há 15 dias
-    frequencyDays: 18, // Frequência de 18 dias -> FALTAM 3 DIAS! (JANELA PERFEITA)
-    totalVisits: 14,
-    totalSpent: 1180.0,
-    preferredBarber: "Carlos Silva",
-    technicalNotes: {
-      cutSpecs:
-        "Lateral disfarçada no pente 1, tesoura no topo, risco fino na sobrancelha esquerda.",
-      beardSpecs:
-        "Barba alinhada com toalha quente, desenhada na navalha sem diminuir o queixo.",
-      allergyAlert:
-        "Sensibilidade a lâmina no pescoço (usar pós-barba sem álcool).",
-    },
-    historyEvents: [
-      {
-        id: "ev-1",
-        date: "28/08/2026",
-        type: "service",
-        title: "Corte Degradê Navalhado + Barboterapia",
-        barberName: "Carlos Silva",
-        totalPrice: 100,
-        notes: "Pente 1 disfarçado nas laterais, tesoura no topo.",
-      },
-      {
-        id: "ev-2",
-        date: "10/08/2026",
-        type: "product",
-        title: "Compra no Balcão: 1x Pomada Matte (50g)",
-        totalPrice: 45,
-      },
-    ],
-  },
-  {
-    id: "cli-2",
-    name: "Guilherme Boulos",
-    phone: "(11) 97654-3210",
-    cpf: "234.567.890-11",
-    birthDate: "1982-06-19",
-    isVip: false,
-    status: "active",
-    lastVisitDate: "10/09/2026",
-    daysSinceLastVisit: 4,
-    frequencyDays: 25,
-    totalVisits: 8,
-    totalSpent: 420.0,
-    preferredBarber: "Marcos Vinicius",
-    technicalNotes: {
-      cutSpecs: "Corte tradicional clássico totalmente na tesoura.",
-      beardSpecs: "Barba cheia alinhada apenas na tesoura.",
-      allergyAlert: "",
-    },
-    historyEvents: [],
-  },
-  {
-    id: "cli-3",
-    name: "Thiago Ventura",
-    phone: "(11) 99887-7665",
-    cpf: "345.678.901-22",
-    birthDate: "1990-04-05",
-    isVip: true,
-    status: "active",
-    lastVisitDate: "02/09/2026",
-    daysSinceLastVisit: 12, // Cortou há 12 dias
-    frequencyDays: 15, // Frequência de 15 dias -> FALTAM 3 DIAS! (JANELA PERFEITA)
-    totalVisits: 22,
-    totalSpent: 1980.0,
-    preferredBarber: "Carlos Silva",
-    technicalNotes: {
-      cutSpecs: "Degradê navalhado alto, pigmentação suave na barba.",
-      beardSpecs: "Barba quadrada desenhada.",
-      allergyAlert: "Prefere café sem açúcar antes do corte.",
-    },
-    historyEvents: [],
-  },
-  {
-    id: "cli-4",
-    name: "Matheus Pereira",
-    phone: "(11) 91122-3344",
-    cpf: "456.789.012-33",
-    birthDate: "1997-12-14",
-    isVip: false,
-    status: "at_risk", // Ausente > 40 dias
-    lastVisitDate: "20/07/2026",
-    daysSinceLastVisit: 54,
-    frequencyDays: 20,
-    totalVisits: 5,
-    totalSpent: 260.0,
-    preferredBarber: "Tiago Santos",
-    technicalNotes: {
-      cutSpecs: "Corte militar baixo.",
-      beardSpecs: "Apenas raspado completo.",
-      allergyAlert: "",
-    },
-    historyEvents: [],
-  },
-];
-
-export default function ClientsDirectoryView({ onNavigateToBooking, onBack }) {
-  const [clients, setClients] = useState(initialClientsList);
+// [Função componente: recebe clientsList real e callback de atualização do dashboard]
+export default function ClientsDirectoryView({
+  clientsList = [],
+  onUpdateClients,
+  onNavigateToBooking,
+  onBack,
+}) {
+  // [Estado: inicializado com a lista oficial da barbearia]
+  const [clients, setClients] = useState(clientsList);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isSavingClient, setIsSavingClient] = useState(false);
+
+  // [Efeito de sincronização: atualiza a lista interna sempre que a prop clientsList mudar]
+  useEffect(() => {
+    if (clientsList) {
+      setClients(clientsList);
+    }
+  }, [clientsList]);
 
   // Modal de Prontuário Técnico
   const [selectedClientForRecord, setSelectedClientForRecord] = useState(null);
@@ -164,9 +73,12 @@ export default function ClientsDirectoryView({ onNavigateToBooking, onBack }) {
       client.frequencyDays - (client.daysSinceLastVisit || 0),
     );
 
-    // 👇 LINK DINÂMICO: Usa localhost no seu PC e o domínio real em produção!
+    // [Variável: formata o identificador do barbeiro preferido real do cliente]
+    const barberParam = encodeURIComponent(client.preferredBarber || "geral");
+
+    // [Link dinâmico: aponta para a agenda oficial do barbeiro preferido sem mock fixo de carlos]
     const origin = window.location.origin;
-    const customLink = `${origin}/?screen=client-app&barbeiro=carlos&cliente=${encodeURIComponent(client.name)}&telefone=${encodeURIComponent(client.phone)}`;
+    const customLink = `${origin}/?screen=client-app&barbeiro=${barberParam}&cliente=${encodeURIComponent(client.name)}&telefone=${encodeURIComponent(client.phone)}`;
 
     // Mensagem humanizada pronta com o link funcional
     const prebuiltMsg =
@@ -179,18 +91,34 @@ export default function ClientsDirectoryView({ onNavigateToBooking, onBack }) {
     setCustomMessage(prebuiltMsg);
   };
 
-  // 3. Atualizar a Frequência Habitual do Cliente
-  const handleUpdateClientFrequency = (clientId, newFrequency) => {
-    setClients((prev) =>
-      prev.map((c) =>
-        c.id === clientId ? { ...c, frequencyDays: Number(newFrequency) } : c,
-      ),
+  // [Função assíncrona: atualiza a frequência habitual no banco e no estado do dashboard]
+  const handleUpdateClientFrequency = async (clientId, newFrequency) => {
+    const freqNum = Number(newFrequency);
+
+    const updated = clients.map((c) =>
+      c.id === clientId ? { ...c, frequencyDays: freqNum } : c,
     );
+    setClients(updated);
+
+    if (onUpdateClients) {
+      onUpdateClients(updated);
+    }
+
     if (recallModalClient && recallModalClient.id === clientId) {
       setRecallModalClient((prev) => ({
         ...prev,
-        frequencyDays: Number(newFrequency),
+        frequencyDays: freqNum,
       }));
+    }
+
+    try {
+      // Método Supabase: persiste a frequência de retorno na tabela clients
+      await supabase
+        .from("clients")
+        .update({ frequency_days: freqNum })
+        .eq("id", clientId);
+    } catch (err) {
+      console.error("Erro ao atualizar frequência do cliente:", err);
     }
   };
 
@@ -205,8 +133,8 @@ export default function ClientsDirectoryView({ onNavigateToBooking, onBack }) {
     setRecallModalClient(null);
   };
 
-  // 5. Salvar Novo Cliente (Limpa a busca e reseta os filtros para exibir o cliente no topo!)
-  const handleSaveNewClient = () => {
+  // [Função assíncrona: insere o novo cliente de forma definitiva no Supabase]
+  const handleSaveNewClient = async () => {
     const errs = {};
     if (!newClientForm.name.trim()) errs.name = "Informe o nome completo.";
     if (!newClientForm.phone || newClientForm.phone.length < 14) {
@@ -218,45 +146,79 @@ export default function ClientsDirectoryView({ onNavigateToBooking, onBack }) {
       return;
     }
 
-    const created = {
-      id: `cli-${Date.now()}`,
+    setIsSavingClient(true);
+
+    const clientPayload = {
       name: newClientForm.name.trim(),
-      phone: newClientForm.phone,
-      cpf: newClientForm.cpf || "Não informado",
-      birthDate: newClientForm.birthDate || "",
-      isVip: false,
+      phone: newClientForm.phone.trim(),
+      cpf: newClientForm.cpf?.trim() || null,
+      birth_date: newClientForm.birthDate || null,
+      frequency_days: Number(newClientForm.frequencyDays || 18),
       status: "active",
-      lastVisitDate: "Hoje (Cadastrado)",
-      daysSinceLastVisit: 0,
-      frequencyDays: Number(newClientForm.frequencyDays || 18),
-      totalVisits: 1,
-      totalSpent: 0.0,
-      preferredBarber: "Carlos Silva",
-      technicalNotes: {
-        cutSpecs: newClientForm.notes || "Primeiro atendimento na barbearia.",
-        beardSpecs: "",
-        allergyAlert: "",
-      },
-      historyEvents: [],
+      total_visits: 0,
+      total_spent: 0,
+      notes: newClientForm.notes?.trim() || "",
     };
 
-    // Insere o cliente no início da lista
-    setClients((prev) => [created, ...prev]);
-    setIsNewClientModalOpen(false);
+    try {
+      // Método Supabase: insere o cliente e recupera o ID oficial gerado
+      const { data, error } = await supabase
+        .from("clients")
+        .insert([clientPayload])
+        .select()
+        .single();
 
-    // 👇 CORREÇÃO: Limpa a busca e os filtros para que a tabela mostre o cliente na hora!
-    setSearchTerm("");
-    setStatusFilter("all");
+      if (error) throw error;
 
-    setNewClientForm({
-      name: "",
-      phone: "",
-      cpf: "",
-      birthDate: "",
-      frequencyDays: "18",
-      notes: "",
-    });
-    setFormErrors({});
+      // Normaliza o objeto para o estado React
+      const created = {
+        id: data.id,
+        name: data.name,
+        phone: data.phone,
+        cpf: data.cpf || "Não informado",
+        birthDate: data.birth_date || "",
+        isVip: false,
+        status: "active",
+        lastVisitDate: "Recém-cadastrado",
+        daysSinceLastVisit: 0,
+        frequencyDays: data.frequency_days || 18,
+        totalVisits: 0,
+        totalSpent: 0.0,
+        preferredBarber: "Não definido",
+        technicalNotes: {
+          cutSpecs: data.notes || "Primeiro atendimento na barbearia.",
+          beardSpecs: "",
+          allergyAlert: "",
+        },
+        historyEvents: [],
+      };
+
+      const updated = [created, ...clients];
+      setClients(updated);
+
+      if (onUpdateClients) {
+        onUpdateClients(updated);
+      }
+
+      setIsNewClientModalOpen(false);
+      setSearchTerm("");
+      setStatusFilter("all");
+
+      setNewClientForm({
+        name: "",
+        phone: "",
+        cpf: "",
+        birthDate: "",
+        frequencyDays: "18",
+        notes: "",
+      });
+      setFormErrors({});
+    } catch (err) {
+      console.error("Erro ao salvar cliente no Supabase:", err);
+      alert("Erro ao cadastrar cliente no banco de dados.");
+    } finally {
+      setIsSavingClient(false);
+    }
   };
 
   // Filtros
@@ -703,7 +665,12 @@ export default function ClientsDirectoryView({ onNavigateToBooking, onBack }) {
             >
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleSaveNewClient}>
+            {/* [Botão conectado ao estado assíncrono de salvamento no Supabase] */}
+            <Button
+              variant="primary"
+              isLoading={isSavingClient}
+              onClick={handleSaveNewClient}
+            >
               Salvar Cliente na Base
             </Button>
           </>

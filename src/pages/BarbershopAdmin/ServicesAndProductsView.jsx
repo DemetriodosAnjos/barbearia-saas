@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// [Import: cliente Supabase para sincronização real de serviços e produtos no banco]
+import { supabase } from "../../lib/supabase";
 import { barbershopStyles } from "./BarbershopDashboard.styles";
 import ServiceCard from "../../components/services/ServiceCard";
 import PosProductItem from "../../components/pos/PosProductItem";
@@ -6,43 +8,7 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
-import Alert from "../../components/ui/Alert"; // 👈 Importa o componente oficial de alerta
-
-const initialProducts = [
-  {
-    id: "p-1",
-    name: "Cerveja IPA Artesanal (Lata 350ml)",
-    category: "Bar",
-    icon: "🍺",
-    costPrice: 8,
-    price: 16,
-    stock: 18,
-    commissionPercent: 5,
-    active: true,
-  },
-  {
-    id: "p-2",
-    name: "Pomada Modeladora Efeito Matte (50g)",
-    category: "Vitrine",
-    icon: "🧴",
-    costPrice: 20,
-    price: 45,
-    stock: 6,
-    commissionPercent: 15,
-    active: true,
-  },
-  {
-    id: "p-3",
-    name: "Café Expresso Grão Especial",
-    category: "Bar",
-    icon: "☕",
-    costPrice: 1.5,
-    price: 6,
-    stock: 40,
-    commissionPercent: 0,
-    active: true,
-  },
-];
+import Alert from "../../components/ui/Alert";
 
 export default function ServicesAndProductsView({
   services = [],
@@ -53,9 +19,45 @@ export default function ServicesAndProductsView({
   const [activeTab, setActiveTab] = useState("services");
   const [statusFilter, setStatusFilter] = useState("active");
 
-  const [products, setProducts] = useState(initialProducts);
+  // [Estado real: inicia vazio aguardando dados da tabela products do Supabase]
+  const [products, setProducts] = useState([]);
 
-  // 👇 ESTADO UNIFICADO DE FEEDBACK (Substituindo todos os alerts nativos!)
+  // [Efeito de ciclo de vida: busca o estoque real de produtos no banco de dados]
+  useEffect(() => {
+    let isMounted = true;
+    async function loadProducts() {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .order("name");
+
+        if (!error && data && isMounted) {
+          setProducts(
+            data.map((p) => ({
+              id: p.id,
+              name: p.name,
+              category: p.category || "Bar",
+              icon: p.category === "Bar" ? "🍺" : "🧴",
+              costPrice: Number(p.cost_price || 0),
+              price: Number(p.price || 0),
+              stock: Number(p.stock || 0),
+              commissionPercent: Number(p.commission_percent || 0),
+              active: p.active !== false,
+            })),
+          );
+        }
+      } catch (err) {
+        console.error("Erro ao carregar produtos:", err);
+      }
+    }
+    loadProducts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // ESTADO UNIFICADO DE FEEDBACK (Substituindo todos os alerts nativos!)
   const [feedbackAlert, setFeedbackAlert] = useState(null); // { variant, title, message }
 
   // Modais de Criação e Edição
@@ -145,8 +147,8 @@ export default function ServicesAndProductsView({
     });
   };
 
-  // 3. SALVAR NOVO PRODUTO
-  const handleSaveNewProduct = () => {
+  // [Função assíncrona: persiste o novo produto na tabela products do Supabase]
+  const handleSaveNewProduct = async () => {
     if (!newProductName || !newProductPrice) {
       setFeedbackAlert({
         variant: "warning",
@@ -156,35 +158,63 @@ export default function ServicesAndProductsView({
       return;
     }
 
-    const created = {
-      id: `p-${Date.now()}`,
-      name: newProductName,
+    const productPayload = {
+      name: newProductName.trim(),
       category: newProductCategory,
-      icon: newProductCategory === "Bar" ? "🍺" : "🧴",
-      costPrice: Number(newProductCost || 0),
+      cost_price: Number(newProductCost || 0),
       price: Number(newProductPrice),
       stock: Number(newProductStock || 10),
-      commissionPercent: Number(newProductCommission || 0),
+      commission_percent: Number(newProductCommission || 0),
       active: true,
     };
 
-    setProducts((prev) => [created, ...prev]);
-    setIsProductModalOpen(false);
-    setNewProductName("");
-    setNewProductPrice("");
-    setNewProductCost("");
-    setNewProductStock("");
+    try {
+      // Método Supabase: insere o produto e retorna o registro com o ID oficial
+      const { data, error } = await supabase
+        .from("products")
+        .insert([productPayload])
+        .select()
+        .single();
 
-    setFeedbackAlert({
-      variant: "success",
-      title: "Produto Cadastrado!",
-      message: `O produto "${created.name}" foi adicionado ao estoque do PDV.`,
-    });
+      if (error) throw error;
+
+      const created = {
+        id: data.id,
+        name: data.name,
+        category: data.category,
+        icon: data.category === "Bar" ? "🍺" : "🧴",
+        costPrice: Number(data.cost_price || 0),
+        price: Number(data.price),
+        stock: Number(data.stock),
+        commissionPercent: Number(data.commission_percent || 0),
+        active: true,
+      };
+
+      setProducts((prev) => [created, ...prev]);
+      setIsProductModalOpen(false);
+      setNewProductName("");
+      setNewProductPrice("");
+      setNewProductCost("");
+      setNewProductStock("");
+
+      setFeedbackAlert({
+        variant: "success",
+        title: "Produto Cadastrado!",
+        message: `O produto "${created.name}" foi adicionado ao estoque do PDV.`,
+      });
+    } catch (err) {
+      console.error("Erro ao salvar produto no Supabase:", err);
+      setFeedbackAlert({
+        variant: "error",
+        title: "Erro de Conexão",
+        message: "Não foi possível cadastrar o produto no banco de dados.",
+      });
+    }
   };
 
-  // 4. SALVAR EDIÇÃO DE PRODUTO
-  const handleSaveEditProduct = () => {
-    if (!editingProduct.name || !editingProduct.price) {
+  // [Função assíncrona: atualiza os dados e estoque do produto no Supabase]
+  const handleSaveEditProduct = async () => {
+    if (!editingProduct?.name || !editingProduct?.price) {
       setFeedbackAlert({
         variant: "warning",
         title: "Atenção",
@@ -193,64 +223,117 @@ export default function ServicesAndProductsView({
       return;
     }
 
-    setProducts((prev) =>
-      prev.map((p) => (p.id === editingProduct.id ? editingProduct : p)),
-    );
+    const updatePayload = {
+      name: editingProduct.name.trim(),
+      category: editingProduct.category,
+      cost_price: Number(editingProduct.costPrice || 0),
+      price: Number(editingProduct.price),
+      stock: Number(editingProduct.stock || 0),
+      commission_percent: Number(editingProduct.commissionPercent || 0),
+    };
 
-    const savedName = editingProduct.name;
-    setEditingProduct(null);
+    try {
+      const { error } = await supabase
+        .from("products")
+        .update(updatePayload)
+        .eq("id", editingProduct.id);
 
-    setFeedbackAlert({
-      variant: "success",
-      title: "Produto Atualizado!",
-      message: `As alterações do produto "${savedName}" foram salvas com sucesso.`,
-    });
+      if (error) throw error;
+
+      setProducts((prev) =>
+        prev.map((p) => (p.id === editingProduct.id ? editingProduct : p)),
+      );
+
+      const savedName = editingProduct.name;
+      setEditingProduct(null);
+
+      setFeedbackAlert({
+        variant: "success",
+        title: "Produto Atualizado!",
+        message: `As alterações do produto "${savedName}" foram salvas com sucesso.`,
+      });
+    } catch (err) {
+      console.error("Erro ao atualizar produto no Supabase:", err);
+      setFeedbackAlert({
+        variant: "error",
+        title: "Erro",
+        message: "Não foi possível salvar as alterações do produto no banco.",
+      });
+    }
   };
 
-  // 5. CONFIRMAÇÃO DE DESATIVAÇÃO SEGURA (SOFT DELETE COM ALERTA)
-  const handleConfirmDeactivate = () => {
+  // [Função assíncrona: soft delete persistido no Supabase mantendo o histórico de vendas intacto]
+  const handleConfirmDeactivate = async () => {
     if (!itemToDeactivate) return;
-    const itemName = itemToDeactivate.item.name;
+    const targetItem = itemToDeactivate.item;
+    const itemName = targetItem.name;
 
-    if (itemToDeactivate.type === "service") {
-      if (onDeleteService) {
-        onDeleteService(itemToDeactivate.item.id);
+    try {
+      if (itemToDeactivate.type === "service") {
+        await supabase
+          .from("services")
+          .update({ active: false })
+          .eq("id", targetItem.id);
+
+        if (onDeleteService) {
+          onDeleteService(targetItem.id);
+        }
+      } else {
+        await supabase
+          .from("products")
+          .update({ active: false })
+          .eq("id", targetItem.id);
+
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === targetItem.id ? { ...p, active: false } : p,
+          ),
+        );
       }
-    } else {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === itemToDeactivate.item.id ? { ...p, active: false } : p,
-        ),
-      );
+
+      setItemToDeactivate(null);
+
+      setFeedbackAlert({
+        variant: "info",
+        title: "Item Desativado do Catálogo",
+        message: `O item "${itemName}" foi movido para a aba "Desativados / Histórico". O histórico financeiro passado continua 100% preservado.`,
+      });
+    } catch (err) {
+      console.error("Erro ao desativar item no Supabase:", err);
     }
-
-    setItemToDeactivate(null);
-
-    // 👇 EXIBE O ALERTA SOLICITADO NO ITEM 3!
-    setFeedbackAlert({
-      variant: "info",
-      title: "Item Desativado do Catálogo",
-      message: `O item "${itemName}" foi movido para a aba "Desativados / Histórico". O histórico financeiro passado continua 100% preservado.`,
-    });
   };
 
-  // 6. REATIVAÇÃO COM FEEDBACK
-  const handleRestoreItem = (item, type) => {
-    if (type === "service") {
-      if (onUpdateService) {
-        onUpdateService({ ...item, active: true });
-      }
-    } else {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === item.id ? { ...p, active: true } : p)),
-      );
-    }
+  // [Função assíncrona: reativa serviço ou produto diretamente no Supabase]
+  const handleRestoreItem = async (item, type) => {
+    try {
+      if (type === "service") {
+        await supabase
+          .from("services")
+          .update({ active: true })
+          .eq("id", item.id);
 
-    setFeedbackAlert({
-      variant: "success",
-      title: "Item Reativado!",
-      message: `"${item.name}" voltou a ficar ativo no catálogo de agendamentos e vendas.`,
-    });
+        if (onUpdateService) {
+          onUpdateService({ ...item, active: true });
+        }
+      } else {
+        await supabase
+          .from("products")
+          .update({ active: true })
+          .eq("id", item.id);
+
+        setProducts((prev) =>
+          prev.map((p) => (p.id === item.id ? { ...p, active: true } : p)),
+        );
+      }
+
+      setFeedbackAlert({
+        variant: "success",
+        title: "Item Reativado!",
+        message: `"${item.name}" voltou a ficar ativo no catálogo de agendamentos e vendas.`,
+      });
+    } catch (err) {
+      console.error("Erro ao reativar item no Supabase:", err);
+    }
   };
 
   const filteredServices = services.filter((s) =>

@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+// [Import: cliente Supabase para persistência de agendamentos e alterações de status]
+import { supabase } from "../../lib/supabase";
 import { scheduleStyles } from "./ScheduleView.styles";
 import CalendarView from "../../components/calendar/CalendarView";
 import NewAppointmentModal from "../../components/calendar/NewAppointmentModal";
@@ -8,34 +10,12 @@ import Badge from "../../components/ui/Badge";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 
-// Catálogo Padrão de Serviços caso não venha por props
-const defaultServices = [
-  { id: "s1", name: "Corte Degradê Navalhado", price: 55, durationMinutes: 60 },
-  {
-    id: "s2",
-    name: "Barboterapia Tradicional",
-    price: 45,
-    durationMinutes: 45,
-  },
-  {
-    id: "s3",
-    name: "Combo VIP: Cabelo + Barba",
-    price: 90,
-    durationMinutes: 70,
-  },
-  {
-    id: "s4",
-    name: "Corte na Tesoura Clássico",
-    price: 50,
-    durationMinutes: 60,
-  },
-];
-
+// [Função componente: consome serviços reais sem catálogo fictício de fallback]
 export default function ScheduleView({
   barbers = [],
   appointments = [],
   onUpdateAppointments,
-  services = defaultServices,
+  services = [],
   onAddService,
   onNavigateToCashier,
   onBack,
@@ -43,13 +23,8 @@ export default function ScheduleView({
   // Filtra apenas barbeiros que não foram excluídos/inativados para a grade
   const activeBarbers = barbers.filter((b) => b.status !== "inactive");
 
-  // Estado reativo da lista de agendamentos (atualizado em tempo real)
-  const [currentAppointments, setCurrentAppointments] = useState(appointments);
-
-  // Sincroniza se a prop externa mudar
-  useEffect(() => {
-    setCurrentAppointments(appointments);
-  }, [appointments]);
+  // [Single Source of Truth: consome diretamente a prop appointments sem duplicação de estado ou cascata]
+  const currentAppointments = appointments;
 
   // Modais de Criação e Detalhes
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -90,79 +65,55 @@ export default function ScheduleView({
     });
   };
 
-  // 2. Salvar Edição do Agendamento
-  const handleConfirmSaveEdit = () => {
-    const selectedBarber = activeBarbers.find(
-      (b) => b.id === editForm.barberId,
-    ) ||
-      activeBarbers[0] || { id: "barber-carlos", name: "Barbeiro" };
-    const selectedService = services.find((s) => s.id === editForm.serviceId) ||
-      services[0] || { durationMinutes: 40, price: 55, name: "Serviço" };
-
-    const [startH, startM] = editForm.startTime.split(":").map(Number);
-    const totalMinutes =
-      startH * 60 + startM + (Number(selectedService.durationMinutes) || 40);
-    const endH = Math.floor(totalMinutes / 60);
-    const endM = totalMinutes % 60;
-    const newEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
-
-    const updatedAppt = {
-      ...selectedAppointment,
-      barberId: selectedBarber.id,
-      barberName: selectedBarber.name,
-      serviceId: selectedService.id,
-      serviceName: selectedService.name,
-      durationMinutes: Number(selectedService.durationMinutes) || 40,
-      startTime: editForm.startTime,
-      endTime: newEndTime,
-      price: Number(editForm.price || selectedService.price),
-      notes: editForm.notes,
-      hasNotes: Boolean(editForm.notes),
-    };
-
-    const updatedList = currentAppointments.map((a) =>
-      a.id === updatedAppt.id ? updatedAppt : a,
-    );
-
-    setCurrentAppointments(updatedList);
-    if (onUpdateAppointments) {
-      onUpdateAppointments(updatedList);
-    }
-
-    setSelectedAppointment(updatedAppt);
-    setIsEditingAppointment(false);
-    setIsConfirmEditModalOpen(false);
-  };
-
-  // 3. Salvar Novo Serviço Criado na Hora
-  const handleSaveQuickService = () => {
+  // [Função assíncrona: grava o novo serviço na tabela services do Supabase e o seleciona na hora]
+  const handleSaveQuickService = async () => {
     if (!quickServiceName.trim() || !quickServicePrice) {
       alert("Informe o nome e o preço do novo serviço.");
       return;
     }
 
-    const newService = {
-      id: `s-${Date.now()}`,
+    const servicePayload = {
       name: quickServiceName.trim(),
       category: "Cabelo",
-      durationMinutes: Number(quickServiceDuration),
+      duration_minutes: Number(quickServiceDuration),
       price: Number(quickServicePrice),
-      commissionPercent: 50,
-      onlineBooking: true,
-      description: "Serviço cadastrado durante o agendamento.",
+      active: true,
     };
 
-    if (onAddService) onAddService(newService);
+    try {
+      // Método Supabase: insere no banco e resgata o ID gerado
+      const { data, error } = await supabase
+        .from("services")
+        .insert([servicePayload])
+        .select()
+        .single();
 
-    setEditForm((prev) => ({
-      ...prev,
-      serviceId: newService.id,
-      price: String(newService.price),
-    }));
+      if (error) throw error;
 
-    setQuickServiceName("");
-    setQuickServicePrice("");
-    setIsQuickServiceModalOpen(false);
+      const createdService = {
+        id: data.id,
+        name: data.name,
+        category: data.category,
+        durationMinutes: data.duration_minutes,
+        price: Number(data.price),
+        active: true,
+      };
+
+      if (onAddService) onAddService(createdService);
+
+      setEditForm((prev) => ({
+        ...prev,
+        serviceId: createdService.id,
+        price: String(createdService.price),
+      }));
+
+      setQuickServiceName("");
+      setQuickServicePrice("");
+      setIsQuickServiceModalOpen(false);
+    } catch (err) {
+      console.error("Erro ao salvar serviço no Supabase:", err);
+      alert("Não foi possível salvar o novo serviço no catálogo.");
+    }
   };
 
   // 4. Salvar Novo Agendamento (Refatorado e Blindado)
@@ -189,7 +140,6 @@ export default function ScheduleView({
     };
 
     const updatedList = [...currentAppointments, appointmentToAdd];
-    setCurrentAppointments(updatedList);
 
     if (onUpdateAppointments) {
       onUpdateAppointments(updatedList);
@@ -198,13 +148,12 @@ export default function ScheduleView({
     setIsNewModalOpen(false);
   };
 
-  // 5. Alterar Status (Ex: Iniciar Atendimento / Concluir)
-  const handleStatusChange = (appointmentId, newStatus) => {
+  // [Função assíncrona: atualiza status no estado e na tabela appointments do Supabase]
+  const handleStatusChange = async (appointmentId, newStatus) => {
     const updatedList = currentAppointments.map((a) =>
       a.id === appointmentId ? { ...a, status: newStatus } : a,
     );
 
-    setCurrentAppointments(updatedList);
     if (onUpdateAppointments) {
       onUpdateAppointments(updatedList);
     }
@@ -212,22 +161,104 @@ export default function ScheduleView({
     if (selectedAppointment && selectedAppointment.id === appointmentId) {
       setSelectedAppointment((prev) => ({ ...prev, status: newStatus }));
     }
+
+    try {
+      await supabase
+        .from("appointments")
+        .update({ status: newStatus })
+        .eq("id", appointmentId);
+    } catch (err) {
+      console.error("Erro ao atualizar status no Supabase:", err);
+    }
   };
 
-  // 6. Confirmar Cancelamento
-  const handleConfirmCancellation = () => {
+  // [Função assíncrona: cancela o agendamento no estado e no banco liberando a vaga]
+  const handleConfirmCancellation = async () => {
     if (!appointmentToCancel) return;
 
+    const targetId = appointmentToCancel.id;
     const updatedList = currentAppointments.map((a) =>
-      a.id === appointmentToCancel.id ? { ...a, status: "cancelled" } : a,
+      a.id === targetId ? { ...a, status: "cancelled" } : a,
     );
 
-    setCurrentAppointments(updatedList);
     if (onUpdateAppointments) {
       onUpdateAppointments(updatedList);
     }
 
     setAppointmentToCancel(null);
+
+    try {
+      await supabase
+        .from("appointments")
+        .update({ status: "cancelled" })
+        .eq("id", targetId);
+    } catch (err) {
+      console.error("Erro ao cancelar agendamento no Supabase:", err);
+    }
+  };
+
+  // [Função assíncrona: salva edição do atendimento e persiste no Supabase de forma limpa e unificada]
+  const handleConfirmSaveEdit = async () => {
+    const selectedBarber =
+      activeBarbers.find((b) => b.id === editForm.barberId) || activeBarbers[0];
+    const selectedService =
+      services.find((s) => s.id === editForm.serviceId) || services[0];
+
+    const [startH, startM] = editForm.startTime.split(":").map(Number);
+    const duration = Number(
+      selectedService?.durationMinutes ||
+        selectedService?.duration_minutes ||
+        30,
+    );
+    const totalMinutes = startH * 60 + startM + duration;
+    const endH = Math.floor(totalMinutes / 60);
+    const endM = totalMinutes % 60;
+    const newEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+
+    const updatedAppt = {
+      ...selectedAppointment,
+      barberId: selectedBarber?.id || "",
+      barberName: selectedBarber?.name || "Barbeiro",
+      serviceId: selectedService?.id || "",
+      serviceName: selectedService?.name || "Serviço",
+      durationMinutes: duration,
+      startTime: editForm.startTime,
+      endTime: newEndTime,
+      price: Number(editForm.price || selectedService?.price || 0),
+      notes: editForm.notes,
+      hasNotes: Boolean(editForm.notes),
+    };
+
+    const updatedList = currentAppointments.map((a) =>
+      a.id === updatedAppt.id ? updatedAppt : a,
+    );
+
+    if (onUpdateAppointments) {
+      onUpdateAppointments(updatedList);
+    }
+
+    setSelectedAppointment(updatedAppt);
+    setIsEditingAppointment(false);
+    setIsConfirmEditModalOpen(false);
+
+    try {
+      // Método Supabase: atualiza as colunas na tabela appointments
+      await supabase
+        .from("appointments")
+        .update({
+          barber_id: updatedAppt.barberId,
+          barber_name: updatedAppt.barberName,
+          service_name: updatedAppt.serviceName,
+          duration_minutes: updatedAppt.durationMinutes,
+          start_time: updatedAppt.startTime,
+          end_time: updatedAppt.endTime,
+          price: updatedAppt.price,
+          notes: updatedAppt.notes,
+        })
+        .eq("id", updatedAppt.id);
+    } catch (err) {
+      console.error("Erro ao sincronizar edição com o Supabase:", err);
+    }
   };
 
   // 7. Arrastar e Soltar (Drag & Drop)
@@ -296,7 +327,6 @@ export default function ScheduleView({
         : a,
     );
 
-    setCurrentAppointments(updatedList);
     if (onUpdateAppointments) {
       onUpdateAppointments(updatedList);
     }

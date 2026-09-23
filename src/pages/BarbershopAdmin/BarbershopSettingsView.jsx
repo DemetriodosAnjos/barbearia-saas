@@ -1,4 +1,6 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
+// [Import: cliente Supabase para persistência real no banco de dados]
+import { supabase } from "../../lib/supabase";
 import { settingsStyles } from "./BarbershopSettingsView.styles";
 import Tabs from "../../components/ui/Tabs";
 import Input from "../../components/ui/Input";
@@ -7,33 +9,36 @@ import Select from "../../components/ui/Select";
 import Alert from "../../components/ui/Alert";
 import Toggle from "../../components/ui/Toggle";
 
-export default function BarbershopSettingsView({ onBack }) {
-  const [activeTab, setActiveTab] = useState("financeiro"); // Inicia na Aba 5 para você testar na hora!
+// [Função componente: recebe tenant real e callback de sincronização]
+export default function BarbershopSettingsView({
+  tenant,
+  onUpdateTenant,
+  onBack,
+}) {
+  // [Estado: inicia na aba principal padrão]
+  const [activeTab, setActiveTab] = useState("estabelecimento");
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [errors, setErrors] = useState({});
-
-  const numberInputRef = useRef(null);
-  const [isSearchingCep, setIsSearchingCep] = useState(false);
-  const logoFileRef = useRef(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
   // ========================================================
-  // ABA 1: ESTABELECIMENTO
+  // ABA 1: ESTABELECIMENTO (Consome dados reais do tenant)
   // ========================================================
+  // [Objeto: inicialização dinâmica a partir do tenant ou strings vazias sem mocks]
   const [businessData, setBusinessData] = useState({
-    tradeName: "Barbearia Vintage Club",
-    corporateName: "Vintage Club Barbearia e Estética LTDA",
-    cnpj: "34.123.456/0001-89",
-    phone: "(11) 98765-4321",
-    slug: "vintage-club",
-    logoUrl: "",
-    cep: "01414-001",
-    street: "Rua Oscar Freire",
-    number: "1042",
-    complement: "Sala 02",
-    neighborhood: "Jardins",
-    city: "São Paulo",
-    state: "SP",
+    tradeName: tenant?.name || "",
+    corporateName: tenant?.corporate_name || tenant?.corporateName || "",
+    cnpj: tenant?.cnpj || "",
+    phone: tenant?.phone || "",
+    slug: tenant?.slug || "",
+    logoUrl: tenant?.logo_url || tenant?.logoUrl || "",
+    cep: tenant?.cep || "",
+    street: tenant?.street || "",
+    number: tenant?.number || "",
+    complement: tenant?.complement || "",
+    neighborhood: tenant?.neighborhood || "",
+    city: tenant?.city || "",
+    state: tenant?.state || "",
   });
 
   // ========================================================
@@ -124,14 +129,16 @@ export default function BarbershopSettingsView({ onBack }) {
     npsFeedback: false,
     birthdayGreeting: true,
     activeMessageType: "booking",
+
+    // [Objeto templates: utiliza o nome dinâmico da barbearia cadastrada no sistema]
     templates: {
       booking:
-        "Olá {cliente}! 👋 Seu agendamento de {servico} com {barbeiro} foi confirmado para {data} às {horario}h na Barbearia Vintage Club. Caso precise reagendar, acesse: {link_cancelar}",
+        "Olá {cliente}! 👋 Seu agendamento de {servico} com {barbeiro} foi confirmado para {data} às {horario}h. Caso precise reagendar, acesse: {link_cancelar}",
       reminder2h:
         "Fala {cliente}, beleza? Passando para lembrar que seu corte é hoje às {horario}h com {barbeiro}. Te esperamos na cadeira! 💈",
       nps: "Olá {cliente}! O que achou do seu corte com {barbeiro}? Deixe sua avaliação de 1 a 5 estrelas aqui: {link_avaliar} ⭐",
       birthday:
-        "Parabéns {cliente}! 🎉 A equipe da Barbearia Vintage Club te deseja um feliz aniversário! Use o cupom NIVER15 e ganhe 15% de desconto no seu corte este mês.",
+        "Parabéns {cliente}! 🎉 Nossa equipe te deseja um feliz aniversário! Ganhe 15% de desconto no seu corte este mês com o cupom NIVER15.",
     },
   });
 
@@ -161,53 +168,79 @@ export default function BarbershopSettingsView({ onBack }) {
     acceptCash: true,
   });
 
-  // Handlers
-  const handleSaveTab1 = () => {
+  // [Função auxiliar assíncrona: persiste payload no Supabase na tabela barbershops]
+  const saveSettingsToSupabase = async (payload, successMsg) => {
     setSuccessMessage("");
+    setErrorMessage("");
     setIsSaving(true);
-    setTimeout(() => {
+
+    try {
+      if (tenant?.id) {
+        const { error } = await supabase
+          .from("barbershops")
+          .update(payload)
+          .eq("id", tenant.id);
+
+        if (error) throw error;
+
+        if (onUpdateTenant) {
+          onUpdateTenant({ ...tenant, ...payload });
+        }
+      }
+      setSuccessMessage(successMsg);
+    } catch (err) {
+      console.error("Erro ao salvar configurações:", err);
+      setErrorMessage(
+        "Erro ao sincronizar com o banco de dados. Tente novamente.",
+      );
+    } finally {
       setIsSaving(false);
-      setSuccessMessage("Dados do estabelecimento salvos!");
-    }, 1000);
+    }
+  };
+
+  // [Métodos de salvamento reais por aba conectadas à tabela do Supabase]
+  const handleSaveTab1 = () => {
+    saveSettingsToSupabase(
+      {
+        name: businessData.tradeName,
+        corporate_name: businessData.corporateName,
+        cnpj: businessData.cnpj,
+        phone: businessData.phone,
+        slug: businessData.slug,
+        street: businessData.street,
+        city: businessData.city,
+        state: businessData.state,
+      },
+      "Dados do estabelecimento salvos com sucesso!",
+    );
   };
 
   const handleSaveTab2 = () => {
-    setSuccessMessage("");
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSuccessMessage("Regras de agendamento salvas!");
-    }, 1000);
+    saveSettingsToSupabase(
+      { booking_rules: bookingRules },
+      "Regras de agendamento salvas com sucesso!",
+    );
   };
 
   const handleSaveTab3 = () => {
-    setSuccessMessage("");
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSuccessMessage("Horário de funcionamento salvo!");
-    }, 1000);
+    saveSettingsToSupabase(
+      { store_hours: storeHours, holiday_settings: holidaySettings },
+      "Horários de funcionamento salvos com sucesso!",
+    );
   };
 
   const handleSaveTab4 = () => {
-    setSuccessMessage("");
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSuccessMessage("Automações do WhatsApp salvas!");
-    }, 1000);
+    saveSettingsToSupabase(
+      { whatsapp_settings: whatsappSettings },
+      "Automações do WhatsApp salvas com sucesso!",
+    );
   };
 
-  // 5. AÇÃO: Salvar Políticas Financeiras (Aba 5)
   const handleSaveTab5 = () => {
-    setSuccessMessage("");
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSuccessMessage(
-        "Políticas financeiras, taxas e regras de sinal atualizadas com sucesso!",
-      );
-    }, 1000);
+    saveSettingsToSupabase(
+      { financial_policies: financialPolicies },
+      "Políticas financeiras, taxas e regras de sinal atualizadas com sucesso!",
+    );
   };
 
   const settingsTabs = [
@@ -257,9 +290,16 @@ export default function BarbershopSettingsView({ onBack }) {
 
       {/* CONTEÚDO DA ABA ATIVA */}
       <div className={settingsStyles.tabContentCard}>
+        {/* [Feedback nativo de sucesso ou erro do Supabase] */}
         {successMessage && (
           <Alert variant="success" title="Configurações Atualizadas!">
             {successMessage}
+          </Alert>
+        )}
+
+        {errorMessage && (
+          <Alert variant="error" title="Atenção">
+            {errorMessage}
           </Alert>
         )}
 

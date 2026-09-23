@@ -1,9 +1,11 @@
 import { useState } from "react";
+// [Import: cliente Supabase para persistência real de barbeiros no banco de dados]
+import { supabase } from "../../lib/supabase";
 import { teamStyles } from "./BarbersTeamView.styles";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
-import Badge from "../../components/ui/Badge";
+// [Remoção do import Badge que nunca era utilizado no arquivo]
 import Modal from "../../components/ui/Modal";
 import Avatar from "../../components/ui/Avatar";
 import TagInput from "../../components/ui/TagInput";
@@ -76,61 +78,6 @@ const defaultWeeklySchedule = [
   },
 ];
 
-const initialBarbers = [
-  {
-    id: "barber-carlos",
-    name: "Carlos Silva",
-    displayName: "Carlos Navalha",
-    role: "Master Barber",
-    email: "carlos@vintageclub.com",
-    phone: "(11) 98765-4321",
-    pixKey: "carlos.silva.pix@gmail.com",
-    serviceCommission: 50,
-    productCommission: 10,
-    status: "active",
-    rating: 4.9,
-    reviewCount: 168,
-    specialties: ["Degradê Navalhado", "Barboterapia", "Tesoura"],
-    notes:
-      "Profissional referência da casa. Prefere produtos com efeito matte.",
-    schedule: defaultWeeklySchedule,
-  },
-  {
-    id: "barber-marcos",
-    name: "Marcos Vinicius",
-    displayName: "Marquinhos",
-    role: "Especialista Degradê & Químicas",
-    email: "marcos@vintageclub.com",
-    phone: "(11) 97654-3210",
-    pixKey: "123.456.789-00",
-    serviceCommission: 50,
-    productCommission: 15,
-    status: "active",
-    rating: 4.8,
-    reviewCount: 94,
-    specialties: ["Pigmentação", "Platinado / Nevou", "Desenhos"],
-    notes: "Especialista em químicas de sexta e sábado.",
-    schedule: defaultWeeklySchedule,
-  },
-  {
-    id: "barber-tiago",
-    name: "Tiago Santos",
-    displayName: "Tiago Barbeiro",
-    role: "Barbeiro Tradicional",
-    email: "tiago@vintageclub.com",
-    phone: "(11) 91234-5678",
-    pixKey: "tiago.barber@hotmail.com",
-    serviceCommission: 45,
-    productCommission: 10,
-    status: "vacation",
-    rating: 4.7,
-    reviewCount: 82,
-    specialties: ["Corte Clássico", "Barba Alinhada", "Sobrancelha"],
-    notes: "Em férias no momento.",
-    schedule: defaultWeeklySchedule,
-  },
-];
-
 export default function BarbersTeamView({
   barbers = [], // 👈 Recebe via props
   onUpdateBarbers, // 👈 Atualiza o estado global
@@ -147,6 +94,8 @@ export default function BarbersTeamView({
   // Modais e formulários...
   const [isNewBarberModalOpen, setIsNewBarberModalOpen] = useState(false);
   const [newBarberActiveTab, setNewBarberActiveTab] = useState("dados"); // 'dados' | 'escala'
+  // [Novo estado: feedback visual durante inserção e atualização no Supabase]
+  const [isSavingBarber, setIsSavingBarber] = useState(false);
 
   const [newBarberForm, setNewBarberForm] = useState({
     name: "",
@@ -160,9 +109,11 @@ export default function BarbersTeamView({
     notes: "",
     specialties: ["Degradê Navalhado", "Barboterapia"],
   });
+
   const [newBarberSchedule, setNewBarberSchedule] = useState(
     defaultWeeklySchedule,
   );
+
   const [newBarberErrors, setNewBarberErrors] = useState({});
 
   // Estados do Modal de Detalhes & Edição
@@ -199,8 +150,8 @@ export default function BarbersTeamView({
     setIsNewBarberModalOpen(true);
   };
 
-  // Salvar Novo Barbeiro
-  const handleSaveNewBarber = () => {
+  // [Função assíncrona: insere o novo barbeiro diretamente na tabela 'barbers' do Supabase]
+  const handleSaveNewBarber = async () => {
     const errs = {};
     if (!newBarberForm.name.trim())
       errs.name = "Informe o nome completo do documento.";
@@ -215,35 +166,59 @@ export default function BarbersTeamView({
       return;
     }
 
-    const created = {
-      id: `barber-${Date.now()}`,
+    setIsSavingBarber(true);
+
+    // [Payload com suporte a colunas snake_case do Postgres e camelCase do React]
+    const dbPayload = {
       name: newBarberForm.name.trim(),
-      displayName: newBarberForm.displayName.trim(),
+      display_name: newBarberForm.displayName.trim(),
       role: newBarberForm.role,
-      email:
-        newBarberForm.email ||
-        `${newBarberForm.displayName.toLowerCase().replace(/\s+/g, "")}@vintageclub.com`,
-      phone: newBarberForm.phone,
-      pixKey: newBarberForm.pixKey || newBarberForm.phone,
-      serviceCommission: Number(newBarberForm.serviceCommission || 50),
-      productCommission: Number(newBarberForm.productCommission || 10),
-      notes: newBarberForm.notes || "",
+      email: newBarberForm.email?.trim() || null,
+      phone: newBarberForm.phone.trim(),
+      pix_key: newBarberForm.pixKey?.trim() || null,
+      service_commission: Number(newBarberForm.serviceCommission || 50),
+      product_commission: Number(newBarberForm.productCommission || 10),
+      notes: newBarberForm.notes?.trim() || "",
       status: "active",
       rating: 5.0,
-      reviewCount: 1,
+      review_count: 0,
       specialties: newBarberForm.specialties || [],
       schedule: newBarberSchedule,
     };
 
-    // 👇 AQUI ESTAVA FALTANDO: Declara o novo array com o barbeiro incluído
-    const updatedTeam = [...barbers, created];
+    try {
+      // Método Supabase: insere no banco e retorna o registro criado com id oficial
+      const { data, error } = await supabase
+        .from("barbers")
+        .insert([dbPayload])
+        .select()
+        .single();
 
-    if (onUpdateBarbers) {
-      onUpdateBarbers(updatedTeam);
+      if (error) throw error;
+
+      const created = {
+        ...data,
+        displayName: data.display_name || data.name,
+        serviceCommission: data.service_commission ?? 50,
+        productCommission: data.product_commission ?? 10,
+        pixKey: data.pix_key || "",
+      };
+
+      const updatedTeam = [...barbers, created];
+
+      if (onUpdateBarbers) {
+        onUpdateBarbers(updatedTeam);
+      }
+
+      setIsNewBarberModalOpen(false);
+    } catch (err) {
+      console.error("Erro ao cadastrar barbeiro no Supabase:", err);
+      alert(
+        "Não foi possível salvar o barbeiro no banco de dados. Verifique a conexão.",
+      );
+    } finally {
+      setIsSavingBarber(false);
     }
-
-    setIsNewBarberModalOpen(false);
-    alert(`💈 Barbeiro "${created.name}" cadastrado com sucesso!`);
   };
 
   // Detalhes & Edição
@@ -253,40 +228,78 @@ export default function BarbersTeamView({
     setEditFormData({ ...barber });
   };
 
-  // Salvar Edição do Barbeiro
-  const handleSaveEditBarber = () => {
-    const updatedTeam = barbers.map((b) =>
-      b.id === editFormData.id ? { ...editFormData } : b,
-    );
+  // [Função assíncrona: atualiza os dados do profissional na tabela 'barbers' do Supabase]
+  const handleSaveEditBarber = async () => {
+    if (!editFormData?.id) return;
+    setIsSavingBarber(true);
 
-    if (onUpdateBarbers) {
-      onUpdateBarbers(updatedTeam);
+    const updatePayload = {
+      display_name: editFormData.displayName || editFormData.name,
+      phone: editFormData.phone,
+      pix_key: editFormData.pixKey || null,
+      role: editFormData.role,
+      service_commission: Number(editFormData.serviceCommission || 50),
+      product_commission: Number(editFormData.productCommission || 10),
+      status: editFormData.status || "active",
+      specialties: editFormData.specialties || [],
+    };
+
+    try {
+      const { error } = await supabase
+        .from("barbers")
+        .update(updatePayload)
+        .eq("id", editFormData.id);
+
+      if (error) throw error;
+
+      const updatedTeam = barbers.map((b) =>
+        b.id === editFormData.id ? { ...b, ...editFormData } : b,
+      );
+
+      if (onUpdateBarbers) {
+        onUpdateBarbers(updatedTeam);
+      }
+
+      setSelectedBarberForDetails({ ...editFormData });
+      setIsEditMode(false);
+    } catch (err) {
+      console.error("Erro ao atualizar barbeiro no Supabase:", err);
+      alert("Erro ao salvar alterações no banco de dados.");
+    } finally {
+      setIsSavingBarber(false);
     }
-
-    setSelectedBarberForDetails({ ...editFormData });
-    setIsEditMode(false);
-    alert(
-      `✅ Dados do profissional "${editFormData.name}" atualizados com sucesso!`,
-    );
   };
 
-  // Escala individual rápida
-  const handleSaveBarberSchedule = () => {
-    if (!barberForScheduleEdit) return;
+  // [Função assíncrona: persiste a escala semanal e horários de intervalo do barbeiro]
+  const handleSaveBarberSchedule = async () => {
+    if (!barberForScheduleEdit?.id) return;
+    setIsSavingBarber(true);
 
-    // Atualiza a escala do barbeiro no array oficial
-    const updatedTeam = barbers.map((b) =>
-      b.id === barberForScheduleEdit.id ? { ...b, schedule: tempSchedule } : b,
-    );
+    try {
+      const { error } = await supabase
+        .from("barbers")
+        .update({ schedule: tempSchedule })
+        .eq("id", barberForScheduleEdit.id);
 
-    if (onUpdateBarbers) {
-      onUpdateBarbers(updatedTeam);
+      if (error) throw error;
+
+      const updatedTeam = barbers.map((b) =>
+        b.id === barberForScheduleEdit.id
+          ? { ...b, schedule: tempSchedule }
+          : b,
+      );
+
+      if (onUpdateBarbers) {
+        onUpdateBarbers(updatedTeam);
+      }
+
+      setBarberForScheduleEdit(null);
+    } catch (err) {
+      console.error("Erro ao salvar escala no Supabase:", err);
+      alert("Erro ao sincronizar escala com o banco de dados.");
+    } finally {
+      setIsSavingBarber(false);
     }
-
-    alert(
-      `✅ Escala e almoço de ${barberForScheduleEdit.name} salvos com sucesso!`,
-    );
-    setBarberForScheduleEdit(null);
   };
 
   return (
@@ -498,8 +511,10 @@ export default function BarbersTeamView({
                 </Button>
               )}
 
+              {/* [Botão conectado ao estado assíncrono de salvamento no Supabase] */}
               <Button
                 variant="primary"
+                isLoading={isSavingBarber}
                 onClick={handleSaveNewBarber}
                 className="bg-emerald-600 hover:bg-emerald-500 font-bold"
               >

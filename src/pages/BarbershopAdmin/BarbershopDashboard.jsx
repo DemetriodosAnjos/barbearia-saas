@@ -33,13 +33,20 @@ export default function BarbershopDashboard({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [barberPresenceStatus, setBarberPresenceStatus] = useState("available");
 
-  // Função/Cálculo: resolve os dias reais de trial sem quebrar se trial_ends_at não estiver definido
-  const realDaysLeft = (() => {
-    const trialEnds = tenant?.trial_ends_at || tenant?.trialEndsAt;
-    if (!trialEnds) return tenant?.trialDaysLeft ?? null;
-    const diffTime = new Date(trialEnds).getTime() - Date.now();
-    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-  })();
+  // [Lazy Initializer: captura o timestamp de referência de forma idempotente na montagem]
+  const [referenceDate] = useState(() => new Date());
+
+  // [Cálculo derivado puro: cálculo determinístico sem efeitos colaterais ou cascatas]
+  const trialEnds = tenant?.trial_ends_at || tenant?.trialEndsAt;
+  const realDaysLeft = trialEnds
+    ? Math.max(
+        0,
+        Math.ceil(
+          (new Date(trialEnds).getTime() - referenceDate.getTime()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      )
+    : (tenant?.trialDaysLeft ?? null);
 
   const barbershopMenuItems = [
     {
@@ -181,7 +188,11 @@ export default function BarbershopDashboard({
               <ReferralProgramView onBack={() => setActiveMenuTab("agenda")} />
             )}
             {activeMenuTab === "perfil" && (
-              <UserProfileView onBack={() => setActiveMenuTab("agenda")} />
+              <UserProfileView
+                user={user}
+                tenant={tenant}
+                onBack={() => setActiveMenuTab("agenda")}
+              />
             )}
             {activeMenuTab === "configuracoes" && (
               <BarbershopSettingsView

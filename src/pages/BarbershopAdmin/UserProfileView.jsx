@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+// [Import: cliente Supabase para atualização de perfil e senha no Auth]
+import { supabase } from "../../lib/supabase";
 import { profileStyles } from "./UserProfileView.styles";
 import Tabs from "../../components/ui/Tabs";
 import Input from "../../components/ui/Input";
@@ -10,7 +12,8 @@ import Select from "../../components/ui/Select";
 import TagInput from "../../components/ui/TagInput";
 import Alert from "../../components/ui/Alert";
 
-export default function UserProfileView({ onBack }) {
+// [Função componente: consome o usuário e barbearia reais autenticados]
+export default function UserProfileView({ user, tenant, onBack }) {
   const [activeTab, setActiveTab] = useState("pessoal");
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef(null);
@@ -19,6 +22,7 @@ export default function UserProfileView({ onBack }) {
   const [passwordErrors, setPasswordErrors] = useState({});
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordSuccessMsg, setPasswordSuccessMsg] = useState("");
+  const [passwordApiError, setPasswordApiError] = useState("");
 
   // Estado para armazenar os erros dos campos do perfil
   const [profileErrors, setProfileErrors] = useState({});
@@ -28,51 +32,45 @@ export default function UserProfileView({ onBack }) {
   const numberInputRef = useRef(null);
   const [isSearchingCep, setIsSearchingCep] = useState(false);
 
-  // Senha atual cadastrada para teste no protótipo:
-  const MOCK_SENHA_ATUAL = "senha123";
-
-  // Função de Validação e Atualização da Senha
-  const handleUpdatePassword = () => {
+  // [Função assíncrona: atualiza a senha diretamente no Supabase Auth]
+  const handleUpdatePassword = async () => {
     const errs = {};
     setPasswordSuccessMsg("");
+    setPasswordApiError("");
 
-    // 1. Validação da Senha Atual
-    if (!securityData.currentPassword.trim()) {
-      errs.current = "Informe sua senha atual de acesso.";
-    } else if (securityData.currentPassword !== MOCK_SENHA_ATUAL) {
-      errs.current = "A senha atual informada está incorreta. Tente novamente.";
-    }
-
-    // 2. Validação da Nova Senha
+    // 1. Validação da Nova Senha
     if (!securityData.newPassword.trim()) {
       errs.new = "Informe a nova senha.";
     } else if (securityData.newPassword.length < 8) {
       errs.new = "A nova senha deve conter no mínimo 8 caracteres.";
-    } else if (securityData.newPassword === MOCK_SENHA_ATUAL) {
-      errs.new = "A nova senha deve ser diferente da senha atual.";
     }
 
-    // 3. Validação da Confirmação de Senha
+    // 2. Validação da Confirmação
     if (!securityData.confirmPassword.trim()) {
       errs.confirm = "Confirme a nova senha.";
-    } else if (securityData.confirmPassword.length < 8) {
-      errs.confirm = "A confirmação deve conter no mínimo 8 caracteres.";
     } else if (securityData.newPassword !== securityData.confirmPassword) {
       errs.confirm =
         "As senhas não coincidem. Digite exatamente a mesma senha.";
     }
 
-    // Se houver erros, aplica nos inputs e bloqueia
     if (Object.keys(errs).length > 0) {
       setPasswordErrors(errs);
       return;
     }
 
-    // Se passou em tudo:
     setIsUpdatingPassword(true);
-    setTimeout(() => {
-      setIsUpdatingPassword(false);
-      setPasswordSuccessMsg("Sua senha de acesso foi atualizada com sucesso!");
+
+    try {
+      // Método Supabase: atualiza a credencial do usuário conectado
+      const { error } = await supabase.auth.updateUser({
+        password: securityData.newPassword,
+      });
+
+      if (error) throw error;
+
+      setPasswordSuccessMsg(
+        "Sua senha de acesso foi atualizada com sucesso no banco de dados!",
+      );
       setSecurityData((prev) => ({
         ...prev,
         currentPassword: "",
@@ -80,43 +78,48 @@ export default function UserProfileView({ onBack }) {
         confirmPassword: "",
       }));
       setPasswordErrors({});
-    }, 1200);
+    } catch (err) {
+      console.error("Erro ao atualizar senha no Supabase:", err);
+      setPasswordApiError(
+        err.message || "Erro ao atualizar a senha. Tente novamente.",
+      );
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
-  // 1. DADOS PESSOAIS & IDENTIFICAÇÃO
+  // 1. DADOS PESSOAIS (Iniciados com os metadados do usuário real)
   const [personalData, setPersonalData] = useState({
-    fullName: "Carlos Eduardo Silva",
-    displayName: "Carlos Navalha",
-    cpf: "123.456.789-00",
-    cnpj: "45.123.456/0001-89", // MEI parceiro
-    birthDate: "1994-05-18",
-    avatarSrc: "",
+    fullName: user?.user_metadata?.name || user?.name || tenant?.name || "",
+    displayName: user?.user_metadata?.display_name || user?.displayName || "",
+    cpf: user?.user_metadata?.cpf || "",
+    cnpj: tenant?.cnpj || "",
+    birthDate: user?.user_metadata?.birth_date || "",
+    avatarSrc: user?.user_metadata?.avatar_url || "",
   });
 
   // 2. CONTATO & LOCALIZAÇÃO PESSOAL
   const [contactData, setContactData] = useState({
-    email: "carlos@vintageclub.com",
-    phone: "(11) 98765-4321",
-    cep: "01414-001",
-    street: "Rua Oscar Freire",
-    number: "1042",
-    complement: "Apto 42",
-    neighborhood: "Jardins",
-    city: "São Paulo",
-    state: "SP",
+    email: user?.email || "",
+    phone: user?.phone || tenant?.phone || "",
+    cep: tenant?.cep || "",
+    street: tenant?.street || "",
+    number: tenant?.number || "",
+    complement: tenant?.complement || "",
+    neighborhood: tenant?.neighborhood || "",
+    city: tenant?.city || "",
+    state: tenant?.state || "",
   });
 
-  // 3. ATUAÇÃO PROFISSIONAL & CHAVE PIX (PARA COMISSÕES)
+  // 3. ATUAÇÃO PROFISSIONAL & CHAVE PIX
   const [professionalData, setProfessionalData] = useState({
-    bio: "Especialista em cortes degradê navalhados, barboterapia tradicional com toalha quente e visagismo masculino. Mais de 8 anos de experiência.",
-    pixKey: "carlos.silva.barber@gmail.com",
-    pixType: "E-mail",
-    instagram: "@carlos_navalha_sp",
-    specialties: [
-      "Degradê Navalhado",
-      "Barboterapia",
-      "Tesoura Clássica",
-      "Pigmentação",
+    bio: user?.user_metadata?.bio || "",
+    pixKey: user?.user_metadata?.pix_key || "",
+    pixType: "Chave Geral",
+    instagram: user?.user_metadata?.instagram || "",
+    specialties: user?.user_metadata?.specialties || [
+      "Corte Tradicional",
+      "Barba",
     ],
   });
 
@@ -535,14 +538,14 @@ export default function UserProfileView({ onBack }) {
               </div>
             </div>
 
+            {/* Linha de Endereço: Número + Complemento + Bairro (Sem duplicações) */}
             <div className={profileStyles.gridThreeCols}>
-              {/* Campo Número com a ref de foco automático */}
               <div className="w-full flex flex-col gap-1.5 text-left">
                 <label className="text-sm font-medium text-neutral-300">
                   Número *
                 </label>
                 <input
-                  ref={numberInputRef} // 👈 Recebe o foco automático
+                  ref={numberInputRef}
                   type="text"
                   placeholder="Ex: 1042"
                   value={contactData.number}
@@ -580,7 +583,7 @@ export default function UserProfileView({ onBack }) {
 
               <Input
                 label="Bairro"
-                placeholder="Centro, Jardins..."
+                placeholder="Centro, Bairro..."
                 value={contactData.neighborhood}
                 onChange={(e) =>
                   setContactData({
@@ -820,6 +823,17 @@ export default function UserProfileView({ onBack }) {
               {passwordSuccessMsg && (
                 <Alert variant="success" title="Senha Atualizada!">
                   {passwordSuccessMsg}
+                </Alert>
+              )}
+
+              {/* [Leitura ativa: Alerta de erro da API do Supabase Auth caso a troca falhe] */}
+              {passwordApiError && (
+                <Alert
+                  variant="error"
+                  title="Erro ao Atualizar Senha"
+                  onClose={() => setPasswordApiError("")}
+                >
+                  {passwordApiError}
                 </Alert>
               )}
 

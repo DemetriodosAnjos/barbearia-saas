@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// [Import: cliente Supabase para buscar produtos reais e sincronizar comandas]
+import { supabase } from "../../lib/supabase";
 import { posStyles } from "./CashierPosView.styles";
 import ComandaCard from "../../components/pos/ComandaCard";
 import PosProductItem from "../../components/pos/PosProductItem";
@@ -10,133 +12,74 @@ import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import Alert from "../../components/ui/Alert";
 
-// Mock inicial de Comandas Abertas na Barbearia
-const initialComandas = [
-  {
-    id: "CMD-1041",
-    clientName: "Rodrigo Faro",
-    clientPhone: "(11) 98765-4321",
-    barberName: "Carlos Silva",
-    status: "open", // 'open' | 'pending_payment' | 'paid'
-    openedAt: "14:15",
-    services: [
-      {
-        id: "s1",
-        name: "Corte Degradê Navalhado",
-        price: 55,
-        barberCommission: 27.5,
-      },
-      {
-        id: "s2",
-        name: "Barboterapia Tradicional",
-        price: 45,
-        barberCommission: 22.5,
-      },
-    ],
-    products: [
-      {
-        id: "p1",
-        name: "Cerveja IPA Artesanal (Lata)",
-        quantity: 2,
-        unitPrice: 16,
-        total: 32,
-        sellerCommission: 3.2,
-      },
-    ],
-  },
-  {
-    id: "CMD-1042",
-    clientName: "Guilherme Boulos",
-    clientPhone: "(11) 97654-3210",
-    barberName: "Marcos Vinicius",
-    status: "pending_payment", // Aguardando acerto no balcão!
-    openedAt: "15:00",
-    services: [
-      {
-        id: "s3",
-        name: "Corte na Tesoura Clássico",
-        price: 50,
-        barberCommission: 25.0,
-      },
-    ],
-    products: [
-      {
-        id: "p2",
-        name: "Pomada Matte (50g)",
-        quantity: 1,
-        unitPrice: 45,
-        total: 45,
-        sellerCommission: 4.5,
-      },
-    ],
-  },
-];
+// [Função componente: consome comandas e barbeiros reais da barbearia]
+export default function CashierPosView({
+  sharedComandas = [],
+  onUpdateComandas,
+  barbers = [],
+  onBack,
+}) {
+  // [Estados reais: comandas compartilhadas e lista de produtos obtida do Supabase]
+  const [comandas, setComandas] = useState(sharedComandas);
+  const [waitlist, setWaitlist] = useState([]);
+  const [products, setProducts] = useState([]);
 
-// Mock de Produtos Disponíveis no Bar/Vitrine do PDV
-const posProductsList = [
-  {
-    id: "p1",
-    name: "Cerveja IPA 350ml",
-    category: "Bar",
-    icon: "🍺",
-    price: 16,
-    stock: 14,
-    commissionPercent: 10,
-  },
-  {
-    id: "p2",
-    name: "Pomada Matte 50g",
-    category: "Vitrine",
-    icon: "🧴",
-    price: 45,
-    stock: 5,
-    commissionPercent: 15,
-  },
-  {
-    id: "p3",
-    name: "Café Expresso Grão",
-    category: "Bar",
-    icon: "☕",
-    price: 6,
-    stock: 35,
-    commissionPercent: 0,
-  },
-];
+  // Sincroniza com as comandas do dashboard global
+  useEffect(() => {
+    if (sharedComandas && sharedComandas.length > 0) {
+      setComandas(sharedComandas);
+    }
+  }, [sharedComandas]);
 
-// Mock de Clientes na Fila de Espera (Walk-ins)
-const initialWaitlist = [
-  {
-    id: "q-101",
-    position: 1,
-    clientName: "Matheus Pereira",
-    serviceName: "Corte Degradê Simples",
-    entryTimeAgo: "10 min atrás",
-    estimatedWaitMinutes: 15,
-    priority: "vip",
-    status: "waiting",
-    phone: "(11) 91234-5678",
-  },
-];
+  // [Efeito de ciclo de vida: busca catálogo real de produtos no Supabase]
+  useEffect(() => {
+    let isMounted = true;
+    async function loadPosProducts() {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .order("name");
 
-export default function CashierPosView({ onBack }) {
-  const [comandas, setComandas] = useState(initialComandas);
-  const [waitlist, setWaitlist] = useState(initialWaitlist);
-  const [products] = useState(posProductsList);
+        if (!error && data && isMounted) {
+          setProducts(
+            data.map((p) => ({
+              id: p.id,
+              name: p.name,
+              category: p.category || "Bar",
+              icon: p.category === "Bar" ? "🍺" : "🧴",
+              price: Number(p.price || 0),
+              stock: p.stock || 0,
+              commissionPercent: p.commission_percent || 10,
+            })),
+          );
+        }
+      } catch (err) {
+        console.error("Erro ao carregar produtos do PDV:", err);
+      }
+    }
+    loadPosProducts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Estados de Liquidação / Pagamento da Comanda
   const [comandaToPay, setComandaToPay] = useState(null);
 
   // Estados para Adicionar Item Rápido a uma Comanda Aberta
-  const [selectedComandaIdForAdd, setSelectedComandaIdForAdd] = useState(
-    initialComandas[0]?.id || "",
-  );
+  const [selectedComandaIdForAdd, setSelectedComandaIdForAdd] = useState("");
+
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [productToAdd, setProductToAdd] = useState(null);
 
   // Estados para Abrir Nova Comanda Balcão Avulsa
   const [isNewComandaModalOpen, setIsNewComandaModalOpen] = useState(false);
   const [newClientName, setNewClientName] = useState("");
-  const [newBarberName, setNewBarberName] = useState("Carlos Silva");
+  // [Variável: utiliza o primeiro barbeiro cadastrado real da barbearia]
+  const [newBarberName, setNewBarberName] = useState(
+    barbers[0]?.name || "Barbeiro Geral",
+  );
 
   // Feedback
   const [alertSuccess, setAlertSuccess] = useState("");
@@ -147,8 +90,20 @@ export default function CashierPosView({ onBack }) {
     (c) => c.status === "pending_payment",
   ).length;
 
-  // Total acumulado em caixa no dia
-  const totalReceivedToday = 480.0; // Valor consolidado já liquidado
+  // [Cálculo dinâmico com método reduce: soma o valor real de comandas já liquidadas]
+  const totalReceivedToday = comandas
+    .filter((c) => c.status === "paid")
+    .reduce((acc, cmd) => {
+      const servicesTotal = (cmd.services || []).reduce(
+        (sum, s) => sum + Number(s.price || 0),
+        0,
+      );
+      const productsTotal = (cmd.products || []).reduce(
+        (sum, p) => sum + Number(p.total || 0),
+        0,
+      );
+      return acc + servicesTotal + productsTotal;
+    }, 0);
 
   // 1. AÇÃO: Lançar Produto do Bar em uma Comanda Ativa
   const handleQuickAddProduct = (product) => {
@@ -282,22 +237,25 @@ export default function CashierPosView({ onBack }) {
     setTimeout(() => setAlertSuccess(""), 4000);
   };
 
-  // 4. AÇÃO: Finalizar Pagamento no Seletor de Métodos (Liquidação)
+  // [Função: liquida a comanda e sincroniza com o dashboard global e Supabase]
   const handleFinishComandaPayment = (paymentsSummary) => {
     if (!comandaToPay) return;
 
-    setComandas((prev) =>
-      prev.map((c) =>
-        c.id === comandaToPay.id ? { ...c, status: "paid" } : c,
-      ),
+    const updated = comandas.map((c) =>
+      c.id === comandaToPay.id ? { ...c, status: "paid" } : c,
     );
+
+    setComandas(updated);
+    if (onUpdateComandas) {
+      onUpdateComandas(updated);
+    }
 
     const paidId = comandaToPay.id;
     const clientName = comandaToPay.clientName;
     setComandaToPay(null);
 
     setAlertSuccess(
-      `🎉 Comanda #${paidId} (${clientName}) foi QUITADA E ARQUIVADA no caixa! Comissões e estoque atualizados.`,
+      `🎉 Comanda #${paidId} (${clientName}) foi QUITADA E ARQUIVADA no caixa!`,
     );
     setTimeout(() => setAlertSuccess(""), 5000);
   };
@@ -623,15 +581,16 @@ export default function CashierPosView({ onBack }) {
             onChange={(e) => setNewClientName(e.target.value)}
           />
 
+          {/* [Select dinâmico: consome a lista real de barbeiros do Supabase] */}
           <Select
             label="Barbeiro Responsável"
             value={newBarberName}
             onChange={(e) => setNewBarberName(e.target.value)}
-            options={[
-              { value: "Carlos Silva", label: "Carlos Silva" },
-              { value: "Marcos Vinicius", label: "Marcos Vinicius" },
-              { value: "Tiago Santos", label: "Tiago Santos" },
-            ]}
+            options={
+              barbers.length > 0
+                ? barbers.map((b) => ({ value: b.name, label: b.name }))
+                : [{ value: "Geral", label: "Atendente Geral" }]
+            }
           />
         </div>
       </Modal>
