@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
+// [Import: cliente Supabase para persistir agendamentos feitos pelos clientes]
+import { supabase } from "../../lib/supabase";
 import { clientBookingStyles } from "./ClientBookingView.styles";
 import Navbar from "../../components/ui/Navbar";
-import BottomNavigation from "../../components/ui/BottomNavigation";
 import ServiceCard from "../../components/services/ServiceCard";
 import ProfessionalCard from "../../components/services/ProfessionalCard";
 import DatePicker from "../../components/ui/DatePicker";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
-import Alert from "../../components/ui/Alert";
 
 // Horários do dia
 const baseTimeSlots = [
@@ -29,16 +29,19 @@ const baseTimeSlots = [
   { time: "18:00", available: true },
 ];
 
+// [Função componente: recebe tenant real e zera os fallbacks estáticos de cliente/barbeiro]
 export default function ClientBookingView({
+  tenant,
   services = [],
-  barbers = [], // 👈 Recebe a equipe oficial em tempo real!
-  initialBarberId = "barber-carlos",
-  initialClientName = "Rodrigo Faro",
-  initialClientPhone = "(11) 98765-4321",
+  barbers = [],
+  initialBarberId = "",
+  initialClientName = "",
+  initialClientPhone = "",
   onFinishBooking,
 }) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [activeBottomTab, setActiveBottomTab] = useState("agendar");
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [bookingErrorMessage, setBookingErrorMessage] = useState("");
 
   // Serviços ativos no catálogo
   const activeServicesList = services.filter((s) => s.active !== false);
@@ -130,16 +133,23 @@ export default function ClientBookingView({
     });
   };
 
-  const handleConfirmReservation = () => {
+  // [Função assíncrona: valida os dados e grava o agendamento na tabela appointments do Supabase]
+  const handleConfirmReservation = async () => {
+    setBookingErrorMessage("");
+
     if (!clientName.trim() || !clientPhone || clientPhone.length < 14) {
-      alert("Por favor, preencha seu nome e WhatsApp para confirmar.");
+      setBookingErrorMessage(
+        "Por favor, preencha seu nome completo e WhatsApp com DDD.",
+      );
       return;
     }
 
     if (!bookingTime) {
-      alert("Selecione um horário disponível.");
+      setBookingErrorMessage("Selecione um horário disponível na grade.");
       return;
     }
+
+    setIsSubmittingBooking(true);
 
     const [startH, startM] = bookingTime.split(":").map(Number);
     const totalMins = startH * 60 + startM + totalDuration;
@@ -147,16 +157,18 @@ export default function ClientBookingView({
     const endM = totalMins % 60;
     const computedEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
 
-    // Se o cliente escolheu "Qualquer Barbeiro", atribuímos ao primeiro barbeiro ativo disponível
+    // Atribui ao primeiro barbeiro livre se escolheu a opção coringa
     const finalBarber = selectedBarberObj.isAnyProfessional
       ? activeBarbersList[0] || selectedBarberObj
       : selectedBarberObj;
 
+    const protocolId = `AG-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const bookingPayload = {
-      protocol: `AG-${Math.floor(1000 + Math.random() * 9000)}`,
+      protocol: protocolId,
       clientName: clientName.trim(),
       clientPhone,
-      barberId: finalBarber.id, // 👈 ID real sincronizado com a agenda!
+      barberId: finalBarber.id,
       barberName: finalBarber.name,
       services: selectedServices.map((s) => s.name).join(" + "),
       totalPrice,
@@ -165,6 +177,30 @@ export default function ClientBookingView({
       time: bookingTime,
       endTime: computedEndTime,
     };
+
+    try {
+      // Método Supabase: insere o agendamento real na tabela appointments
+      await supabase.from("appointments").insert([
+        {
+          tenant_id: tenant?.id || null,
+          client_name: clientName.trim(),
+          client_phone: clientPhone,
+          barber_id: finalBarber.id !== "any" ? finalBarber.id : null,
+          barber_name: finalBarber.name,
+          service_name: selectedServices.map((s) => s.name).join(" + "),
+          duration_minutes: totalDuration,
+          price: totalPrice,
+          start_time: bookingTime,
+          end_time: computedEndTime,
+          status: "confirmed",
+          is_paid: false,
+        },
+      ]);
+    } catch (err) {
+      console.error("Erro ao salvar agendamento no Supabase:", err);
+    } finally {
+      setIsSubmittingBooking(false);
+    }
 
     setConfirmedBooking(bookingPayload);
     setCurrentStep(5);
@@ -254,10 +290,11 @@ export default function ClientBookingView({
                 Quais serviços você deseja?
               </h2>
               <p className={clientBookingStyles.stepDescription}>
-                Serviços oficiais da Barbearia Vintage Club.
+                Serviços oficiais de {tenant?.name || "nossa barbearia"}.
               </p>
             </div>
 
+            {/* [Restauração: Lista de serviços com seleção interativa] */}
             <div className="space-y-3">
               {activeServicesList.map((service) => (
                 <ServiceCard
@@ -364,13 +401,21 @@ export default function ClientBookingView({
             </div>
 
             <div className="space-y-3">
+              {/* [Aviso visual sem alert nativo] */}
+              {bookingErrorMessage && (
+                <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-xl text-xs text-red-300">
+                  ⚠️ {bookingErrorMessage}
+                </div>
+              )}
+
               <Input
                 label="Seu Nome Completo"
-                placeholder="Ex: Rodrigo Faro"
+                placeholder="Ex: Carlos Eduardo"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
               />
 
+              {/* [Restauração: Input do WhatsApp com máscara e validação DDD] */}
               <Input
                 label="Seu WhatsApp (com DDD)"
                 mask="phone"
@@ -403,8 +448,9 @@ export default function ClientBookingView({
             <div className="space-y-2 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
               <div className={clientBookingStyles.voucherItem}>
                 <span>Barbearia:</span>
+                {/* [Exibe o nome oficial do tenant no voucher de confirmação] */}
                 <span className={clientBookingStyles.voucherItemValue}>
-                  Vintage Club Jardins
+                  {tenant?.name || "Barbearia"}
                 </span>
               </div>
               <div className={clientBookingStyles.voucherItem}>
@@ -457,8 +503,10 @@ export default function ClientBookingView({
               </span>
             </div>
 
+            {/* [Botão conectado ao estado assíncrono de salvamento no Supabase] */}
             <Button
               variant="primary"
+              isLoading={isSubmittingBooking}
               onClick={() => {
                 if (currentStep === 4) handleConfirmReservation();
                 else setCurrentStep((prev) => prev + 1);

@@ -249,16 +249,10 @@ export default function App() {
       {/* 1. APP DO CLIENTE: Consome os barbeiros e serviços reais! */}
       {currentScreen === "client-app" && (
         <ClientBookingView
+          tenant={tenant}
           services={services}
-          barbers={barbers} // 👈 Passa a equipe oficial de barbeiros!
-          initialBarberId={
-            urlBarber === "carlos"
-              ? "barber-carlos"
-              : urlBarber || "barber-carlos"
-          }
-          initialClientName={urlClient || "Rodrigo Faro"}
-          initialClientPhone={urlPhone || "(11) 98765-4321"}
-          onFinishBooking={handleClientBookingFinished}
+          barbers={barbers}
+          onFinishBooking={handleFinishBooking}
         />
       )}
 
