@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// [Import: cliente Supabase para consulta e controle de todas as barbearias cadastradas]
+import { supabase } from "../../lib/supabase";
 import { superAdminStyles } from "./SuperAdminDashboard.styles";
 import StatCard from "../../components/dashboard/StatCard";
 import Table from "../../components/ui/Table";
@@ -8,156 +10,129 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Select from "../../components/ui/Select";
 import Input from "../../components/ui/Input";
-import Alert from "../../components/ui/Alert";
 import { getBestContrastTextColor } from "../../utils/theme";
-
-// 1. Mock inicial de Barbearias (Tenants)
-const initialTenants = [
-  {
-    id: "t-1",
-    name: "Barbearia Vintage Club",
-    slug: "vintage-club",
-    ownerName: "Carlos Silva",
-    ownerEmail: "carlos@vintageclub.com",
-    ownerPhone: "(11) 98765-4321",
-    plan: "pro",
-    status: "active",
-    barbersCount: 5,
-    mrr: 149.9,
-    trialDaysLeft: 0,
-    hasWhiteLabel: true,
-    brandPrimary: "#ea580c",
-    brandSecondary: "#16a34a",
-  },
-  {
-    id: "t-2",
-    name: "Dom Pedro Barbershop",
-    slug: "dom-pedro",
-    ownerName: "Pedro Alcantara",
-    ownerEmail: "pedro@dompedro.com",
-    ownerPhone: "(11) 97654-3210",
-    plan: "enterprise",
-    status: "active",
-    barbersCount: 12,
-    mrr: 279.9,
-    trialDaysLeft: 0,
-    hasWhiteLabel: false,
-    brandPrimary: "#d97706",
-    brandSecondary: "#059669",
-  },
-  {
-    id: "t-3",
-    name: "Navalha de Ouro",
-    slug: "navalha-de-ouro",
-    ownerName: "Marcos Vinicius",
-    ownerEmail: "marcos@navalhaouro.com",
-    ownerPhone: "(11) 91234-5678",
-    plan: "starter",
-    status: "trial",
-    barbersCount: 1,
-    mrr: 69.9,
-    trialDaysLeft: 3,
-    hasWhiteLabel: false,
-    brandPrimary: "#d97706",
-    brandSecondary: "#059669",
-  },
-  {
-    id: "t-4",
-    name: "Estilo & Arte Barbearia",
-    slug: "estilo-arte",
-    ownerName: "Thiago Ventura",
-    ownerEmail: "thiago@estiloarte.com",
-    ownerPhone: "(11) 99887-7665",
-    plan: "pro",
-    status: "overdue",
-    barbersCount: 4,
-    mrr: 149.9,
-    trialDaysLeft: 0,
-    hasWhiteLabel: false,
-    brandPrimary: "#d97706",
-    brandSecondary: "#059669",
-  },
-  {
-    id: "t-5",
-    name: "Corte Rápido Express",
-    slug: "corte-rapido",
-    ownerName: "Felipe Titto",
-    ownerEmail: "felipe@corterapido.com",
-    ownerPhone: "(11) 91122-3344",
-    plan: "starter",
-    status: "suspended",
-    barbersCount: 1,
-    mrr: 69.9,
-    trialDaysLeft: 0,
-    hasWhiteLabel: false,
-    brandPrimary: "#d97706",
-    brandSecondary: "#059669",
-  },
-];
-
-// 2. Mock dos Planos Oficiais do SaaS
-const initialPlans = [
-  {
-    id: "starter",
-    name: "Plano Solo",
-    price: 69.9,
-    maxBarbers: 1,
-    extraBarberPrice: 0,
-    tag: "Individual",
-    active: true,
-    nubankPaymentLink: "https://nubank.com.br/cobrar/barbersaas/plano-solo-69",
-    features: [
-      "1 Cadeira / Barbeiro",
-      "Agenda Online",
-      "Controle de Fila (PDV)",
-      "Suporte por E-mail",
-    ],
-  },
-  {
-    id: "pro",
-    name: "Plano Pro",
-    price: 149.9,
-    maxBarbers: 6,
-    extraBarberPrice: 19.9,
-    tag: "Mais Popular",
-    active: true,
-    nubankPaymentLink: "https://nubank.com.br/cobrar/barbersaas/plano-pro-149",
-    features: [
-      "Até 6 Barbeiros Inclusos",
-      "Comissões Automáticas",
-      "+ R$ 19,90 por barbeiro extra",
-      "WhatsApp Automático",
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Redes & Franquias",
-    price: 279.9,
-    maxBarbers: 999,
-    extraBarberPrice: 0,
-    tag: "Escala & Redes",
-    active: true,
-    nubankPaymentLink:
-      "https://nubank.com.br/cobrar/barbersaas/redes-franquias-279",
-    features: [
-      "Barbeiros Ilimitados",
-      "Múltiplas Filiais",
-      "Pacote White-Label Incluso",
-      "Suporte VIP WhatsApp",
-    ],
-  },
-];
 
 export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
   const [activeTab, setActiveTab] = useState("tenants");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
-  const [tenants, setTenants] = useState(initialTenants);
-  const [plans, setPlans] = useState(initialPlans);
+  // [Estado do array de tenants: armazena coleção de barbearias recuperadas do Supabase]
+  const [tenants, setTenants] = useState([]);
 
+  // [Estado do array de planos: substitui initialPlans por dados dinâmicos da tabela 'plans']
+  const [plans, setPlans] = useState([]);
+
+  // [Estados de controle de filtros: variáveis de string para busca textual e selects]
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
+
+  // [Estado de feedback de gravação: variável de feedback visual para ações assíncronas]
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
+
+  // [Estado booleana de carregamento: controla o feedback visual enquanto o Supabase responde]
+  const [isLoading, setIsLoading] = useState(true);
+
+  // [Estado das configurações Nubank PJ: declarado antes do useEffect para evitar Temporal Dead Zone]
+  const [nubankConfig, setNubankConfig] = useState({
+    pixKey: "",
+    companyName: "",
+    supportWhatsapp: "",
+  });
+
+  // [Hook useEffect: executa busca assíncrona unificada de barbearias, planos e dados Nubank]
+  useEffect(() => {
+    let isMounted = true;
+
+    // [Função assíncrona: consulta concorrente em múltiplas tabelas Supabase]
+    async function fetchAllData() {
+      try {
+        // [Método Supabase Promise.all: executa selects simultâneos em 'tenants', 'plans' e 'saas_config']
+        const [tenantsRes, plansRes, configRes] = await Promise.all([
+          supabase
+            .from("tenants")
+            .select("*")
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("plans")
+            .select("*")
+            .order("price", { ascending: true }),
+          supabase
+            .from("saas_config")
+            .select("*")
+            .eq("id", "default")
+            .maybeSingle(),
+        ]);
+
+        if (isMounted) {
+          // [Método Array.map: normaliza os campos snake_case do PostgreSQL para camelCase]
+          if (tenantsRes.data) {
+            setTenants(
+              tenantsRes.data.map((t) => ({
+                id: t.id,
+                name: t.name,
+                slug: t.slug,
+                ownerName: t.owner_name || "Gestor",
+                ownerEmail: t.owner_email || "gestor@barbearia.com",
+                ownerPhone: t.phone || "Não informado",
+                plan: t.plan || "pro",
+                status: t.status || "active",
+                barbersCount: Number(t.barbers_count || 1),
+                mrr: Number(
+                  t.mrr ||
+                    (t.plan === "enterprise"
+                      ? 279.9
+                      : t.plan === "starter"
+                        ? 69.9
+                        : 149.9),
+                ),
+                trialDaysLeft: Number(t.trial_days_left || 0),
+                hasWhiteLabel: Boolean(t.has_white_label),
+                brandPrimary: t.brand_primary || "#ea580c",
+                brandSecondary: t.brand_secondary || "#16a34a",
+                logoUrl: t.logo_url || "",
+              })),
+            );
+          }
+
+          // [Atualização de estado: popula o array dinâmico de planos]
+          if (plansRes.data && plansRes.data.length > 0) {
+            setPlans(
+              plansRes.data.map((p) => ({
+                id: p.id,
+                name: p.name,
+                price: Number(p.price || 0),
+                maxBarbers: Number(p.max_barbers || 1),
+                extraBarberPrice: Number(p.extra_barber_price || 0),
+                tag: p.tag || "",
+                active: p.active !== false,
+                nubankPaymentLink: p.nubank_payment_link || "",
+                features: Array.isArray(p.features) ? p.features : [],
+              })),
+            );
+          }
+
+          // [Método de atualização de estado: sincroniza dados bancários Nubank PJ uma única vez]
+          if (configRes.data) {
+            setNubankConfig({
+              pixKey: configRes.data.pix_key || "",
+              companyName: configRes.data.company_name || "",
+              supportWhatsapp: configRes.data.support_whatsapp || "",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar dados do Supabase:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    fetchAllData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // ========================================================
   // ESTADOS DE MODAIS DE AÇÕES DA TABELA DE TENANTS
@@ -200,18 +175,11 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
     featuresText: "",
   });
 
-  // Configurações Nubank PJ
-  const [nubankConfig, setNubankConfig] = useState({
-    pixKey: "12.345.678/0001-90 (CNPJ)",
-    companyName: "BarberSaaS Tecnologia e Pagamentos LTDA",
-    supportWhatsapp: "(11) 99999-8888",
-  });
-
-  // Cálculos de KPIs
-  const totalTenants = tenants.length;
+  // [Cálculos de KPIs: variáveis computadas diretamente sobre o array tenants para os cards]
   const activeTenantsCount = tenants.filter(
     (t) => t.status === "active",
   ).length;
+
   const trialTenantsCount = tenants.filter((t) => t.status === "trial").length;
   const totalBarbers = tenants.reduce(
     (acc, t) => acc + (Number(t.barbersCount) || 0),
@@ -238,8 +206,8 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
   // HANDLERS DAS AÇÕES EM MODAIS (SUBSTITUINDO OS ALERTS)
   // ========================================================
 
-  // Confirmação de Ativar / Inativar no Modal
-  const handleConfirmToggleStatus = () => {
+  // [Função assíncrona: ativa ou suspende a barbearia persistindo no Supabase]
+  const handleConfirmToggleStatus = async () => {
     if (!tenantToToggleStatus) return;
 
     const isSuspended = tenantToToggleStatus.status === "suspended";
@@ -251,14 +219,28 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
       ),
     );
 
+    const targetId = tenantToToggleStatus.id;
     setTenantToToggleStatus(null);
+
+    try {
+      // Método Supabase: atualiza a coluna status na tabela tenants
+      const { error } = await supabase
+        .from("tenants")
+        .update({ status: newStatus })
+        .eq("id", targetId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erro ao alterar status do tenant no Supabase:", err);
+    }
   };
 
-  // Confirmação de Adição de Bônus de Teste (+Dias) no Modal
-  const handleConfirmBonusDays = () => {
+  // [Função assíncrona: estende o período de testes da barbearia diretamente no banco]
+  const handleConfirmBonusDays = async () => {
     if (!bonusModalTenant) return;
 
     const daysToAdd = parseInt(bonusDaysInput, 10) || 7;
+    const newDaysLeft = (bonusModalTenant.trialDaysLeft || 0) + daysToAdd;
 
     setTenants((prev) =>
       prev.map((t) =>
@@ -266,13 +248,33 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
           ? {
               ...t,
               status: "trial",
-              trialDaysLeft: (t.trialDaysLeft || 0) + daysToAdd,
+              trialDaysLeft: newDaysLeft,
             }
           : t,
       ),
     );
 
+    const targetId = bonusModalTenant.id;
     setBonusModalTenant(null);
+
+    try {
+      const newTrialDate = new Date();
+      newTrialDate.setDate(newTrialDate.getDate() + newDaysLeft);
+
+      // Método Supabase: atualiza a data de expiração e os dias restantes
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          status: "trial",
+          trial_days_left: newDaysLeft,
+          trial_ends_at: newTrialDate.toISOString(),
+        })
+        .eq("id", targetId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erro ao estender bônus no Supabase:", err);
+    }
   };
 
   // Abertura do Modal de Cobrança do Plano Vigente
@@ -284,9 +286,12 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
     });
   };
 
-  // Salvar Edição de Assinatura do Tenant
-  const handleSaveTenantChanges = () => {
+  // [Função assíncrona: persiste o novo plano de assinatura e status no Supabase]
+  const handleSaveTenantChanges = async () => {
     if (!selectedTenantForEdit) return;
+
+    const newMrr =
+      editPlan === "starter" ? 69.9 : editPlan === "pro" ? 149.9 : 279.9;
 
     setTenants((prev) =>
       prev.map((t) =>
@@ -295,18 +300,32 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
               ...t,
               plan: editPlan,
               status: editStatus,
-              mrr:
-                editPlan === "starter"
-                  ? 69.9
-                  : editPlan === "pro"
-                    ? 149.9
-                    : 279.9,
+              mrr: newMrr,
             }
           : t,
       ),
     );
 
+    const targetId = selectedTenantForEdit.id;
     setSelectedTenantForEdit(null);
+
+    try {
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          plan: editPlan,
+          status: editStatus,
+          mrr: newMrr,
+        })
+        .eq("id", targetId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error(
+        "Erro ao salvar alterações de assinatura no Supabase:",
+        err,
+      );
+    }
   };
 
   // White-Label
@@ -318,7 +337,8 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
     setWlActive(tenant.hasWhiteLabel || false);
   };
 
-  const handleSaveWhiteLabel = () => {
+  // [Função assíncrona: salva as cores e logo personalizadas da barbearia no banco]
+  const handleSaveWhiteLabel = async () => {
     if (!selectedTenantForWhiteLabel) return;
 
     setTenants((prev) =>
@@ -335,14 +355,48 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
       ),
     );
 
+    const targetId = selectedTenantForWhiteLabel.id;
     setSelectedTenantForWhiteLabel(null);
+
+    try {
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          has_white_label: wlActive,
+          brand_primary: wlPrimary,
+          brand_secondary: wlSecondary,
+          logo_url: wlLogoUrl,
+        })
+        .eq("id", targetId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erro ao salvar White-Label no Supabase:", err);
+    }
   };
 
-  // Gestão de Planos
-  const handleTogglePlanActive = (planId) => {
+  // [Função assíncrona: ativa ou inativa plano e persiste no Supabase]
+  const handleTogglePlanActive = async (planId) => {
+    const currentPlan = plans.find((p) => p.id === planId);
+    if (!currentPlan) return;
+    const newActiveState = !currentPlan.active;
+
+    // [Otimismo visual: atualiza o array plans localmente]
     setPlans((prev) =>
-      prev.map((p) => (p.id === planId ? { ...p, active: !p.active } : p)),
+      prev.map((p) => (p.id === planId ? { ...p, active: newActiveState } : p)),
     );
+
+    try {
+      // [Método Supabase: executa update na tabela 'plans']
+      const { error } = await supabase
+        .from("plans")
+        .update({ active: newActiveState })
+        .eq("id", planId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erro ao atualizar status do plano no Supabase:", err);
+    }
   };
 
   const handleOpenCreatePlan = () => {
@@ -376,47 +430,75 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
     setPlanModalMode("edit");
   };
 
-  const handleSavePlanSubmit = () => {
+  // [Função assíncrona: cria ou edita plano persistindo na tabela 'plans' do Supabase]
+  const handleSavePlanSubmit = async () => {
     if (!planForm.name || !planForm.price) return;
 
+    // [Variável array: converte linhas de texto em lista limpa de strings]
     const featuresList = planForm.featuresText
       .split("\n")
       .map((f) => f.trim())
       .filter(Boolean);
 
-    if (planModalMode === "create") {
-      const newPlan = {
-        id: planForm.name.toLowerCase().replace(/\s+/g, "-"),
-        name: planForm.name,
-        price: Number(planForm.price),
-        maxBarbers: Number(planForm.maxBarbers),
-        extraBarberPrice: Number(planForm.extraBarberPrice || 0),
-        tag: planForm.tag || "Novo",
-        active: planForm.active,
-        nubankPaymentLink: planForm.nubankPaymentLink,
-        features: featuresList,
-      };
-      setPlans((prev) => [...prev, newPlan]);
-    } else {
-      setPlans((prev) =>
-        prev.map((p) =>
-          p.id === planForm.id
-            ? {
-                ...p,
-                name: planForm.name,
-                price: Number(planForm.price),
-                maxBarbers: Number(planForm.maxBarbers),
-                extraBarberPrice: Number(planForm.extraBarberPrice || 0),
-                tag: planForm.tag,
-                active: planForm.active,
-                nubankPaymentLink: planForm.nubankPaymentLink,
-                features: featuresList,
-              }
-            : p,
-        ),
-      );
+    // [Objeto payload: formata dados para as colunas do PostgreSQL]
+    const planPayload = {
+      name: planForm.name,
+      price: Number(planForm.price),
+      max_barbers: Number(planForm.maxBarbers),
+      extra_barber_price: Number(planForm.extraBarberPrice || 0),
+      tag: planForm.tag || "Novo",
+      active: planForm.active,
+      nubank_payment_link: planForm.nubankPaymentLink,
+      features: featuresList,
+    };
+
+    try {
+      if (planModalMode === "create") {
+        const generatedId = planForm.name.toLowerCase().replace(/\s+/g, "-");
+        // [Método Supabase insert: insere novo registro na tabela 'plans']
+        const { error } = await supabase
+          .from("plans")
+          .insert({ id: generatedId, ...planPayload });
+
+        if (error) throw error;
+
+        setPlans((prev) => [
+          ...prev,
+          {
+            id: generatedId,
+            ...planPayload,
+            maxBarbers: planPayload.max_barbers,
+            extraBarberPrice: planPayload.extra_barber_price,
+            nubankPaymentLink: planPayload.nubank_payment_link,
+          },
+        ]);
+      } else {
+        // [Método Supabase update: atualiza plano existente filtrando por id]
+        const { error } = await supabase
+          .from("plans")
+          .update(planPayload)
+          .eq("id", planForm.id);
+
+        if (error) throw error;
+
+        setPlans((prev) =>
+          prev.map((p) =>
+            p.id === planForm.id
+              ? {
+                  ...p,
+                  ...planPayload,
+                  maxBarbers: planPayload.max_barbers,
+                  extraBarberPrice: planPayload.extra_barber_price,
+                  nubankPaymentLink: planPayload.nubank_payment_link,
+                }
+              : p,
+          ),
+        );
+      }
+      setPlanModalMode(null);
+    } catch (err) {
+      console.error("Erro ao salvar plano no Supabase:", err);
     }
-    setPlanModalMode(null);
   };
 
   const bestTextColorOnPrimary = getBestContrastTextColor(wlPrimary);
@@ -665,133 +747,144 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
                   </div>
                 </div>
 
-                <Table
-                  data={filteredTenants}
-                  keyField="id"
-                  selectable={false}
-                  columns={[
-                    {
-                      key: "name",
-                      label: "Barbearia",
-                      render: (row) => (
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-white text-xs">
-                              {row.name}
-                            </span>
-                            {row.hasWhiteLabel && (
-                              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-amber-500 text-neutral-950">
-                                White-Label
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] font-mono text-amber-500">
-                            app.barbersaas.com/{row.slug}
-                          </span>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "ownerName",
-                      label: "Dono & Contato",
-                      render: (row) => (
-                        <div className="flex flex-col">
-                          <span className="text-neutral-200 font-medium">
-                            {row.ownerName}
-                          </span>
-                          <span className="text-[10px] text-neutral-400">
-                            {row.ownerPhone}
-                          </span>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "plan",
-                      label: "Plano Vigente",
-                      render: (row) => {
-                        const planObj = plans.find((p) => p.id === row.plan);
-                        return (
+                {/* [Renderização condicional: consome isLoading para exibir indicador de carregamento] */}
+                {isLoading ? (
+                  <div className="py-16 text-center text-xs text-neutral-400 font-mono animate-pulse">
+                    Carregando barbearias e planos do Supabase...
+                  </div>
+                ) : (
+                  <Table
+                    data={filteredTenants}
+                    keyField="id"
+                    selectable={false}
+                    columns={[
+                      {
+                        key: "name",
+                        label: "Barbearia",
+                        render: (row) => (
                           <div className="flex flex-col">
-                            <span className="text-xs font-bold uppercase text-white font-mono">
-                              {planObj?.name || row.plan}
-                            </span>
-                            <span className="text-[10px] text-emerald-400 font-mono">
-                              R$ {Number(planObj?.price || row.mrr).toFixed(2)}
-                              /mês
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-white text-xs">
+                                {row.name}
+                              </span>
+                              {row.hasWhiteLabel && (
+                                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-amber-500 text-neutral-950">
+                                  White-Label
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] font-mono text-amber-500">
+                              app.barbersaas.com/{row.slug}
                             </span>
                           </div>
-                        );
+                        ),
                       },
-                    },
-                    {
-                      key: "status",
-                      label: "Status de Acesso",
-                      render: (row) => {
-                        const map = {
-                          active: { label: "Ativa", status: "completed" },
-                          trial: {
-                            label: `Trial (${row.trialDaysLeft}d)`,
-                            status: "confirmed",
-                          },
-                          overdue: { label: "Inadimplente", status: "waiting" },
-                          suspended: {
-                            label: "Inativa ✕",
-                            status: "cancelled",
-                          },
-                        };
-                        const curr = map[row.status] || map.active;
-                        return (
-                          <Badge
-                            status={curr.status}
-                            label={curr.label}
-                            size="sm"
-                          />
-                        );
+                      {
+                        key: "ownerName",
+                        label: "Dono & Contato",
+                        render: (row) => (
+                          <div className="flex flex-col">
+                            <span className="text-neutral-200 font-medium">
+                              {row.ownerName}
+                            </span>
+                            <span className="text-[10px] text-neutral-400">
+                              {row.ownerPhone}
+                            </span>
+                          </div>
+                        ),
                       },
-                    },
-                  ]}
-                  actions={[
-                    {
-                      label: "Enviar Cobrança / Link Nubank PJ",
-                      icon: "💳",
-                      onClick: (row) => handleOpenBilling(row),
-                    },
-                    {
-                      label: "Acessar como Barbearia (Impersonate)",
-                      icon: "🚀",
-                      onClick: (row) =>
-                        onImpersonateTenant && onImpersonateTenant(row),
-                    },
-                    {
-                      label: "Configurar Cores e White-Label",
-                      icon: "🎨",
-                      onClick: (row) => handleOpenWhiteLabelModal(row),
-                    },
-                    {
-                      label: "Editar Assinatura e Status",
-                      icon: "⚙️",
-                      onClick: (row) => {
-                        setSelectedTenantForEdit(row);
-                        setEditPlan(row.plan);
-                        setEditStatus(row.status);
+                      {
+                        key: "plan",
+                        label: "Plano Vigente",
+                        render: (row) => {
+                          const planObj = plans.find((p) => p.id === row.plan);
+                          return (
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold uppercase text-white font-mono">
+                                {planObj?.name || row.plan}
+                              </span>
+                              <span className="text-[10px] text-emerald-400 font-mono">
+                                R${" "}
+                                {Number(planObj?.price || row.mrr).toFixed(2)}
+                                /mês
+                              </span>
+                            </div>
+                          );
+                        },
                       },
-                    },
-                    {
-                      label: "Inativar ou Ativar Acesso",
-                      icon: "⏸️",
-                      isDanger: true,
-                      onClick: (row) => setTenantToToggleStatus(row),
-                    },
-                    {
-                      label: "Conceder Bônus de Teste (+Dias)",
-                      icon: "🎁",
-                      onClick: (row) => {
-                        setBonusModalTenant(row);
-                        setBonusDaysInput("7");
+                      {
+                        key: "status",
+                        label: "Status de Acesso",
+                        render: (row) => {
+                          const map = {
+                            active: { label: "Ativa", status: "completed" },
+                            trial: {
+                              label: `Trial (${row.trialDaysLeft}d)`,
+                              status: "confirmed",
+                            },
+                            overdue: {
+                              label: "Inadimplente",
+                              status: "waiting",
+                            },
+                            suspended: {
+                              label: "Inativa ✕",
+                              status: "cancelled",
+                            },
+                          };
+                          const curr = map[row.status] || map.active;
+                          return (
+                            <Badge
+                              status={curr.status}
+                              label={curr.label}
+                              size="sm"
+                            />
+                          );
+                        },
                       },
-                    },
-                  ]}
-                />
+                    ]}
+                    actions={[
+                      {
+                        label: "Enviar Cobrança / Link Nubank PJ",
+                        icon: "💳",
+                        onClick: (row) => handleOpenBilling(row),
+                      },
+                      {
+                        label: "Acessar como Barbearia (Impersonate)",
+                        icon: "🚀",
+                        onClick: (row) =>
+                          onImpersonateTenant && onImpersonateTenant(row),
+                      },
+                      {
+                        label: "Configurar Cores e White-Label",
+                        icon: "🎨",
+                        onClick: (row) => handleOpenWhiteLabelModal(row),
+                      },
+                      {
+                        label: "Editar Assinatura e Status",
+                        icon: "⚙️",
+                        onClick: (row) => {
+                          setSelectedTenantForEdit(row);
+                          setEditPlan(row.plan);
+                          setEditStatus(row.status);
+                        },
+                      },
+                      {
+                        label: "Inativar ou Ativar Acesso",
+                        icon: "⏸️",
+                        isDanger: true,
+                        onClick: (row) => setTenantToToggleStatus(row),
+                      },
+                      {
+                        label: "Conceder Bônus de Teste (+Dias)",
+                        icon: "🎁",
+                        onClick: (row) => {
+                          setBonusModalTenant(row);
+                          setBonusDaysInput("7");
+                        },
+                      },
+                    ]}
+                  />
+                )}
               </div>
             </div>
           )}
@@ -977,12 +1070,44 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
                   />
                 </div>
 
-                <div className="flex justify-end pt-2">
+                <div className="flex items-center justify-between pt-2">
+                  {/* [Feedback de UX: indicador de sucesso inline sem alertas intrusivos] */}
+                  {saveSuccessMsg ? (
+                    <span className="text-xs font-bold text-emerald-400">
+                      {saveSuccessMsg}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+
+                  {/* [Função assíncrona: upsert dos dados bancários institucionais no Supabase] */}
                   <Button
                     variant="primary"
-                    onClick={() =>
-                      alert("Configurações do Nubank PJ salvas com sucesso!")
-                    }
+                    onClick={async () => {
+                      try {
+                        const { error } = await supabase
+                          .from("saas_config")
+                          .upsert({
+                            id: "default",
+                            pix_key: nubankConfig.pixKey,
+                            company_name: nubankConfig.companyName,
+                            support_whatsapp: nubankConfig.supportWhatsapp,
+                            updated_at: new Date().toISOString(),
+                          });
+
+                        if (!error) {
+                          setSaveSuccessMsg(
+                            "✓ Dados do Nubank PJ salvos com sucesso!",
+                          );
+                          setTimeout(() => setSaveSuccessMsg(""), 4000);
+                        }
+                      } catch (err) {
+                        console.error(
+                          "Erro ao salvar dados do Nubank no Supabase:",
+                          err,
+                        );
+                      }
+                    }}
                     className="text-xs py-2 px-5 bg-purple-600 hover:bg-purple-500 font-extrabold"
                   >
                     Salvar Dados da Conta PJ
@@ -1186,17 +1311,17 @@ export default function SuperAdminDashboard({ onImpersonateTenant, onLogout }) {
                   value={billingTenantModal.plan.nubankPaymentLink}
                   className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs font-mono p-2.5 rounded-xl outline-none"
                 />
+                {/* [Ação: copia para a área de transferência de forma silenciosa e moderna] */}
                 <Button
                   variant="secondary"
                   onClick={() => {
                     navigator.clipboard.writeText(
                       billingTenantModal.plan.nubankPaymentLink,
                     );
-                    alert("Link do Nubank PJ copiado!");
                   }}
                   className="text-xs py-2 px-3 shrink-0"
                 >
-                  Copiar
+                  Copiar Link
                 </Button>
               </div>
             </div>

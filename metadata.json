@@ -1,0 +1,7 @@
+{
+  "name": "Barbearia SaaS - Plataforma de Gestão",
+  "description": "Sistema SaaS para barbearias com agendamentos, comissões, gestão de equipe e rotina de testes.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

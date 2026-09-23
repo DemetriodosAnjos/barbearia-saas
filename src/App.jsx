@@ -6,6 +6,7 @@ import Login from "./pages/Auth/Login";
 import SuperAdminDashboard from "./pages/SuperAdmin/SuperAdminDashboard";
 import BarbershopDashboard from "./pages/BarbershopAdmin/BarbershopDashboard";
 import ClientBookingView from "./pages/ClientBooking/ClientBookingView";
+import QAPanel from "./pages/QAPanel/QAPanel";
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -244,6 +245,18 @@ export default function App() {
         >
           🎨 UI Kit
         </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentScreen("qa-panel")}
+          className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+            currentScreen === "qa-panel"
+              ? "bg-amber-600 text-white shadow-xs"
+              : "text-neutral-400 hover:text-white bg-neutral-800/60"
+          }`}
+        >
+          🧪 QA Studio
+        </button>
       </div>
 
       {/* 1. APP DO CLIENTE: Consome os barbeiros e serviços reais! */}
@@ -287,6 +300,8 @@ export default function App() {
       )}
 
       {currentScreen === "design-system" && <DesignSystem />}
+
+      {currentScreen === "qa-panel" && <QAPanel />}
     </div>
   );
 }

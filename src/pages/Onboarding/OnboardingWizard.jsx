@@ -1,4 +1,6 @@
 import { useState } from "react";
+// [Import: cliente Supabase para cadastro real de usuário no Auth e criação de tenant]
+import { supabase } from "../../lib/supabase";
 import { onboardingStyles } from "./Onboarding.styles";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
@@ -26,6 +28,9 @@ export default function OnboardingWizard({
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // [Estado: captura erros reais retornados pelo Supabase Auth e PostgreSQL]
+  const [apiError, setApiError] = useState("");
 
   const updateField = (field, value) => {
     setFormData((prev) => {
@@ -133,29 +138,76 @@ export default function OnboardingWizard({
     return Object.keys(errs).length === 0;
   };
 
-  // Finalização direto no Passo 2!
-  const handleFinish = () => {
+  // [Função assíncrona: cria a conta no Supabase Auth e registra a nova barbearia no banco]
+  const handleFinish = async () => {
     if (!validateStep2()) return;
 
     setIsLoading(true);
+    setApiError("");
 
-    setTimeout(() => {
-      setIsLoading(false);
-      alert(
-        `🎉 BEM-VINDO AO BARBERSAAS!\n\n` +
-          `• Estabelecimento: ${formData.barbershopName}\n` +
-          `• Link da Barbearia: app.barbersaas.com/${formData.slug}\n` +
-          `• Período de Testes: 7 DIAS GRÁTIS ATIVADOS!\n\n` +
-          `Acessando o painel de controle da sua barbearia agora...`,
-      );
+    try {
+      // 1. Método Supabase Auth: cadastra o gestor com seus metadados
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email.trim(),
+        password: formData.password,
+        options: {
+          data: {
+            name: formData.ownerName.trim(),
+            role: "owner",
+          },
+        },
+      });
+
+      if (authError) throw authError;
+
+      // 2. Data de término do teste (7 dias corridos)
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+
+      // 3. Método Supabase: insere a barbearia na tabela tenants
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .insert([
+          {
+            name: formData.barbershopName.trim(),
+            slug: formData.slug.trim(),
+            phone: formData.phone.trim(),
+            owner_id: authData?.user?.id || null,
+            trial_ends_at: trialEndsAt.toISOString(),
+            status: "active",
+          },
+        ])
+        .select()
+        .single();
+
+      // [Leitura ativa: lança exceção caso ocorra erro na criação do tenant no PostgreSQL]
+      if (tenantError) throw tenantError;
+
+      const finalTenant = tenantData || {
+        id: `tnt-${Date.now()}`,
+        name: formData.barbershopName.trim(),
+        slug: formData.slug.trim(),
+        phone: formData.phone.trim(),
+        trial_ends_at: trialEndsAt.toISOString(),
+        trialDaysLeft: 7,
+      };
 
       if (onCompleteOnboarding) {
         onCompleteOnboarding({
-          ...formData,
-          trialDaysLeft: 7, // Inicia com 7 dias de teste!
+          user: authData?.user,
+          tenant: finalTenant,
+          trialDaysLeft: 7,
         });
       }
-    }, 1500);
+    } catch (err) {
+      console.error("Erro ao concluir onboarding no Supabase:", err);
+      setApiError(
+        err.message ||
+          "Erro ao criar conta no banco de dados. Tente novamente.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -209,6 +261,19 @@ export default function OnboardingWizard({
 
         {/* CARD DO FORMULÁRIO */}
         <div className={onboardingStyles.cardForm}>
+          {/* [Alerta visual de erro da API do Supabase sem popup de alert nativo] */}
+          {apiError && (
+            <div className="mb-4">
+              <Alert
+                variant="error"
+                title="Falha no Cadastro"
+                onClose={() => setApiError("")}
+              >
+                {apiError}
+              </Alert>
+            </div>
+          )}
+
           {/* ETAPA 1: ACESSO DO DONO */}
           {currentStep === 1 && (
             <div className="space-y-4">
@@ -222,10 +287,22 @@ export default function OnboardingWizard({
                 </p>
               </div>
 
-              {/* Botão Google */}
+              {/* [Ação: autenticação oficial do Google via Supabase Auth] */}
               <button
                 type="button"
-                onClick={() => alert("Simulação de Cadastro com Google OAuth!")}
+                onClick={async () => {
+                  try {
+                    await supabase.auth.signInWithOAuth({
+                      provider: "google",
+                      options: { redirectTo: window.location.origin },
+                    });
+                  } catch (err) {
+                    console.error("Erro no cadastro com Google:", err);
+                    setApiError(
+                      "Não foi possível iniciar o cadastro com o Google.",
+                    );
+                  }
+                }}
                 className={onboardingStyles.googleButton}
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
