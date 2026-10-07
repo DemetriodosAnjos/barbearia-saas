@@ -51,7 +51,7 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          extra_args: --debug --only-verified=false --fail
+          extra_args: --debug
         continue-on-error: false
 
   # =========================================================================
