@@ -456,6 +456,32 @@ export default function Login({
                 </span>
               )}
             </Button>
+
+            {/* Acesso de Teste Rápido como Dono da Barbearia */}
+            <div className="pt-2 border-t border-neutral-800/80">
+              <button
+                type="button"
+                onClick={() => {
+                  const ownerTestUser = {
+                    id: "owner-usr-01",
+                    email: email.trim() || "dono@barbearia.com",
+                    user_metadata: {
+                      role: "admin",
+                      name: "Carlos Silva (Dono da Barbearia)",
+                      barbershop_name: "Vintage Club Barber Shop",
+                    },
+                  };
+                  if (onLoginSuccess) {
+                    onLoginSuccess(ownerTestUser);
+                  }
+                }}
+                className="w-full py-2.5 px-3 rounded-xl border border-amber-600/40 bg-amber-950/20 hover:bg-amber-900/30 text-amber-300 hover:text-amber-200 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                title="Acesse instantaneamente o painel como dono da barbearia para testes"
+              >
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Testar como Dono da Barbearia</span>
+              </button>
+            </div>
           </form>
         </div>
 

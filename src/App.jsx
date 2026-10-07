@@ -43,7 +43,7 @@ export default function App() {
     if (isDirectProtectedUrl) return "login";
     if (urlScreen) return urlScreen;
     if (urlBarber) return "login";
-    return "client-app"; // Tela padrão inicial do SaaS: App de Agendamentos do Cliente
+    return "login"; // Revela apenas Login.jsx por padrão para o fluxo de autenticação do dono
   })();
 
   const [currentScreen, setCurrentScreen] = useState(initialScreen);
@@ -404,6 +404,48 @@ export default function App() {
   };
 
   // 1. Tela de Carregamento
+  // 1. Se estiver na tela de login, revela única e exclusivamente o Login.jsx
+  if (currentScreen === "login") {
+    return (
+      <ErrorBoundary componentName="Tela de Login">
+        <Login
+          onGoToSignup={() => setCurrentScreen("onboarding")}
+          onLoginSuccess={(loggedUser) => {
+            const role = loggedUser?.user_metadata?.role || USER_ROLES.ADMIN;
+            const userWithRole = {
+              ...loggedUser,
+              user_metadata: {
+                ...(loggedUser?.user_metadata || {}),
+                role: role,
+              },
+            };
+            setCurrentUser(userWithRole);
+            setActiveUserRole(role);
+            setCurrentScreen("barbershop");
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
+
+  // 2. Se estiver no onboarding, exibe o assistente isolado
+  if (currentScreen === "onboarding") {
+    return (
+      <ErrorBoundary componentName="Onboarding Wizard">
+        <OnboardingWizard
+          onGoToLogin={() => setCurrentScreen("login")}
+          onCompleteOnboarding={({ user: newUser, tenant: newTenant }) => {
+            if (newUser) setCurrentUser(newUser);
+            if (newTenant) setTenant(newTenant);
+            setActiveUserRole(USER_ROLES.ADMIN);
+            setCurrentScreen("barbershop");
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
+
+  // 3. Tela de Carregamento para rotas autenticadas/operacionais
   if (loadingData) {
     return (
       <div className="min-h-screen w-full bg-neutral-950 flex flex-col items-center justify-center gap-3">
@@ -415,7 +457,7 @@ export default function App() {
     );
   }
 
-  // 2. Tela de Erro de Conexão
+  // 4. Tela de Erro de Conexão
   if (connectionError) {
     return (
       <div className="min-h-screen w-full bg-neutral-950 flex flex-col items-center justify-center p-6 text-center">
@@ -437,9 +479,12 @@ export default function App() {
     );
   }
 
+  const showDevNav = urlParams.get("dev") === "true";
+
   return (
     <div>
-      {/* Barra de Navegação Central do SaaS */}
+      {/* Barra de Navegação Central do SaaS (Apenas visível se ?dev=true) */}
+      {showDevNav && (
       <div className="bg-neutral-900 border-b border-neutral-800 p-2.5 flex flex-wrap items-center justify-between gap-3 text-xs z-50 sticky top-0 shadow-lg select-none">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-neutral-500 font-bold self-center">
@@ -539,12 +584,13 @@ export default function App() {
           </select>
         </div>
       </div>
+      )}
 
       {/* Indicador discreto de resiliência e status offline */}
-      <OfflineBanner showSimulator={false} />
+      {showDevNav && <OfflineBanner showSimulator={false} />}
 
       {/* Aviso não-bloqueante de contingência de contrato Zod */}
-      {contractNotice && (
+      {showDevNav && contractNotice && (
         <div className="p-3 bg-neutral-900 border-b border-amber-500/20">
           <PartialDataNotice
             entityName="dados do SaaS"
