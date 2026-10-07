@@ -1,7 +1,7 @@
 export const timelineColumnStyles = {
-  // Coluna individual do barbeiro
+  // Coluna individual do barbeiro com largura expandida para evitar apinhamento
   column:
-    "relative flex-1 min-w-[240px] max-w-[320px] bg-neutral-950 border-r border-neutral-800/80 flex flex-col select-none",
+    "relative flex-1 min-w-[290px] md:min-w-[320px] max-w-[400px] bg-neutral-950 border-r border-neutral-800/80 flex flex-col select-none",
 
   // Cabeçalho Fixo do Barbeiro
   header:
@@ -13,7 +13,7 @@ export const timelineColumnStyles = {
   role: "text-[10px] text-neutral-400 truncate",
 
   // Corpo da Régua Horária
-  timelineBody: "relative w-full overflow-hidden",
+  timelineBody: "relative w-full",
 
   // Cada Linha da Hora (Grid de fundo)
   hourSlot:
@@ -23,12 +23,12 @@ export const timelineColumnStyles = {
 
   // Bloco de Pausa / Almoço (Faixas diagonais)
   breakBlock:
-    "absolute inset-x-2 rounded-xl border border-neutral-800 ... z-10 select-none",
+    "absolute inset-x-2 rounded-xl border border-neutral-800 bg-neutral-900/80 z-10 select-none flex items-center justify-center pointer-events-none",
   breakText:
     "text-[11px] font-semibold text-neutral-400 tracking-wide flex items-center gap-1.5 bg-neutral-900/90 px-3 py-1 rounded-md border border-neutral-700/60 shadow-xs",
 
   // Camada onde os cards de agendamento são posicionados
-  cardsLayer: "absolute inset-0 px-2 pointer-events-none z-20",
+  cardsLayer: "absolute inset-0 px-1 pointer-events-none z-20",
   cardWrapper:
-    "absolute inset-x-2 pointer-events-auto transition-all duration-150",
+    "absolute pointer-events-auto transition-all duration-150 hover:z-40 focus-within:z-50",
 };

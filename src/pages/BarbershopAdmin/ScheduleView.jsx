@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para persistência de agendamentos e alterações de status]
 import { supabase } from "../../lib/supabase";
 import { scheduleStyles } from "./ScheduleView.styles";
@@ -9,9 +10,13 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
+import ProjectIcon from "../../components/ui/ProjectIcon";
+import { SafeHtml } from "../../components/ui/SafeHtml";
+import MercadoPagoCheckoutModal from "../../components/payments/MercadoPagoCheckoutModal";
 
 // [Função componente: consome serviços reais sem catálogo fictício de fallback]
 export default function ScheduleView({
+  tenant,
   barbers = [],
   appointments = [],
   onUpdateAppointments,
@@ -33,6 +38,7 @@ export default function ScheduleView({
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
+  const [isMercadoPagoModalOpen, setIsMercadoPagoModalOpen] = useState(false);
 
   // Estados do Modo Edição
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
@@ -72,8 +78,9 @@ export default function ScheduleView({
       return;
     }
 
+    const cleanServiceName = DOMPurify.sanitize(quickServiceName.trim(), { ALLOWED_TAGS: [] });
     const servicePayload = {
-      name: quickServiceName.trim(),
+      name: cleanServiceName,
       category: "Cabelo",
       duration_minutes: Number(quickServiceDuration),
       price: Number(quickServicePrice),
@@ -218,15 +225,15 @@ export default function ScheduleView({
     const updatedAppt = {
       ...selectedAppointment,
       barberId: selectedBarber?.id || "",
-      barberName: selectedBarber?.name || "Barbeiro",
+      barberName: DOMPurify.sanitize(selectedBarber?.name || "Barbeiro", { ALLOWED_TAGS: [] }),
       serviceId: selectedService?.id || "",
-      serviceName: selectedService?.name || "Serviço",
+      serviceName: DOMPurify.sanitize(selectedService?.name || "Serviço", { ALLOWED_TAGS: [] }),
       durationMinutes: duration,
       startTime: editForm.startTime,
       endTime: newEndTime,
       price: Number(editForm.price || selectedService?.price || 0),
-      notes: editForm.notes,
-      hasNotes: Boolean(editForm.notes),
+      notes: DOMPurify.sanitize(editForm.notes || "", { ALLOWED_TAGS: ["b", "i", "strong", "em"] }),
+      hasNotes: Boolean(editForm.notes?.trim()),
     };
 
     const updatedList = currentAppointments.map((a) =>
@@ -283,16 +290,29 @@ export default function ScheduleView({
     const targetBarberName = targetBarber ? targetBarber.name : "Barbeiro";
 
     // Conflito de Almoço
-    const barberBreaks = targetBarber?.breaks || [];
+    const rawBreaks = Array.isArray(targetBarber?.breaks)
+      ? targetBarber.breaks
+      : Array.isArray(targetBarber?.breaks?.intervals)
+      ? targetBarber.breaks.intervals
+      : [];
+    const barberBreaks = [...rawBreaks];
+    if (barberBreaks.length === 0 && Array.isArray(targetBarber?.schedule)) {
+      targetBarber.schedule.forEach((s) => {
+        if (s?.breakStart && s?.breakEnd) {
+          barberBreaks.push({ startTime: s.breakStart, endTime: s.breakEnd });
+        }
+      });
+    }
+
     const hasLunchConflict = barberBreaks.some((brk) => {
-      const bStart = timeToMins(brk.startTime);
-      const bEnd = timeToMins(brk.endTime);
+      const bStart = timeToMins(brk.startTime || brk.start_time || brk.breakStart);
+      const bEnd = timeToMins(brk.endTime || brk.end_time || brk.breakEnd);
       return newStartMins < bEnd && newEndMins > bStart;
     });
 
     if (hasLunchConflict) {
       alert(
-        `⚠️ CONFLITO COM ALMOÇO:\n\n${targetBarberName} está em intervalo de almoço neste horário.`,
+        `CONFLITO COM ALMOÇO:\n\n${targetBarberName} está em intervalo de almoço neste horário.`,
       );
       return;
     }
@@ -310,7 +330,7 @@ export default function ScheduleView({
 
     if (hasConflict) {
       alert(
-        `⚠️ CONFLITO DE HORÁRIO:\n\n${targetBarberName} já possui atendimento marcado neste horário.`,
+        `CONFLITO DE HORÁRIO:\n\n${targetBarberName} já possui atendimento marcado neste horário.`,
       );
       return;
     }
@@ -332,6 +352,21 @@ export default function ScheduleView({
     }
   };
 
+  const getNextAvailableTimeSlot = () => {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    let nextM = Math.ceil((m + 5) / 15) * 15;
+    let nextH = h;
+    if (nextM >= 60) {
+      nextH += 1;
+      nextM = 0;
+    }
+    if (nextH < 8) return "08:00";
+    if (nextH >= 20) return "08:00";
+    return `${String(nextH).padStart(2, "0")}:${String(nextM).padStart(2, "0")}`;
+  };
+
   const handleSlotClick = (barberId, time) => {
     setPrefilledBarberId(barberId);
     setPrefilledTime(time);
@@ -343,11 +378,11 @@ export default function ScheduleView({
     setSelectedAppointment(null);
     if (appt.isPaid) {
       alert(
-        `✅ ATENDIMENTO CONCLUÍDO!\n\n• Cliente: ${appt.clientName}\n• Quitado e finalizado com sucesso!`,
+        `ATENDIMENTO CONCLUÍDO!\n\n• Cliente: ${appt.clientName}\n• Quitado e finalizado com sucesso!`,
       );
     } else {
       alert(
-        `🧾 ATENDIMENTO CONCLUÍDO (PAGAMENTO PENDENTE):\n\n• Cliente: ${appt.clientName}\n• Valor: R$ ${Number(appt.price).toFixed(2)}\n• Encaminhe o cliente para o caixa.`,
+        `ATENDIMENTO CONCLUÍDO (PAGAMENTO PENDENTE):\n\n• Cliente: ${appt.clientName}\n• Valor: R$ ${Number(appt.price).toFixed(2)}\n• Encaminhe o cliente para o caixa.`,
       );
     }
   };
@@ -369,7 +404,7 @@ export default function ScheduleView({
       <div className={scheduleStyles.headerCard}>
         <div className={scheduleStyles.titleWrapper}>
           <h1 className={scheduleStyles.title}>
-            <span>📅</span>
+            <ProjectIcon name="Calendar" size={24} className="text-amber-500" />
             <span>Agenda Operacional de Atendimentos</span>
           </h1>
           <p className={scheduleStyles.subtitle}>
@@ -383,14 +418,14 @@ export default function ScheduleView({
             <div
               className={`${scheduleStyles.statBadge} ${scheduleStyles.statAppointments}`}
             >
-              <span>✂️</span>
+              <ProjectIcon name="Scissors" size={16} className="text-amber-500" />
               <span>{totalTodayAppointments} cortes hoje</span>
             </div>
 
             <div
               className={`${scheduleStyles.statBadge} ${scheduleStyles.statRevenue}`}
             >
-              <span>💰</span>
+              <ProjectIcon name="DollarSign" size={16} className="text-amber-500" />
               <span>
                 R$ {totalEstimatedRevenue.toFixed(2).replace(".", ",")} previsto
               </span>
@@ -403,7 +438,10 @@ export default function ScheduleView({
               onClick={onBack}
               className="text-xs py-2 px-3"
             >
-              ← Voltar
+              <span className="flex items-center gap-1.5">
+                <ProjectIcon name="ArrowLeft" size={14} colorVariant="inherit" />
+                Voltar
+              </span>
             </Button>
           )}
         </div>
@@ -419,13 +457,13 @@ export default function ScheduleView({
         onSlotClick={handleSlotClick}
         onNewAppointmentClick={() => {
           setPrefilledBarberId(activeBarbers[0]?.id || "");
-          setPrefilledTime("09:00");
+          setPrefilledTime(getNextAvailableTimeSlot());
           setIsNewModalOpen(true);
         }}
         onAppointmentClick={(appt) => handleOpenDetails(appt)}
         onOpenComanda={(id) => {
           if (onNavigateToCashier) onNavigateToCashier(id);
-          else alert(`🧾 Abrindo Comanda #${id} no Caixa!`);
+          else alert(`Abrindo Comanda #${id} no Caixa!`);
         }}
         onStatusChange={handleStatusChange}
         onDropAppointment={handleDropAppointment}
@@ -440,7 +478,7 @@ export default function ScheduleView({
         }}
         title={
           isEditingAppointment
-            ? `✏️ Editar Atendimento: ${selectedAppointment?.clientName}`
+            ? `Editar Atendimento: ${selectedAppointment?.clientName}`
             : `Detalhes do Atendimento #${selectedAppointment?.id}`
         }
         footer={
@@ -478,6 +516,17 @@ export default function ScheduleView({
                     )}
 
                   <div className="flex items-center gap-2 ml-auto">
+                    {!selectedAppointment.isPaid && selectedAppointment.status !== "cancelled" && (
+                      <Button
+                        variant="primary"
+                        onClick={() => setIsMercadoPagoModalOpen(true)}
+                        className="text-xs py-2 px-3.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <ProjectIcon name="CreditCard" size={13} colorVariant="inherit" />
+                        <span>Pagar com Mercado Pago</span>
+                      </Button>
+                    )}
+
                     <Button
                       variant="secondary"
                       onClick={() => setSelectedAppointment(null)}
@@ -493,7 +542,10 @@ export default function ScheduleView({
                           onClick={() => setIsEditingAppointment(true)}
                           className="text-xs py-2 px-3 text-amber-400 border-amber-500/40 hover:bg-amber-500/10"
                         >
-                          ✏️ Editar
+                          <span className="flex items-center gap-1.5">
+                            <ProjectIcon name="Edit3" size={13} colorVariant="inherit" />
+                            Editar
+                          </span>
                         </Button>
                       )}
 
@@ -510,7 +562,10 @@ export default function ScheduleView({
                         }}
                         className="text-xs py-2 px-4 bg-purple-600 hover:bg-purple-500 font-bold"
                       >
-                        ✂️ Iniciar Atendimento
+                        <span className="flex items-center gap-1.5">
+                          <ProjectIcon name="Scissors" size={14} colorVariant="inherit" />
+                          Iniciar Atendimento
+                        </span>
                       </Button>
                     )}
 
@@ -526,9 +581,17 @@ export default function ScheduleView({
                             : "bg-amber-600 hover:bg-amber-500 text-white"
                         }`}
                       >
-                        {selectedAppointment.isPaid
-                          ? "✓ Finalizar Atendimento"
-                          : "🧾 Finalizar o Atendimento"}
+                        {selectedAppointment.isPaid ? (
+                          <span className="flex items-center gap-1.5">
+                            <ProjectIcon name="Check" size={14} colorVariant="inherit" />
+                            Finalizar Atendimento
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5">
+                            <ProjectIcon name="Receipt" size={14} colorVariant="inherit" />
+                            Finalizar o Atendimento
+                          </span>
+                        )}
                       </Button>
                     )}
                   </div>
@@ -548,14 +611,16 @@ export default function ScheduleView({
                       Cliente Agendado
                     </span>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <span>{selectedAppointment.clientName}</span>
+                      <SafeHtml html={selectedAppointment.clientName} />
                       {selectedAppointment.isVip && (
-                        <span className="text-amber-400 text-xs">★ VIP</span>
+                        <span className="text-amber-400 text-xs flex items-center gap-1">
+                          <ProjectIcon name="Star" size={12} className="text-amber-400 fill-amber-400" />
+                          VIP
+                        </span>
                       )}
                     </h3>
                     <p className="text-xs text-neutral-400 font-mono mt-0.5">
-                      {selectedAppointment.clientPhone ||
-                        "Telefone não informado"}
+                      <SafeHtml html={selectedAppointment.clientPhone || "Telefone não informado"} />
                     </p>
                   </div>
                   <Badge status={selectedAppointment.status} />
@@ -566,9 +631,9 @@ export default function ScheduleView({
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
                       Barbeiro:
                     </span>
-                    <strong className="text-amber-400 text-sm flex items-center gap-1 mt-0.5">
-                      <span>💈</span>
-                      <span>{selectedAppointment.barberName}</span>
+                    <strong className="text-amber-400 text-sm flex items-center gap-1.5 mt-0.5">
+                      <ProjectIcon name="Scissors" size={14} className="text-amber-500" />
+                      <SafeHtml html={selectedAppointment.barberName} />
                     </strong>
                   </div>
                   <div>
@@ -576,7 +641,7 @@ export default function ScheduleView({
                       Serviço:
                     </span>
                     <strong className="text-white text-sm block mt-0.5">
-                      {selectedAppointment.serviceName}
+                      <SafeHtml html={selectedAppointment.serviceName} />
                     </strong>
                   </div>
                 </div>
@@ -610,15 +675,34 @@ export default function ScheduleView({
                   <span
                     className={
                       selectedAppointment.isPaid
-                        ? "text-emerald-400 font-bold"
-                        : "text-amber-400 font-bold"
+                        ? "text-emerald-400 font-bold flex items-center gap-1"
+                        : "text-amber-400 font-bold flex items-center gap-1"
                     }
                   >
-                    {selectedAppointment.isPaid
-                      ? "✓ Pago no Caixa"
-                      : "⚠️ Pendente"}
+                    {selectedAppointment.isPaid ? (
+                      <>
+                        <ProjectIcon name="Check" size={13} colorVariant="inherit" />
+                        Pago no Caixa
+                      </>
+                    ) : (
+                      <>
+                        <ProjectIcon name="AlertTriangle" size={13} colorVariant="inherit" />
+                        Pendente
+                      </>
+                    )}
                   </span>
                 </div>
+
+                {selectedAppointment.notes && (
+                  <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-2xl text-xs space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-amber-400 block">
+                      Observações do Atendimento:
+                    </span>
+                    <div className="text-neutral-300">
+                      <SafeHtml html={selectedAppointment.notes} />
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -816,11 +900,45 @@ export default function ScheduleView({
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
         onSaveAppointment={handleSaveNewAppointment}
+        tenant={tenant}
         barbers={activeBarbers.length > 0 ? activeBarbers : barbers}
         services={services}
         prefilledBarberId={prefilledBarberId}
         prefilledTime={prefilledTime}
       />
+
+      {/* MODAL MERCADO PAGO CHECKOUT (PIX / CARTÃO CRÉDITO & DÉBITO) */}
+      {selectedAppointment && (
+        <MercadoPagoCheckoutModal
+          isOpen={isMercadoPagoModalOpen}
+          onClose={() => setIsMercadoPagoModalOpen(false)}
+          appointment={selectedAppointment}
+          tenant={tenant}
+          onPaymentSuccess={(paymentInfo) => {
+            const updatedAppt = {
+              ...selectedAppointment,
+              isPaid: true,
+              status: "completed",
+            };
+            const updatedList = currentAppointments.map((a) =>
+              a.id === selectedAppointment.id ? updatedAppt : a
+            );
+            if (onUpdateAppointments) {
+              onUpdateAppointments(updatedList);
+            }
+            setSelectedAppointment(updatedAppt);
+            setIsMercadoPagoModalOpen(false);
+            try {
+              supabase
+                .from("appointments")
+                .update({ is_paid: true, status: "completed" })
+                .eq("id", selectedAppointment.id);
+            } catch (err) {
+              console.error("Erro ao sincronizar status de pagamento no Supabase:", err);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

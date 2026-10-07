@@ -1,5 +1,6 @@
 import { commissionStyles } from "./CommissionBreakdownCard.styles";
 import Button from "../ui/Button";
+import ProjectIcon from "../ui/ProjectIcon";
 
 export default function CommissionBreakdownCard({
   barber,
@@ -101,7 +102,7 @@ export default function CommissionBreakdownCard({
         {/* Crédito: Serviços */}
         <div className={commissionStyles.breakdownRow}>
           <div className={commissionStyles.rowLabel}>
-            <span>✂️</span>
+            <ProjectIcon name="Scissors" size={14} colorVariant="amber" />
             <span>Comissão de Serviços ({serviceCommissionPercent}%):</span>
           </div>
           <span className={commissionStyles.creditValue}>
@@ -112,7 +113,7 @@ export default function CommissionBreakdownCard({
         {/* Crédito: Produtos */}
         <div className={commissionStyles.breakdownRow}>
           <div className={commissionStyles.rowLabel}>
-            <span>🍺</span>
+            <ProjectIcon name="Beer" size={14} colorVariant="emerald" />
             <span>Comissão de Produtos ({productCommissionPercent}%):</span>
           </div>
           <span className={commissionStyles.creditValue}>
@@ -124,7 +125,7 @@ export default function CommissionBreakdownCard({
         {paymentFeesDeduction > 0 && (
           <div className={commissionStyles.breakdownRow}>
             <div className={commissionStyles.rowLabel}>
-              <span>💳</span>
+              <ProjectIcon name="CreditCard" size={14} colorVariant="neutral" />
               <span>Dedução de Taxas de Cartão/PIX:</span>
             </div>
             <span className={commissionStyles.debitValue}>
@@ -137,7 +138,7 @@ export default function CommissionBreakdownCard({
         {advances > 0 && (
           <div className={commissionStyles.breakdownRow}>
             <div className={commissionStyles.rowLabel}>
-              <span>💵</span>
+              <ProjectIcon name="DollarSign" size={14} colorVariant="neutral" />
               <span>Vales & Adiantamentos Concedidos:</span>
             </div>
             <span className={commissionStyles.debitValue}>
@@ -178,22 +179,25 @@ export default function CommissionBreakdownCard({
         <Button
           variant="secondary"
           onClick={onExportReport}
-          className="text-xs py-2 px-3.5"
+          className="text-xs py-2 px-3.5 flex items-center gap-1.5"
         >
-          📄 Exportar Extrato (PDF)
+          <ProjectIcon name="FileText" size={13} colorVariant="inherit" />
+          <span>Exportar Extrato (PDF)</span>
         </Button>
 
         {!isSettled ? (
           <Button
             variant="primary"
             onClick={onSettlePayment}
-            className="text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-md"
+            className="text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-md flex items-center gap-1.5"
           >
-            💸 Quitar e Pagar via PIX
+            <ProjectIcon name="DollarSign" size={13} colorVariant="inherit" />
+            <span>Quitar e Pagar via PIX</span>
           </Button>
         ) : (
           <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-            <span>✓</span> Folha Paga e Arquivada
+            <ProjectIcon name="CheckCircle2" size={14} colorVariant="emerald" />
+            <span>Folha Paga e Arquivada</span>
           </span>
         )}
       </div>

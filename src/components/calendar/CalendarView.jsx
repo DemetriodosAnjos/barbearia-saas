@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
+import { AlertTriangle, Plus, Calendar, FileText } from "lucide-react";
 import { calendarViewStyles } from "./CalendarView.styles";
 import BarberTimelineColumn from "./BarberTimelineColumn";
+import UnavailableSlotModal from "./UnavailableSlotModal";
 import IconButton from "../ui/IconButton";
 import Button from "../ui/Button";
 
@@ -21,6 +23,14 @@ export default function CalendarView({
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedBarberFilter, setSelectedBarberFilter] = useState("all");
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Estado do Modal de Horário Indisponível (Slots Passados)
+  const [isUnavailableModalOpen, setIsUnavailableModalOpen] = useState(false);
+  const [unavailableSlotData, setUnavailableSlotData] = useState({
+    barberId: "",
+    time: "",
+    date: null,
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -71,44 +81,75 @@ export default function CalendarView({
 
   const handleToday = () => setCurrentDate(new Date());
 
-  // 4. REGRA DE NEGÓCIO UNIFICADA: Clique em qualquer Dia (Semana ou Mês)
-  const handleDateClick = (targetDate) => {
-    const isPast = isDateInPast(targetDate);
+  // 4. Validador de Slot Passado (Dia anterior OU horário anterior no mesmo dia)
+  const isSlotInPast = (date, timeString) => {
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
 
-    if (isPast) {
-      // SE FOR PASSADA: Exibe alerta de bloqueio e avança em modo consulta
-      alert(
-        `⚠️ ATENÇÃO: DATA RETROATIVA (${targetDate.toLocaleDateString("pt-BR")})\n\n` +
-          `Não é possível realizar novos agendamentos em datas passadas.\n\n` +
-          `Clique em "Entendi!" para abrir a data em MODO DE CONSULTA HISTÓRICA (apenas para ver detalhes de agendamentos realizados).`,
-      );
-      setCurrentDate(targetDate);
-      setViewMode("day");
-    } else {
-      // SE FOR HOJE OU FUTURA: Abre direto na visão diária liberada
-      alert(
-        `📅 ABRINDO DIA NA VISÃO DIÁRIA:\n\n` +
-          `• Data Selecionada: ${targetDate.toLocaleDateString("pt-BR")}\n` +
-          `• Status: Horários livres liberados para agendamento!`,
-      );
-      setCurrentDate(targetDate);
-      setViewMode("day");
+    const compareDate = new Date(date);
+    compareDate.setHours(0, 0, 0, 0);
+
+    // Se o dia for estritamente anterior a hoje
+    if (compareDate < today) {
+      return true;
+    }
+
+    // Se for o mesmo dia, valida se o horário em minutos já passou do relógio atual
+    if (compareDate.getTime() === today.getTime()) {
+      if (!timeString || typeof timeString !== "string") return false;
+      const [h, m] = timeString.split(":").map(Number);
+      const slotMinutes = (h || 0) * 60 + (m || 0);
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      return slotMinutes <= currentMinutes;
+    }
+
+    return false; // Dia futuro
+  };
+
+  // 5. Interceptador do clique em slot da timeline
+  const handleTimelineSlotClick = (barberId, time) => {
+    const inPast = isSlotInPast(currentDate, time);
+
+    if (inPast) {
+      setUnavailableSlotData({
+        barberId,
+        time,
+        date: currentDate,
+      });
+      setIsUnavailableModalOpen(true);
+      return;
+    }
+
+    // Se for horário futuro válido, prossegue com o fluxo normal
+    if (onSlotClick) {
+      onSlotClick(barberId, time, currentDate);
     }
   };
 
-  // 5. Clique no Card de Agendamento (Detalhes)
+  // 6. Ação do Botão "Ver horários disponíveis" do Modal
+  const handleViewAvailableSlots = () => {
+    setIsUnavailableModalOpen(false);
+    // Move para o dia de hoje na visão diária
+    setCurrentDate(new Date());
+    setViewMode("day");
+
+    // Dispara criação com cálculo dinâmico para os horários disponíveis
+    if (onNewAppointmentClick) {
+      onNewAppointmentClick();
+    }
+  };
+
+  // 7. Clique em qualquer Dia (Semana ou Mês) - Alterna para visão diária
+  const handleDateClick = (targetDate) => {
+    setCurrentDate(targetDate);
+    setViewMode("day");
+  };
+
+  // 8. Clique no Card de Agendamento (Detalhes)
   const handleCardClick = (appt) => {
     if (onAppointmentClick) {
       onAppointmentClick(appt);
-    } else {
-      alert(
-        `📄 MODAL: DETALHES DO AGENDAMENTO nº ${appt.id}\n\n` +
-          `• Cliente: ${appt.clientName} ${appt.isVip ? "(VIP ★)" : ""}\n` +
-          `• Serviço: ${appt.serviceName}\n` +
-          `• Horário: ${appt.startTime} às ${appt.endTime} (${appt.durationMinutes} min)\n` +
-          `• Status: ${appt.status.toUpperCase()}\n` +
-          `• Pagamento: ${appt.isPaid ? "Quitado (Pago)" : "Pendente no Caixa"}`,
-      );
     }
   };
 
@@ -257,9 +298,10 @@ export default function CalendarView({
             variant="primary"
             onClick={onNewAppointmentClick}
             disabled={isCurrentViewPast}
-            className="text-xs py-2 px-3.5"
+            className="text-xs py-2 px-3.5 flex items-center gap-1.5"
           >
-            <span>+</span> Novo Agendamento
+            <Plus className="w-3.5 h-3.5 text-neutral-950" />
+            <span>Novo Agendamento</span>
           </Button>
         </div>
       </div>
@@ -267,10 +309,13 @@ export default function CalendarView({
       {/* Faixa de Aviso se estiver em Data Passada */}
       {isCurrentViewPast && viewMode === "day" && (
         <div className="bg-amber-950/40 border-b border-amber-800/60 px-4 py-2 text-xs text-amber-300 flex items-center justify-between">
-          <span>
-            ⚠️ <strong>Modo de Consulta Histórica:</strong> Visualizando dia
-            passado ({currentDate.toLocaleDateString("pt-BR")}). Agendamentos
-            desabilitados.
+          <span className="flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 inline" />
+            <span>
+              <strong>Modo de Consulta Histórica:</strong> Visualizando dia
+              passado ({currentDate.toLocaleDateString("pt-BR")}). Agendamentos
+              desabilitados.
+            </span>
           </span>
           <button
             type="button"
@@ -325,9 +370,10 @@ export default function CalendarView({
                   endHour={endHour}
                   minuteHeight={minuteHeight}
                   isPastDate={isCurrentViewPast}
-                  breaks={barber.breaks || []}
+                  isSlotPast={(time) => isSlotInPast(currentDate, time)}
+                  breaks={Array.isArray(barber.breaks) ? barber.breaks : Array.isArray(barber.breaks?.intervals) ? barber.breaks.intervals : []}
                   appointments={barberAppts}
-                  onSlotClick={onSlotClick}
+                  onSlotClick={handleTimelineSlotClick}
                   onAppointmentClick={handleCardClick}
                   onOpenComanda={onOpenComanda}
                   onStatusChange={onStatusChange}
@@ -499,6 +545,15 @@ export default function CalendarView({
           </div>
         </div>
       )}
+
+      {/* MODAL DE HORÁRIO INDISPONÍVEL COM OVERLAY (SLOTS PASSADOS) */}
+      <UnavailableSlotModal
+        isOpen={isUnavailableModalOpen}
+        onClose={() => setIsUnavailableModalOpen(false)}
+        onViewAvailable={handleViewAvailableSlots}
+        selectedTime={unavailableSlotData.time}
+        selectedDate={unavailableSlotData.date}
+      />
     </div>
   );
 }

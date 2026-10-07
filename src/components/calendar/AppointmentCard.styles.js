@@ -1,18 +1,22 @@
 export const appointmentCardStyles = {
   // Container posicionado na grade horária com borda e sombra
   container:
-    "relative w-full rounded-xl border p-2.5 flex flex-col justify-between transition-all duration-150 select-none text-left overflow-hidden group cursor-pointer shadow-xs hover:shadow-md hover:z-20",
+    "relative w-full rounded-xl border p-2.5 flex flex-col justify-between transition-all duration-200 select-none text-left group cursor-pointer shadow-xs hover:shadow-xl",
 
-  // Variantes de Status de Atendimento
+  // Variantes de Status de Atendimento com borda lateral colorida anti-confusão visual
   variants: {
-    waiting: "bg-amber-950/30 border-amber-800/60 hover:border-amber-600",
-    confirmed: "bg-sky-950/30 border-sky-800/60 hover:border-sky-600",
+    waiting:
+      "bg-amber-950/40 border-amber-800/70 border-l-[3px] border-l-amber-500 hover:border-amber-500 hover:bg-amber-950/60",
+    confirmed:
+      "bg-sky-950/40 border-sky-800/70 border-l-[3px] border-l-sky-500 hover:border-sky-500 hover:bg-sky-950/60",
     in_progress:
-      "bg-purple-950/40 border-purple-600/80 hover:border-purple-500 ring-1 ring-purple-500/30",
+      "bg-purple-950/50 border-purple-600/80 border-l-[3px] border-l-purple-500 hover:border-purple-400 ring-1 ring-purple-500/40 hover:bg-purple-950/70",
     completed:
-      "bg-emerald-950/20 border-emerald-800/50 opacity-80 hover:opacity-100",
-    cancelled: "bg-neutral-900 border-neutral-800 opacity-50 line-through",
-    no_show: "bg-red-950/30 border-red-800/60 hover:border-red-600",
+      "bg-emerald-950/30 border-emerald-800/70 border-l-[3px] border-l-emerald-500 opacity-90 hover:opacity-100 hover:border-emerald-500 hover:bg-emerald-950/50",
+    cancelled:
+      "bg-neutral-900 border-neutral-800 opacity-50 line-through border-l-[3px] border-l-neutral-700",
+    no_show:
+      "bg-red-950/40 border-red-800/70 border-l-[3px] border-l-red-500 hover:border-red-500 hover:bg-red-950/60",
   },
 
   // Alerta de Atraso Crítico (Borda pulsante vermelha)
@@ -20,7 +24,7 @@ export const appointmentCardStyles = {
 
   // Cabeçalho do Card (Horário e Badges)
   header: "flex items-center justify-between gap-1 mb-1",
-  timeText: "text-[11px] font-bold text-neutral-300 font-mono tracking-tight",
+  timeText: "text-[11px] font-bold text-neutral-200 font-mono tracking-tight",
 
   // Informações Centrais (Cliente e Serviço)
   clientName:
@@ -29,21 +33,24 @@ export const appointmentCardStyles = {
 
   // Rodapé (Pagamento e Ações)
   footer:
-    "flex items-center justify-between mt-auto pt-1.5 border-t border-white/5",
+    "flex items-center justify-between mt-auto pt-1.5 border-t border-white/5 relative z-10",
 
   // Indicador de Pagamento
   paidBadge:
-    "text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+    "text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
   pendingBadge:
-    "text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-neutral-800 text-amber-400 border border-neutral-700",
+    "text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30",
 
   // Botão de Opções Rápidas (3 pontinhos)
   moreButton:
-    "text-neutral-400 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors",
+    "text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-white/15 transition-all cursor-pointer shrink-0 active:scale-95",
 
-  // Menu de Ações Rápidas Flutuante
+  // Menu de Ações Rápidas Flutuante com z-index ultra elevado (z-[100]) e posicionamento inteligente
   menuDropdown:
-    "absolute right-2 top-8 w-44 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl py-1 z-30 text-xs text-left animate-in fade-in zoom-in-95 duration-100",
+    "absolute right-0 w-52 bg-neutral-900/98 backdrop-blur-xl border border-neutral-700/90 rounded-xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.95)] py-1.5 z-[100] text-xs text-left ring-1 ring-white/15 animate-in fade-in zoom-in-95 duration-100",
+  menuDropdownTop: "bottom-full mb-1.5",
+  menuDropdownBottom: "top-full mt-1.5",
+
   menuItem:
-    "w-full px-3 py-1.5 text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors flex items-center gap-2 cursor-pointer",
+    "w-full px-3 py-2 text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors flex items-center gap-2.5 cursor-pointer font-medium text-xs",
 };

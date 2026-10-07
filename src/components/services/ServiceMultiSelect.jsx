@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Clock, ArrowRight } from "lucide-react";
 import { serviceMultiSelectStyles } from "./ServiceMultiSelect.styles";
 import ServiceCard from "./ServiceCard";
 import Button from "../ui/Button";
@@ -156,7 +157,7 @@ export default function ServiceMultiSelect({
               Tempo Estimado
             </span>
             <span className={serviceMultiSelectStyles.metricValueTime}>
-              <span>⏱️</span>
+              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 inline mr-1" />
               <span>{formatTotalTime(totalDurationMinutes)}</span>
             </span>
           </div>
@@ -190,7 +191,10 @@ export default function ServiceMultiSelect({
             onClick={onContinue}
             className="w-full sm:w-auto"
           >
-            Avançar para Escolha do Barbeiro ➔
+            <span className="flex items-center gap-1.5 justify-center">
+              <span>Avançar para Escolha do Barbeiro</span>
+              <ArrowRight className="w-4 h-4" />
+            </span>
           </Button>
         </div>
       </div>

@@ -2,7 +2,7 @@ export const clientBookingStyles = {
   pageWrapper:
     "min-h-screen bg-neutral-950 text-neutral-100 flex flex-col justify-between select-none text-left relative overflow-x-hidden",
 
-  // 👇 pb-48 garante espaço de sobra para o conteúdo nunca ficar atrás da barra fixa!
+  // pb-48 garante espaço de sobra para o conteúdo nunca ficar atrás da barra fixa!
   appContainer:
     "w-full max-w-lg mx-auto flex-1 flex flex-col p-4 sm:p-6 space-y-6 pb-48",
 

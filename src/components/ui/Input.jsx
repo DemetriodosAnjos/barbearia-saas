@@ -1,5 +1,6 @@
 import { inputStyles } from "./Input.styles";
 import { masks } from "../../utils/masks";
+import ProjectIcon from "./ProjectIcon";
 
 export default function Input({
   label,
@@ -34,6 +35,12 @@ export default function Input({
     }
   };
 
+  const errorId = inputId ? `${inputId}-error` : undefined;
+  const helperId = inputId ? `${inputId}-helper` : undefined;
+  const ariaDescribedBy = [error ? errorId : null, helperText ? helperId : null]
+    .filter(Boolean)
+    .join(" ") || undefined;
+
   return (
     <div className={inputStyles.container}>
       {label && (
@@ -48,18 +55,28 @@ export default function Input({
         disabled={disabled}
         value={value}
         onChange={handleChange}
+        aria-invalid={Boolean(error)}
+        aria-describedby={ariaDescribedBy}
         className={`${inputStyles.baseInput} ${borderStatus} ${className}`}
         {...props}
       />
 
       {error && (
-        <p className={inputStyles.errorMessage}>
-          <span>⚠️</span> {error}
+        <p
+          id={errorId}
+          role="alert"
+          aria-live="polite"
+          className={inputStyles.errorMessage}
+        >
+          <ProjectIcon name="AlertTriangle" size={13} colorVariant="danger" />
+          <span>{error}</span>
         </p>
       )}
 
       {!error && helperText && (
-        <p className={inputStyles.helperText}>{helperText}</p>
+        <p id={helperId} className={inputStyles.helperText}>
+          {helperText}
+        </p>
       )}
     </div>
   );

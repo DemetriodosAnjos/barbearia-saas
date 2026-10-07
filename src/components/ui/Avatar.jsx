@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Crown } from "lucide-react";
 import { avatarStyles } from "./Avatar.styles";
 
 // Paleta de cores para fallback determinístico
@@ -74,7 +75,7 @@ export default function Avatar({
       {/* Selo VIP */}
       {isVip && (
         <span className={avatarStyles.vipBadge} title="Cliente VIP / Assinante">
-          👑
+          <Crown className="w-2.5 h-2.5 text-neutral-950 fill-neutral-950" />
         </span>
       )}
     </div>

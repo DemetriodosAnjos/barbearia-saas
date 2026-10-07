@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para atualização de perfil e senha no Auth]
 import { supabase } from "../../lib/supabase";
 import { profileStyles } from "./UserProfileView.styles";
@@ -11,6 +12,9 @@ import Toggle from "../../components/ui/Toggle";
 import Select from "../../components/ui/Select";
 import TagInput from "../../components/ui/TagInput";
 import Alert from "../../components/ui/Alert";
+import ProjectIcon from "../../components/ui/ProjectIcon";
+import { SafeHtml } from "../../components/ui/SafeHtml";
+import { validateAvatarUpload } from "../../utils/inputValidator";
 
 // [Função componente: consome o usuário e barbearia reais autenticados]
 export default function UserProfileView({ user, tenant, onBack }) {
@@ -131,12 +135,17 @@ export default function UserProfileView({ user, tenant, onBack }) {
     twoFactorAuth: false,
   });
 
-  // Upload simulado de Avatar
+  const [avatarError, setAvatarError] = useState("");
+
+  // Upload simulado e Validação Estrita de Avatar (Tamanho, Extensão e MIME Type)
   const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
+    setAvatarError("");
+    const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert("A imagem deve ter no máximo 2MB.");
+      const validation = validateAvatarUpload(file);
+      if (!validation.isValid) {
+        setAvatarError(validation.errors[0]);
+        if (e.target) e.target.value = "";
         return;
       }
       const previewUrl = URL.createObjectURL(file);
@@ -285,10 +294,10 @@ export default function UserProfileView({ user, tenant, onBack }) {
   };
 
   const profileTabs = [
-    { id: "pessoal", label: "Dados Pessoais", icon: "👤" },
-    { id: "contato", label: "Contato & Endereço", icon: "📍" },
-    { id: "profissional", label: "Perfil & Chave PIX", icon: "💈" },
-    { id: "seguranca", label: "Segurança & Acesso", icon: "🔒" },
+    { id: "pessoal", label: "Dados Pessoais", icon: <ProjectIcon name="User" size={16} colorVariant="inherit" /> },
+    { id: "contato", label: "Contato & Endereço", icon: <ProjectIcon name="MapPin" size={16} colorVariant="inherit" /> },
+    { id: "profissional", label: "Perfil & Chave PIX", icon: <ProjectIcon name="Scissors" size={16} colorVariant="inherit" /> },
+    { id: "seguranca", label: "Segurança & Acesso", icon: <ProjectIcon name="Lock" size={16} colorVariant="inherit" /> },
   ];
 
   return (
@@ -309,7 +318,7 @@ export default function UserProfileView({ user, tenant, onBack }) {
               status="available"
             />
             <div className={profileStyles.avatarOverlay}>
-              <span>📷</span>
+              <ProjectIcon name="Camera" size={14} colorVariant="inherit" />
               <span>Alterar</span>
             </div>
             <input
@@ -321,16 +330,23 @@ export default function UserProfileView({ user, tenant, onBack }) {
             />
           </div>
 
+          {avatarError && (
+            <div className="w-full mt-2 p-2 bg-rose-950/40 border border-rose-800/50 rounded-lg text-rose-300 text-xs flex items-center gap-2">
+              <ProjectIcon name="AlertTriangle" size={14} colorVariant="inherit" />
+              <span>{avatarError}</span>
+            </div>
+          )}
+
           <div className={profileStyles.infoGroup}>
             <h2 className={profileStyles.nameTitle}>
-              <span>{personalData.fullName}</span>
+              <SafeHtml html={personalData.fullName} />
               <span className="text-amber-400 text-xs font-normal">
-                ("{personalData.displayName}")
+                (<SafeHtml html={`"${personalData.displayName}"`} />)
               </span>
             </h2>
             <p className={profileStyles.displayNameTag}>
               Nome exibido para os clientes:{" "}
-              <strong>{personalData.displayName}</strong>
+              <strong><SafeHtml html={personalData.displayName} /></strong>
             </p>
             <div className={profileStyles.roleMeta}>
               <Badge
@@ -352,11 +368,15 @@ export default function UserProfileView({ user, tenant, onBack }) {
             onClick={onBack}
             className="text-xs py-1.5 px-3 self-center sm:self-auto"
           >
-            ← Voltar ao Painel
+            <span className="flex items-center gap-1.5">
+              <ProjectIcon name="ArrowLeft" size={14} colorVariant="inherit" />
+              Voltar ao Painel
+            </span>
           </Button>
         )}
       </div>
 
+      {/* Monitoramento de Sanitização do Perfil (SafeHtml) */}
       {/* NAVEGAÇÃO ENTRE OS 4 PILARES VIA TABS */}
       <Tabs
         tabs={profileTabs}
@@ -370,7 +390,7 @@ export default function UserProfileView({ user, tenant, onBack }) {
       {/* Alerta de Sucesso Geral */}
       {globalSuccessMessage && (
         <Alert variant="success" title="Perfil Atualizado com Sucesso!">
-          {globalSuccessMessage}
+          <SafeHtml html={globalSuccessMessage} />
         </Alert>
       )}
 
@@ -382,7 +402,10 @@ export default function UserProfileView({ user, tenant, onBack }) {
           <div className="space-y-4">
             <div>
               <h3 className={profileStyles.sectionTitle}>
-                <span>👤</span> Dados Pessoais & Identificação
+                <span className="flex items-center gap-2">
+                  <ProjectIcon name="User" size={18} className="text-amber-500" />
+                  Dados Pessoais & Identificação
+                </span>
               </h3>
               <p className={profileStyles.sectionSubtitle}>
                 Informações para contratos internos, folha de comissões e
@@ -468,7 +491,10 @@ export default function UserProfileView({ user, tenant, onBack }) {
           <div className="space-y-4">
             <div>
               <h3 className={profileStyles.sectionTitle}>
-                <span>📍</span> Contato & Endereço Residencial
+                <span className="flex items-center gap-2">
+                  <ProjectIcon name="MapPin" size={18} className="text-amber-500" />
+                  Contato & Endereço Residencial
+                </span>
               </h3>
               <p className={profileStyles.sectionSubtitle}>
                 Dados para alertas de agendamento, segurança e prestação de
@@ -518,7 +544,7 @@ export default function UserProfileView({ user, tenant, onBack }) {
                 error={profileErrors.cep}
                 helperText={
                   isSearchingCep
-                    ? "🔍 Buscando endereço nos Correios..."
+                    ? "Buscando endereço nos Correios..."
                     : "Digite o CEP para preencher o endereço automaticamente."
                 }
               />
@@ -567,7 +593,8 @@ export default function UserProfileView({ user, tenant, onBack }) {
                 />
                 {profileErrors.number && (
                   <p className="text-xs text-red-500 flex items-center gap-1 mt-0.5">
-                    <span>⚠️</span> {profileErrors.number}
+                    <ProjectIcon name="AlertTriangle" size={13} colorVariant="danger" />
+                    {profileErrors.number}
                   </p>
                 )}
               </div>
@@ -697,7 +724,10 @@ export default function UserProfileView({ user, tenant, onBack }) {
           <div className="space-y-4">
             <div>
               <h3 className={profileStyles.sectionTitle}>
-                <span>💈</span> Perfil Profissional & Repasse Financeiro
+                <span className="flex items-center gap-2">
+                  <ProjectIcon name="Scissors" size={18} className="text-amber-500" />
+                  Perfil Profissional & Repasse Financeiro
+                </span>
               </h3>
               <p className={profileStyles.sectionSubtitle}>
                 Dados para o fechamento de comissões semanais e portfólio para
@@ -709,7 +739,8 @@ export default function UserProfileView({ user, tenant, onBack }) {
             <div className="p-4 bg-emerald-950/20 border border-emerald-800/40 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>💸</span> Chave PIX para Recebimento de Comissões
+                  <ProjectIcon name="DollarSign" size={15} colorVariant="inherit" />
+                  Chave PIX para Recebimento de Comissões
                 </span>
                 <span className="text-[10px] text-neutral-400">
                   Repasse automático pelo gestor
@@ -800,7 +831,10 @@ export default function UserProfileView({ user, tenant, onBack }) {
           <div className="space-y-5">
             <div>
               <h3 className={profileStyles.sectionTitle}>
-                <span>🔒</span> Segurança & Autenticação
+                <span className="flex items-center gap-2">
+                  <ProjectIcon name="Lock" size={18} className="text-amber-500" />
+                  Segurança & Autenticação
+                </span>
               </h3>
               <p className={profileStyles.sectionSubtitle}>
                 Gerenciamento de credenciais, sessões ativas e autenticação
@@ -941,7 +975,9 @@ export default function UserProfileView({ user, tenant, onBack }) {
 
               <div className="space-y-2">
                 <div className={profileStyles.sessionItem}>
-                  <div className={profileStyles.sessionIcon}>💻</div>
+                  <div className={profileStyles.sessionIcon}>
+                    <ProjectIcon name="Laptop" size={18} className="text-amber-500" />
+                  </div>
                   <div className={profileStyles.sessionInfo}>
                     <p className="font-bold text-white">Chrome no Windows 11</p>
                     <span className="text-[11px] text-neutral-500">
@@ -954,7 +990,9 @@ export default function UserProfileView({ user, tenant, onBack }) {
                 </div>
 
                 <div className={profileStyles.sessionItem}>
-                  <div className={profileStyles.sessionIcon}>📱</div>
+                  <div className={profileStyles.sessionIcon}>
+                    <ProjectIcon name="Smartphone" size={18} className="text-amber-500" />
+                  </div>
                   <div className={profileStyles.sessionInfo}>
                     <p className="font-bold text-white">
                       Safari no iPhone 15 Pro

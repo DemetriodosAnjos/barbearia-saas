@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { badgeStyles } from "./Badge.styles";
+import ProjectIcon from "./ProjectIcon";
 
 // 1. Matriz de Transições Permitidas (Regra de Negócio)
 export const STATUS_TRANSITIONS = {
@@ -11,14 +12,14 @@ export const STATUS_TRANSITIONS = {
   no_show: [], // Estado Terminal
 };
 
-// 2. Metadados de cada Status
+// 2. Metadados de cada Status (Ícones Lucide oficiais com herança da paleta)
 export const STATUS_CONFIG = {
-  waiting: { label: "Aguardando", icon: "⏰" },
-  confirmed: { label: "Confirmado", icon: "✓" },
-  in_progress: { label: "Em Atendimento", icon: "✂️" },
-  completed: { label: "Concluído", icon: "✔" },
-  cancelled: { label: "Cancelado", icon: "✕" },
-  no_show: { label: "Falta (No-Show)", icon: "🚫" },
+  waiting: { label: "Aguardando", icon: "Clock" },
+  confirmed: { label: "Confirmado", icon: "Check" },
+  in_progress: { label: "Em Atendimento", icon: "Scissors" },
+  completed: { label: "Concluído", icon: "CheckCircle2" },
+  cancelled: { label: "Cancelado", icon: "X" },
+  no_show: { label: "Falta (No-Show)", icon: "AlertCircle" },
 };
 
 export default function Badge({
@@ -73,9 +74,14 @@ export default function Badge({
         {/* Ponto pulsante de atraso */}
         {isDelayed && <span className={badgeStyles.delayDot} />}
 
-        {/* Ícone */}
+        {/* Ícone vetorial SVG */}
         {showIcon && (
-          <span className="text-xs leading-none">{config.icon}</span>
+          <ProjectIcon
+            name={config.icon}
+            size={size === "sm" ? 11 : size === "lg" ? 15 : 13}
+            colorVariant="inherit"
+            className="leading-none shrink-0"
+          />
         )}
 
         {/* Texto */}
@@ -119,7 +125,11 @@ export default function Badge({
                 }}
                 className={badgeStyles.dropdownItem}
               >
-                <span>{nextConfig.icon}</span>
+                <ProjectIcon
+                  name={nextConfig.icon}
+                  size={12}
+                  colorVariant="inherit"
+                />
                 <span>{nextConfig.label}</span>
               </button>
             );

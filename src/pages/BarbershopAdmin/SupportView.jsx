@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para registro de chamados de suporte]
 import { supabase } from "../../lib/supabase";
 import { supportStyles } from "./SupportView.styles";
@@ -6,6 +7,8 @@ import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import Alert from "../../components/ui/Alert";
+import ProjectIcon from "../../components/ui/ProjectIcon";
+import { SafeHtml } from "../../components/ui/SafeHtml";
 
 // [Função componente: consome o tenant e usuário reais autenticados]
 export default function SupportView({ tenant, user, onBack }) {
@@ -34,7 +37,7 @@ export default function SupportView({ tenant, user, onBack }) {
   const handleOpenWhatsAppSupport = () => {
     const supportNumber = "5511999998888"; // Número do suporte BarberSaaS
     const encodedText = encodeURIComponent(
-      `Olá Suporte BarberSaaS! 👋\n\n` +
+      `Olá Suporte BarberSaaS!\n\n` +
         `Sou ${tenantContext.ownerName} da ${tenantContext.barbershopName} (${tenantContext.plan} • ID: ${tenantContext.tenantSlug}).\n\n` +
         `Estou precisando de atendimento para:`,
     );
@@ -46,7 +49,7 @@ export default function SupportView({ tenant, user, onBack }) {
   const handleOpenEmergencyHotline = () => {
     const supportNumber = "5511999998888";
     const emergencyText = encodeURIComponent(
-      `🚨 [PLANTÃO DE EMERGÊNCIA - SALÃO TRAVADO]\n\n` +
+      `[PLANTÃO DE EMERGÊNCIA - SALÃO TRAVADO]\n\n` +
         `• Estabelecimento: ${tenantContext.barbershopName} (ID: ${tenantContext.tenantSlug})\n` +
         `• Responsável: ${tenantContext.ownerName} (${tenantContext.ownerPhone})\n` +
         `• Urgência: Crítica (Operação de atendimento parada)\n\n` +
@@ -74,14 +77,17 @@ export default function SupportView({ tenant, user, onBack }) {
 
     setIsSubmitting(true);
 
+    const cleanSubject = DOMPurify.sanitize(ticketSubject.trim(), { ALLOWED_TAGS: [] });
+    const cleanMessage = DOMPurify.sanitize(ticketMessage.trim(), { ALLOWED_TAGS: ["b", "i", "strong", "em", "p", "br"] });
+
     const ticketPayload = {
       tenant_id: tenant?.id || null,
-      barbershop_name: tenantContext.barbershopName,
-      contact_name: tenantContext.ownerName,
+      barbershop_name: DOMPurify.sanitize(tenantContext.barbershopName, { ALLOWED_TAGS: [] }),
+      contact_name: DOMPurify.sanitize(tenantContext.ownerName, { ALLOWED_TAGS: [] }),
       category: ticketCategory,
       urgency: ticketUrgency,
-      subject: ticketSubject.trim(),
-      message: ticketMessage.trim(),
+      subject: cleanSubject,
+      message: cleanMessage,
       status: "open",
     };
 
@@ -130,7 +136,7 @@ export default function SupportView({ tenant, user, onBack }) {
     {
       question: "Como conectar o WhatsApp para disparar lembretes automáticos?",
       answer:
-        "Acesse 'Configurações da Barbearia' ➔ aba 'Notificações WhatsApp'. Certifique-se de que a chave 'Confirmação Imediata' e 'Lembrete 2h' estejam ativas. O sistema utiliza a infraestrutura oficial da plataforma para enviar mensagens sem consumir o saldo do seu celular.",
+        "Acesse 'Configurações da Barbearia' -> aba 'Notificações WhatsApp'. Certifique-se de que a chave 'Confirmação Imediata' e 'Lembrete 2h' estejam ativas. O sistema utiliza a infraestrutura oficial da plataforma para enviar mensagens sem consumir o saldo do seu celular.",
     },
     {
       question: "Como funciona a divisão de comissões com os barbeiros?",
@@ -141,7 +147,7 @@ export default function SupportView({ tenant, user, onBack }) {
       question:
         "Onde o barbeiro cadastra a chave PIX para receber as comissões?",
       answer:
-        "O profissional pode acessar 'Meu Perfil' ➔ aba 'Perfil & Chave PIX' e cadastrar sua chave pessoal (CPF, E-mail ou Telefone). Na sexta-feira ou no fechamento da semana, o gestor clica em 'Quitar via PIX' e o sistema usa essa chave para a transferência.",
+        "O profissional pode acessar 'Meu Perfil' -> aba 'Perfil & Chave PIX' e cadastrar sua chave pessoal (CPF, E-mail ou Telefone). Na sexta-feira ou no fechamento da semana, o gestor clica em 'Quitar via PIX' e o sistema usa essa chave para a transferência.",
     },
     {
       question:
@@ -163,7 +169,10 @@ export default function SupportView({ tenant, user, onBack }) {
             </span>
           </div>
           <h1 className={supportStyles.headerTitle}>
-            <span>Central de Ajuda & Suporte</span>
+            <span className="flex items-center gap-2">
+              <ProjectIcon name="LifeBuoy" size={24} className="text-amber-500" />
+              Central de Ajuda & Suporte
+            </span>
           </h1>
           <p className={supportStyles.headerSubtitle}>
             Tire dúvidas operacionais no FAQ rápido ou fale diretamente com
@@ -178,7 +187,10 @@ export default function SupportView({ tenant, user, onBack }) {
               onClick={onBack}
               className="text-xs py-2 px-3 w-full sm:w-auto"
             >
-              ← Voltar ao Painel
+              <span className="flex items-center gap-1.5">
+                <ProjectIcon name="ArrowLeft" size={14} colorVariant="inherit" />
+                Voltar ao Painel
+              </span>
             </Button>
           )}
 
@@ -188,7 +200,7 @@ export default function SupportView({ tenant, user, onBack }) {
             onClick={handleOpenWhatsAppSupport}
             className="text-xs py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-lg w-full sm:w-auto flex items-center justify-center gap-2"
           >
-            <span>💬</span>
+            <ProjectIcon name="MessageSquare" size={16} colorVariant="inherit" />
             <span>Chamar Suporte no WhatsApp</span>
           </Button>
         </div>
@@ -201,7 +213,10 @@ export default function SupportView({ tenant, user, onBack }) {
           <div className={supportStyles.faqCard}>
             <div>
               <h2 className={supportStyles.sectionTitle}>
-                <span>💡</span> Perguntas Frequentes (Autoatendimento)
+                <span className="flex items-center gap-2">
+                  <ProjectIcon name="Lightbulb" size={18} className="text-amber-500" />
+                  Perguntas Frequentes (Autoatendimento)
+                </span>
               </h2>
               <p className={supportStyles.sectionSubtitle}>
                 Clique na dúvida para ver a resolução rápida em 30 segundos.
@@ -246,7 +261,10 @@ export default function SupportView({ tenant, user, onBack }) {
           <div className={supportStyles.ticketCard}>
             <div>
               <h2 className={supportStyles.sectionTitle}>
-                <span>📝</span> Abrir Chamado Interno
+                <span className="flex items-center gap-2">
+                  <ProjectIcon name="FileText" size={18} className="text-amber-500" />
+                  Abrir Chamado Interno
+                </span>
               </h2>
               <p className={supportStyles.sectionSubtitle}>
                 Envie uma solicitação formal para nossa equipe técnica.
@@ -256,9 +274,9 @@ export default function SupportView({ tenant, user, onBack }) {
             {/* [Feedback nativo de sucesso ou aviso de validação] */}
             {ticketSuccess && (
               <Alert variant="success" title="Chamado Criado com Sucesso!">
-                Protocolo: <strong>#{ticketSuccess.id}</strong> (Categoria:{" "}
-                {ticketSuccess.category}). Nossa equipe entrará em contato em
-                até 2 horas úteis.
+                <SafeHtml 
+                  html={`Protocolo: <strong>#${ticketSuccess.id}</strong> (Assunto: <em>${ticketSuccess.subject}</em>). Nossa equipe entrará em contato em até 2 horas úteis.`} 
+                />
               </Alert>
             )}
 
@@ -268,7 +286,7 @@ export default function SupportView({ tenant, user, onBack }) {
                 title="Atenção"
                 onClose={() => setTicketError("")}
               >
-                {ticketError}
+                <SafeHtml html={ticketError} />
               </Alert>
             )}
 
@@ -278,14 +296,14 @@ export default function SupportView({ tenant, user, onBack }) {
                 value={ticketUrgency}
                 onChange={(e) => setTicketUrgency(e.target.value)}
                 options={[
-                  { value: "baixa", label: "🟢 Baixa - Dúvida simples" },
+                  { value: "baixa", label: "Baixa - Dúvida simples" },
                   {
                     value: "media",
-                    label: "🟡 Média - Ajuste de configuração",
+                    label: "Média - Ajuste de configuração",
                   },
                   {
                     value: "critica",
-                    label: "🔴 Crítica - Salão travado / Não atende",
+                    label: "Crítica - Salão travado / Não atende",
                   },
                 ]}
               />
@@ -294,7 +312,8 @@ export default function SupportView({ tenant, user, onBack }) {
               {ticketUrgency === "critica" && (
                 <div className="p-3.5 bg-red-950/40 border border-red-800/60 rounded-2xl text-xs space-y-2">
                   <p className="text-red-300 font-bold flex items-center gap-1.5">
-                    <span>🚨</span> ATENÇÃO: OPERAÇÃO EM RISCO
+                    <ProjectIcon name="AlertCircle" size={16} className="text-red-400" />
+                    ATENÇÃO: OPERAÇÃO EM RISCO
                   </p>
                   <p className="text-neutral-300 text-[11px] leading-relaxed">
                     Para problemas que impedem o atendimento de clientes, não
@@ -339,7 +358,10 @@ export default function SupportView({ tenant, user, onBack }) {
                 isLoading={isSubmitting}
                 className="w-full text-xs py-2.5 font-bold shadow-md"
               >
-                Enviar Chamado para Análise →
+                <span className="flex items-center justify-center gap-1.5">
+                  Enviar Chamado para Análise
+                  <ProjectIcon name="ArrowRight" size={14} colorVariant="inherit" />
+                </span>
               </Button>
             </form>
           </div>
@@ -349,7 +371,9 @@ export default function SupportView({ tenant, user, onBack }) {
       {/* 3. RODAPÉ COM VÍDEOS TUTORIAIS DE 1 MINUTO */}
       <div className={supportStyles.tutorialBanner}>
         <div className={supportStyles.tutorialItem}>
-          <div className={supportStyles.tutorialIcon}>🎬</div>
+          <div className={supportStyles.tutorialIcon}>
+            <ProjectIcon name="Video" size={20} className="text-amber-500" />
+          </div>
           <div>
             <h4 className="font-bold text-white text-xs">
               Vídeos Tutoriais Rápidos (1 Minuto)
@@ -372,7 +396,10 @@ export default function SupportView({ tenant, user, onBack }) {
           }
           className="text-xs py-1.5 px-3 shrink-0"
         >
-          Assistir Tutoriais ➔
+          <span className="flex items-center gap-1.5">
+            Assistir Tutoriais
+            <ProjectIcon name="ExternalLink" size={13} colorVariant="inherit" />
+          </span>
         </Button>
       </div>
     </div>

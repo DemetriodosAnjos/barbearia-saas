@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AlertTriangle, Clock, Check, Star, ArrowRight, ExternalLink } from "lucide-react";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import Alert from "../ui/Alert";
@@ -8,13 +9,12 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-
-  // 1. Defesa: se trialDaysLeft for null/undefined (ex: assinante ativo ou dados ainda carregando), não renderiza
-  if (trialDaysLeft === undefined || trialDaysLeft === null) return null;
-
   // Estados do Modal de Redirecionamento com Spinner
   const [isRedirectModalOpen, setIsRedirectModalOpen] = useState(false);
   const [redirectInfo, setRedirectInfo] = useState({ planName: "", link: "" });
+
+  // 1. Defesa: se trialDaysLeft for null/undefined (ex: assinante ativo ou dados ainda carregando), não renderiza
+  if (trialDaysLeft === undefined || trialDaysLeft === null) return null;
 
   const isExpired = trialDaysLeft <= 0;
 
@@ -84,7 +84,11 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
         `}
       >
         <div className="flex items-center gap-2">
-          <span>{isExpired ? "⚠️" : "⏳"}</span>
+          {isExpired ? (
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          ) : (
+            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+          )}
           <span>
             {isExpired ? (
               <strong className="text-white">
@@ -141,9 +145,10 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
             <Button
               variant="primary"
               onClick={handleProceedToPayment}
-              className="w-full sm:w-auto text-xs py-2.5 px-6 font-extrabold bg-emerald-600 hover:bg-emerald-500 shadow-lg cursor-pointer"
+              className="w-full sm:w-auto text-xs py-2.5 px-6 font-extrabold bg-emerald-600 hover:bg-emerald-500 shadow-lg cursor-pointer flex items-center justify-center gap-1.5"
             >
-              Continuar para Pagamento Seguro →
+              <span>Continuar para Pagamento Seguro</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Button>
           </div>
         }
@@ -199,11 +204,11 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
 
               <div className="space-y-2 pt-2 border-t border-neutral-800/80 text-xs text-neutral-300">
                 <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
                   <span>Agenda Online 24h</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
                   <span>Controle de Fila & PDV</span>
                 </div>
               </div>
@@ -216,9 +221,14 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
                     : "bg-neutral-900 text-neutral-400 hover:text-white"
                 }`}
               >
-                {selectedPlan === "starter"
-                  ? "✓ Selecionado"
-                  : "Escolher Plano Solo"}
+                {selectedPlan === "starter" ? (
+                  <span className="flex items-center justify-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Selecionado</span>
+                  </span>
+                ) : (
+                  "Escolher Plano Solo"
+                )}
               </button>
             </div>
 
@@ -234,8 +244,9 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
                 }
               `}
             >
-              <span className="absolute -top-3 right-4 text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-amber-500 text-neutral-950 shadow-md">
-                Mais Escolhido ★
+              <span className="absolute -top-3 right-4 text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-amber-500 text-neutral-950 shadow-md flex items-center gap-1">
+                <span>Mais Escolhido</span>
+                <Star className="w-2.5 h-2.5 fill-neutral-950 text-neutral-950" />
               </span>
 
               <div className="space-y-2">
@@ -266,11 +277,11 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
 
               <div className="space-y-2 pt-2 border-t border-neutral-800/80 text-xs text-neutral-300">
                 <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
                   <span>Tudo do Plano Solo</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
                   <strong className="text-white">Comissões Automáticas</strong>
                 </div>
               </div>
@@ -283,9 +294,14 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
                     : "bg-neutral-900 text-neutral-400 hover:text-white"
                 }`}
               >
-                {selectedPlan === "pro"
-                  ? "✓ Selecionado"
-                  : "Escolher Plano Pro"}
+                {selectedPlan === "pro" ? (
+                  <span className="flex items-center justify-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Selecionado</span>
+                  </span>
+                ) : (
+                  "Escolher Plano Pro"
+                )}
               </button>
             </div>
 
@@ -320,18 +336,19 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
               </div>
 
               <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl text-xs space-y-1">
-                <p className="text-emerald-400 font-bold">
-                  ★ Barbeiros Ilimitados
+                <p className="text-emerald-400 font-bold flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400 shrink-0" />
+                  <span>Barbeiros Ilimitados</span>
                 </p>
               </div>
 
               <div className="space-y-2 pt-2 border-t border-neutral-800/80 text-xs text-neutral-300">
                 <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
                   <span>Tudo do Plano Pro</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
                   <strong className="text-amber-400">
                     White-Label Incluso
                   </strong>
@@ -346,9 +363,14 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
                     : "bg-neutral-900 text-neutral-400 hover:text-white"
                 }`}
               >
-                {selectedPlan === "enterprise"
-                  ? "✓ Selecionado"
-                  : "Escolher Redes & Franquias"}
+                {selectedPlan === "enterprise" ? (
+                  <span className="flex items-center justify-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Selecionado</span>
+                  </span>
+                ) : (
+                  "Escolher Redes & Franquias"
+                )}
               </button>
             </div>
           </div>
@@ -402,9 +424,10 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
             href={redirectInfo.link}
             target="_blank"
             rel="noreferrer"
-            className="text-[11px] text-amber-500 hover:underline pt-2 inline-block cursor-pointer font-semibold"
+            className="text-[11px] text-amber-500 hover:underline pt-2 inline-flex items-center gap-1 cursor-pointer font-semibold"
           >
-            Clique aqui se a página não abrir sozinha ➔
+            <span>Clique aqui se a página não abrir sozinha</span>
+            <ExternalLink className="w-3 h-3 text-amber-500" />
           </a>
         </div>
       </Modal>

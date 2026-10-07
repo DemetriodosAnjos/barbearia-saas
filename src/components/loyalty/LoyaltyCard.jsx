@@ -1,3 +1,4 @@
+import { Scissors, Gift, Star } from "lucide-react";
 import { loyaltyStyles } from "./LoyaltyCard.styles";
 import Button from "../ui/Button";
 
@@ -30,7 +31,9 @@ export default function LoyaltyCard({
       {/* 1. CABEÇALHO DO CARTÃO */}
       <div className={loyaltyStyles.header}>
         <div className={loyaltyStyles.brandInfo}>
-          <div className={loyaltyStyles.brandIcon}>💈</div>
+          <div className={loyaltyStyles.brandIcon}>
+            <Scissors className="w-5 h-5 text-amber-500" />
+          </div>
           <div>
             <h3 className={loyaltyStyles.title}>Cartão Fidelidade Digital</h3>
             <p className={loyaltyStyles.clientName}>{clientName}</p>
@@ -39,8 +42,9 @@ export default function LoyaltyCard({
 
         {/* Selo indicativo de status com valores reais */}
         {isCompleted ? (
-          <span className={loyaltyStyles.rewardBadgeReady}>
-            🎁 Prêmio Disponível!
+          <span className={`${loyaltyStyles.rewardBadgeReady} flex items-center gap-1`}>
+            <Gift className="w-3.5 h-3.5 text-amber-400" />
+            <span>Prêmio Disponível!</span>
           </span>
         ) : (
           <span className={loyaltyStyles.rewardBadgePending}>
@@ -71,7 +75,13 @@ export default function LoyaltyCard({
                     : `Meta final: ${rewardDescription}`
                 }
               >
-                <span className="text-base">{isCompleted ? "★" : "🎁"}</span>
+                <span className="text-base flex items-center justify-center">
+                  {isCompleted ? (
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  ) : (
+                    <Gift className="w-4 h-4 text-amber-400" />
+                  )}
+                </span>
                 <span className="text-[9px] font-extrabold uppercase mt-0.5">
                   Grátis
                 </span>
@@ -94,7 +104,9 @@ export default function LoyaltyCard({
               }
             >
               {isStamped ? (
-                <span className={loyaltyStyles.stampFilledIcon}>✂️</span>
+                <span className={loyaltyStyles.stampFilledIcon}>
+                  <Scissors className="w-3.5 h-3.5 text-amber-400" />
+                </span>
               ) : (
                 <span className={loyaltyStyles.stampNumber}>{stampNumber}</span>
               )}

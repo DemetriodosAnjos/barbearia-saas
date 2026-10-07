@@ -81,16 +81,16 @@ export const CHECKLIST_ANALYSIS = [
   },
   {
     id: 7,
-    title: "Testes de Invasão & RBAC (Role-Based Access Control)",
-    category: "Segurança / Pentest",
-    priority: "ALTA",
+    title: "Testes de Invasão, RBAC & Negação por Padrão (Default Deny)",
+    category: "Segurança / Pentest & AppSec",
+    priority: "CRÍTICA",
     priorityColor: "emerald",
-    necessity: "Essencial",
-    status: "IMPLEMENTADO",
+    necessity: "Imprescindível (Prompt 01 AppSec)",
+    status: "IMPLEMENTADO & AUDITADO",
     whyNecessary:
-      "Impede que um barbeiro acesse dados de faturamento global do estabelecimento ou que um cliente altere preços de serviços.",
+      "Garante a estratégia Default Deny: qualquer rota não explicitamente pública exige JWT válido (HTTP 401) e perfis 'client' e 'employee' são bloqueados de rotas 'admin' (HTTP 403).",
     strategy:
-      "Validador de limites de privilégio cliente vs barbeiro vs admin no painel.",
+      "Matriz de autorização formal, middleware RBAC com HTTP 401/403 e suite de 18 testes automatizados no Vitest.",
   },
   {
     id: 8,
@@ -234,5 +234,57 @@ export const CHECKLIST_ANALYSIS = [
       "Crítico na véspera de Natal e sextas-feiras às 18h, mas desnecessário durante a prototipação e validação inicial.",
     strategy:
       "Testes de stress com k6 ou Artillery antes do go-live comercial.",
+  },
+  {
+    id: 19,
+    title: "Estrutura de Soft-Delete no Banco de Dados (Task 1.1 & 1.2)",
+    category: "Data Engineering / LGPD",
+    priority: "CRÍTICA",
+    priorityColor: "emerald",
+    necessity: "Imprescindível (LGPD)",
+    status: "IMPLEMENTADO & VALIDADO",
+    whyNecessary:
+      "Garante a retenção temporária e direito de recuperação de dados, abstração de filtros com a VIEW active_customers, índices parciais de performance e revogação imediata de sessões via procedure soft_delete_customer.",
+    strategy:
+      "DDL com coluna deleted_at TIMESTAMPTZ, índices parciais WHERE deleted_at IS NULL/NOT NULL, VIEW active_customers e stored procedure PL/pgSQL com revogação de acessos e sessões ativas.",
+  },
+  {
+    id: 20,
+    title: "Anonimização e Mascaramento Fiscal (Task 2.1 - pgcrypto sha256)",
+    category: "Data Privacy / LGPD & CTN",
+    priority: "CRÍTICA",
+    priorityColor: "emerald",
+    necessity: "Imprescindível (LGPD & CTN)",
+    status: "IMPLEMENTADO & VALIDADO",
+    whyNecessary:
+      "Cumpre o Art. 16, I da LGPD c/c Art. 173 do CTN (guarda compulsória de dados fiscais por 5 anos). Anonimiza irreversivelmente PII (nome, email, CPF) com hashes sha256 e zera dados secundários (telefone, endereço) mantendo o registro para integridade de notas e pedidos.",
+    strategy:
+      "Função PL/pgSQL anonymize_customer_data(UUID) com pgcrypto digest(..., 'sha256'), zeramento de telefone e endereço para NULL, e preservação estrita de chaves primárias e transações fiscais.",
+  },
+  {
+    id: 21,
+    title: "Motor de Hard-Delete e Agendamento Automatizado (Task 3.1 & 3.2)",
+    category: "SecOps / Backend & LGPD",
+    priority: "CRÍTICA",
+    priorityColor: "emerald",
+    necessity: "Imprescindível (LGPD & CTN)",
+    status: "IMPLEMENTADO & VALIDADO",
+    whyNecessary:
+      "Expurgo definitivo de clientes que excederam a janela de retenção (30 dias), anonimização fiscal compulsória (CTN Art. 173) e exclusão física das foreign keys sem obrigatoriedade legal via Edge Function cron disparada com segredo seguro.",
+    strategy:
+      "Procedure PL/pgSQL purge_expired_customers(retention_days INT) com expurgo definitivo em lotes e Edge Function em TypeScript disparada com verificação de secret via pg_cron.",
+  },
+  {
+    id: 22,
+    title: "Tratamento Global de Exceções, requestId e Omissão de Stacks (Prompt 10 - CWE-209 / OWASP A05:2021)",
+    category: "Back-End / Cyber Security",
+    priority: "CRÍTICA",
+    priorityColor: "emerald",
+    necessity: "Imprescindível (CWE-209 / OWASP A05)",
+    status: "IMPLEMENTADO & VALIDADO",
+    whyNecessary:
+      "Impede que respostas HTTP 500 vazem stack traces, nomes de tabelas PostgreSQL, variáveis de ambiente ou credenciais sigilosas para clientes externos. Garante rastreabilidade através de requestId UUID v4 e redação de campos como password, credit_card e token.",
+    strategy:
+      "Middleware global centralizado errorHandlerMiddleware para Express e wrapEdgeFunctionHandler para Deno/Edge Functions, integrados ao configurador secureLogger com redação recursiva de segredos.",
   },
 ];

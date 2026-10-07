@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para persistir agendamentos feitos pelos clientes]
 import { supabase } from "../../lib/supabase";
 import { clientBookingStyles } from "./ClientBookingView.styles";
@@ -8,6 +9,11 @@ import ProfessionalCard from "../../components/services/ProfessionalCard";
 import DatePicker from "../../components/ui/DatePicker";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
+import ProjectIcon from "../../components/ui/ProjectIcon";
+import { SafeHtml } from "../../components/ui/SafeHtml";
+import { validateSchema, SCHEMAS } from "../../utils/inputValidator";
+import ResilientFormHandler from "../../components/resilience/ResilientFormHandler";
+import SkeletonBookingView from "../../components/resilience/SkeletonBookingView";
 
 // Horários do dia
 const baseTimeSlots = [
@@ -42,6 +48,11 @@ export default function ClientBookingView({
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingErrorMessage, setBookingErrorMessage] = useState("");
+  const [submissionFailureError, setSubmissionFailureError] = useState("");
+  const [notificationNotice, setNotificationNotice] = useState("");
+  const [calendarSavedNotice, setCalendarSavedNotice] = useState(false);
+  const [simulateHighLatency, setSimulateHighLatency] = useState(false);
+  const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(false);
 
   // Serviços ativos no catálogo
   const activeServicesList = services.filter((s) => s.active !== false);
@@ -50,7 +61,7 @@ export default function ClientBookingView({
     activeServicesList.length > 0 ? [activeServicesList[0]] : [],
   );
 
-  // 👇 FILTRA APENAS OS BARBEIROS ATIVOS (Exclui quem está de férias ou inativo!)
+  // FILTRA APENAS OS BARBEIROS ATIVOS (Exclui quem está de férias ou inativo!)
   const activeBarbersList = barbers.filter((b) => b.status === "active");
 
   // Opção Coringa para quem tem pressa
@@ -124,7 +135,7 @@ export default function ClientBookingView({
       const exists = prev.some((s) => s.id === service.id);
       if (exists) {
         if (prev.length === 1) {
-          alert("Você precisa selecionar pelo menos 1 serviço.");
+          setBookingErrorMessage("Você precisa selecionar pelo menos 1 serviço.");
           return prev;
         }
         return prev.filter((s) => s.id !== service.id);
@@ -133,25 +144,30 @@ export default function ClientBookingView({
     });
   };
 
-  // [Função assíncrona: valida os dados e grava o agendamento na tabela appointments do Supabase]
-  const handleConfirmReservation = async () => {
+  // [Função assíncrona: valida os dados e grava o agendamento na tabela appointments do Supabase com tratamento de resiliência]
+  const handleConfirmReservation = async (overrideData = null) => {
     setBookingErrorMessage("");
+    setSubmissionFailureError("");
 
-    if (!clientName.trim() || !clientPhone || clientPhone.length < 14) {
+    const effectiveName = overrideData?.clientName || clientName;
+    const effectivePhone = overrideData?.clientPhone || clientPhone;
+    const effectiveTime = overrideData?.time || bookingTime;
+
+    if (!effectiveName.trim() || !effectivePhone || effectivePhone.length < 14) {
       setBookingErrorMessage(
         "Por favor, preencha seu nome completo e WhatsApp com DDD.",
       );
       return;
     }
 
-    if (!bookingTime) {
+    if (!effectiveTime) {
       setBookingErrorMessage("Selecione um horário disponível na grade.");
       return;
     }
 
     setIsSubmittingBooking(true);
 
-    const [startH, startM] = bookingTime.split(":").map(Number);
+    const [startH, startM] = effectiveTime.split(":").map(Number);
     const totalMins = startH * 60 + startM + totalDuration;
     const endH = Math.floor(totalMins / 60);
     const endM = totalMins % 60;
@@ -166,47 +182,86 @@ export default function ClientBookingView({
 
     const bookingPayload = {
       protocol: protocolId,
-      clientName: clientName.trim(),
-      clientPhone,
+      clientName: effectiveName.trim(),
+      clientPhone: effectivePhone,
       barberId: finalBarber.id,
       barberName: finalBarber.name,
       services: selectedServices.map((s) => s.name).join(" + "),
       totalPrice,
       totalDuration,
       dateFormatted: bookingDate.toLocaleDateString("pt-BR"),
-      time: bookingTime,
+      time: effectiveTime,
       endTime: computedEndTime,
     };
 
+    // Validação estrita de schema de ingestão (Defesa contra Mass Assignment e dados corrompidos)
+    const rawAppointment = {
+      client_name: DOMPurify.sanitize(effectiveName.trim(), { ALLOWED_TAGS: [] }),
+      client_phone: DOMPurify.sanitize(effectivePhone.trim(), { ALLOWED_TAGS: [] }),
+      barber_id: finalBarber.id !== "any" ? finalBarber.id : "any",
+      barber_name: DOMPurify.sanitize(finalBarber.name, { ALLOWED_TAGS: [] }),
+      service_name: selectedServices.map((s) => DOMPurify.sanitize(s.name, { ALLOWED_TAGS: [] })).join(" + "),
+      duration_minutes: totalDuration,
+      price: totalPrice,
+      start_time: effectiveTime,
+      end_time: computedEndTime,
+    };
+
+    const validation = validateSchema(rawAppointment, SCHEMAS.appointmentBooking, {
+      rejectUnknown: true,
+      callerRole: "client",
+    });
+
+    if (!validation.isValid) {
+      console.error("[Ingestion Guard] Falha na validação de schema do agendamento:", validation.errors);
+      setIsSubmittingBooking(false);
+      setBookingErrorMessage("Dados de agendamento não atendem aos critérios de validação de segurança.");
+      return;
+    }
+
     try {
-      // Método Supabase: insere o agendamento real na tabela appointments
-      await supabase.from("appointments").insert([
+      // Método Supabase: insere apenas os campos sanitizados e validados
+      const { error: insertError } = await supabase.from("appointments").insert([
         {
           tenant_id: tenant?.id || null,
-          client_name: clientName.trim(),
-          client_phone: clientPhone,
-          barber_id: finalBarber.id !== "any" ? finalBarber.id : null,
-          barber_name: finalBarber.name,
-          service_name: selectedServices.map((s) => s.name).join(" + "),
-          duration_minutes: totalDuration,
-          price: totalPrice,
-          start_time: bookingTime,
-          end_time: computedEndTime,
+          ...validation.sanitized,
+          barber_id: validation.sanitized.barber_id !== "any" ? validation.sanitized.barber_id : null,
           status: "confirmed",
-          is_paid: false,
+          is_paid: false, // is_paid fixado pelo servidor, nunca confiado do cliente
         },
       ]);
+
+      if (insertError) {
+        throw new Error(insertError.message || "Erro retornado pelo banco Supabase ao persistir agendamento");
+      }
+
+      setConfirmedBooking(bookingPayload);
+      setCurrentStep(5);
+      if (onFinishBooking) onFinishBooking(bookingPayload);
     } catch (err) {
-      console.error("Erro ao salvar agendamento no Supabase:", err);
+      console.warn("Erro ao salvar agendamento no Supabase (acionando resiliência com retenção de dados):", err);
+      setSubmissionFailureError(
+        "Instabilidade na conexão com o banco de dados. Seus dados e seleções foram totalmente preservados em memória local para que você possa tentar novamente."
+      );
     } finally {
       setIsSubmittingBooking(false);
     }
-
-    setConfirmedBooking(bookingPayload);
-    setCurrentStep(5);
-
-    if (onFinishBooking) onFinishBooking(bookingPayload);
   };
+
+  // Simulação de alta latência com Skeleton Screen para testes de UX
+  if (isLoadingSkeleton) {
+    return (
+      <div className={clientBookingStyles.pageWrapper}>
+        <Navbar
+          variant="client"
+          user={{ name: clientName || "Cliente", avatar: "CL", loyaltyPoints: 120 }}
+        />
+        <div className={clientBookingStyles.appContainer}>
+          <SkeletonBookingView latencyNotice={true} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={clientBookingStyles.pageWrapper}>
@@ -218,12 +273,36 @@ export default function ClientBookingView({
           loyaltyPoints: 120,
         }}
         onNotificationsClick={() =>
-          alert("Lembrete: Seu último corte foi há 15 dias!")
+          setNotificationNotice("Lembrete: Seu último corte foi há 15 dias!")
         }
         onQuickAction={() => setCurrentStep(1)}
       />
 
-      <div className={clientBookingStyles.appContainer}>
+      {/* Notificação toast amigável substitui window.alert */}
+      {notificationNotice && (
+        <div className="max-w-2xl mx-auto px-4 pt-2">
+          <div
+            role="status"
+            aria-live="polite"
+            className="p-3 bg-neutral-900 border border-amber-500/40 rounded-xl text-xs text-amber-200 flex items-center justify-between shadow-lg"
+          >
+            <div className="flex items-center gap-2">
+              <ProjectIcon name="Bell" size={14} className="text-amber-300" />
+              <span>{notificationNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNotificationNotice("")}
+              aria-label="Fechar aviso de notificação"
+              className="text-neutral-400 hover:text-white text-xs px-2 py-0.5 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none flex items-center"
+            >
+              <ProjectIcon name="X" size={14} colorVariant="inherit" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main id="main-content" className={clientBookingStyles.appContainer}>
         {/* Banner Deep Link */}
         {initialBarberId &&
           currentStep < 5 &&
@@ -231,7 +310,7 @@ export default function ClientBookingView({
           !selectedBarberObj.isAnyProfessional && (
             <div className={clientBookingStyles.deepLinkBanner}>
               <div className="flex items-center gap-2">
-                <span>💈</span>
+                <ProjectIcon name="Scissors" size={16} className="text-amber-500" />
                 <span>
                   Agendando com:{" "}
                   <strong className={clientBookingStyles.deepLinkBarber}>
@@ -251,7 +330,12 @@ export default function ClientBookingView({
 
         {/* Stepper */}
         {currentStep < 5 && (
-          <div className={clientBookingStyles.stepperBox}>
+          <div
+            role="region"
+            aria-label="Etapas do agendamento"
+            aria-live="polite"
+            className={clientBookingStyles.stepperBox}
+          >
             <div className={clientBookingStyles.stepText}>
               <span className={clientBookingStyles.stepIndicator}>
                 {currentStep}
@@ -274,9 +358,11 @@ export default function ClientBookingView({
               <button
                 type="button"
                 onClick={() => setCurrentStep((prev) => prev - 1)}
-                className="text-xs text-neutral-400 hover:text-white underline cursor-pointer"
+                aria-label="Voltar para a etapa anterior"
+                className="text-xs text-neutral-400 hover:text-white underline cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none inline-flex items-center gap-1.5"
               >
-                ← Voltar
+                <ProjectIcon name="ArrowLeft" size={13} colorVariant="inherit" />
+                Voltar
               </button>
             )}
           </div>
@@ -401,28 +487,77 @@ export default function ClientBookingView({
             </div>
 
             <div className="space-y-3">
-              {/* [Aviso visual sem alert nativo] */}
+              {/* [Aviso visual de validação] */}
               {bookingErrorMessage && (
-                <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-xl text-xs text-red-300">
-                  ⚠️ {bookingErrorMessage}
+                <div
+                  id="booking-validation-error"
+                  role="alert"
+                  aria-live="assertive"
+                  className="p-3 bg-red-950/40 border border-red-800/60 rounded-xl text-xs text-red-300 font-medium flex items-center gap-2"
+                >
+                  <ProjectIcon name="AlertTriangle" size={14} colorVariant="danger" />
+                  <span>{bookingErrorMessage}</span>
                 </div>
               )}
 
+              {/* Tratamento Resiliente com Retenção de Formulário e Tentar Novamente */}
+              {submissionFailureError && (
+                <ResilientFormHandler
+                  error={submissionFailureError}
+                  formData={{
+                    clientName,
+                    clientPhone,
+                    servicos: selectedServices.map((s) => s.name).join(" + "),
+                    barbeiro: selectedBarberObj.name,
+                    data: bookingDate.toLocaleDateString("pt-BR"),
+                    horario: `${bookingTime}h`,
+                  }}
+                  fieldLabels={{
+                    clientName: "Nome do Cliente",
+                    clientPhone: "WhatsApp",
+                    servicos: "Serviços Selecionados",
+                    barbeiro: "Profissional",
+                    data: "Data Marcada",
+                    horario: "Horário",
+                  }}
+                  isSubmitting={isSubmittingBooking}
+                  onRetry={() => handleConfirmReservation()}
+                  onEdit={() => setSubmissionFailureError("")}
+                />
+              )}
+
               <Input
+                id="client-name-input"
                 label="Seu Nome Completo"
                 placeholder="Ex: Carlos Eduardo"
                 value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
+                aria-required="true"
+                aria-describedby={bookingErrorMessage ? "booking-validation-error" : undefined}
+                onChange={(e) => setClientName(DOMPurify.sanitize(e.target.value.trimStart(), { ALLOWED_TAGS: [] }))}
               />
 
               {/* [Restauração: Input do WhatsApp com máscara e validação DDD] */}
               <Input
+                id="client-phone-input"
                 label="Seu WhatsApp (com DDD)"
                 mask="phone"
                 placeholder="(11) 99999-9999"
                 value={clientPhone}
-                onChange={(e) => setClientPhone(e.target.value)}
+                aria-required="true"
+                aria-describedby={bookingErrorMessage ? "booking-validation-error" : undefined}
+                onChange={(e) => setClientPhone(DOMPurify.sanitize(e.target.value.trim(), { ALLOWED_TAGS: [] }))}
               />
+
+              {/* Resumo do Agendamento */}
+              <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs space-y-1">
+                <div className="flex items-center gap-1.5 text-neutral-300 font-semibold text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span>Resumo do Agendamento:</span>
+                </div>
+                <SafeHtml
+                  html={`<strong>${clientName || "Seu Nome"}</strong> • <em>${selectedBarberObj.name || "Barbeiro"}</em>`}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -431,7 +566,9 @@ export default function ClientBookingView({
         {currentStep === 5 && confirmedBooking && (
           <div className={clientBookingStyles.voucherCard}>
             <div className={clientBookingStyles.voucherHeader}>
-              <div className={clientBookingStyles.successIconBox}>✓</div>
+              <div className={clientBookingStyles.successIconBox}>
+                <ProjectIcon name="Check" size={24} className="text-emerald-400" />
+              </div>
               <div>
                 <span className="text-[10px] font-extrabold uppercase text-emerald-400">
                   Agendamento Confirmado!
@@ -450,19 +587,19 @@ export default function ClientBookingView({
                 <span>Barbearia:</span>
                 {/* [Exibe o nome oficial do tenant no voucher de confirmação] */}
                 <span className={clientBookingStyles.voucherItemValue}>
-                  {tenant?.name || "Barbearia"}
+                  <SafeHtml html={tenant?.name || "Barbearia"} />
                 </span>
               </div>
               <div className={clientBookingStyles.voucherItem}>
                 <span>Barbeiro:</span>
                 <span className="font-bold text-amber-400">
-                  {confirmedBooking.barberName}
+                  <SafeHtml html={confirmedBooking.barberName} />
                 </span>
               </div>
               <div className={clientBookingStyles.voucherItem}>
                 <span>Serviços:</span>
                 <span className={clientBookingStyles.voucherItemValue}>
-                  {confirmedBooking.services}
+                  <SafeHtml html={confirmedBooking.services} />
                 </span>
               </div>
               <div className={clientBookingStyles.voucherItem}>
@@ -479,16 +616,26 @@ export default function ClientBookingView({
               </div>
             </div>
 
-            <Button
-              variant="primary"
-              onClick={() => alert("Adicionando à sua agenda do celular...")}
-              className="w-full text-xs py-2.5 font-bold"
-            >
-              📅 Salvar na Agenda do Celular
-            </Button>
+            {calendarSavedNotice ? (
+              <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-xs text-emerald-300 text-center font-bold flex items-center justify-center gap-1.5">
+                <ProjectIcon name="Check" size={14} colorVariant="inherit" />
+                <span>Evento agendado salvo na memória do dispositivo!</span>
+              </div>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => setCalendarSavedNotice(true)}
+                className="w-full text-xs py-2.5 font-bold cursor-pointer"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <ProjectIcon name="Calendar" size={15} colorVariant="inherit" />
+                  Salvar na Agenda do Celular
+                </span>
+              </Button>
+            )}
           </div>
         )}
-      </div>
+      </main>
 
       {/* BARRA FLUTUANTE */}
       {currentStep < 5 && (
@@ -513,7 +660,17 @@ export default function ClientBookingView({
               }}
               className="text-xs py-2.5 px-6 font-extrabold shadow-lg bg-amber-600 hover:bg-amber-500 cursor-pointer"
             >
-              {currentStep === 4 ? "Confirmar Agendamento ✓" : "Continuar ➔"}
+              {currentStep === 4 ? (
+                <span className="flex items-center gap-1.5">
+                  Confirmar Agendamento
+                  <ProjectIcon name="Check" size={14} colorVariant="inherit" />
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  Continuar
+                  <ProjectIcon name="ArrowRight" size={14} colorVariant="inherit" />
+                </span>
+              )}
             </Button>
           </div>
         </div>

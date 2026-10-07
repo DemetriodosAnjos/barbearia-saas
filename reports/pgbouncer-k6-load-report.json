@@ -1,0 +1,56 @@
+{
+  "title": "Relatório de Teste de Carga e Estresse para PgBouncer (k6 / Supabase)",
+  "timestamp": "2026-09-28T17:33:07.082Z",
+  "generator": "k6 Load Benchmark Simulator & Performance QA",
+  "targetConfig": {
+    "url": "http://127.0.0.1:62939",
+    "poolMode": "Transaction Pooling",
+    "peakVUs": 500,
+    "startVUs": 50,
+    "totalDurationMs": 4099
+  },
+  "summaryMetrics": {
+    "totalRequests": 2000,
+    "errorCount": 0,
+    "errorRatePercent": 0,
+    "p50LatencyMs": 16.53,
+    "p95LatencyMs": 88.52,
+    "p99LatencyMs": 203.27,
+    "readOperationsCount": 1321,
+    "writeOperationsCount": 679,
+    "poolExhaustionEvents": 0,
+    "status": "APPROVED"
+  },
+  "criteria": [
+    {
+      "name": "Rampa de Acesso 50 -> 500 VUs",
+      "threshold": "500 VUs sustentados em pico",
+      "actual": "500 VUs executados",
+      "passed": true
+    },
+    {
+      "name": "Taxa de Erros de Conexão",
+      "threshold": "< 1.00%",
+      "actual": "0%",
+      "passed": true
+    },
+    {
+      "name": "Tempo de Resposta Percentílico p(95)",
+      "threshold": "< 500ms",
+      "actual": "88.52ms",
+      "passed": true
+    },
+    {
+      "name": "Tempo de Resposta Percentílico p(99)",
+      "threshold": "< 1500ms",
+      "actual": "203.27ms",
+      "passed": true
+    },
+    {
+      "name": "Prevenção de Estouro do Pool PgBouncer",
+      "threshold": "Zero 503 / Zero Connection Slot Crashes",
+      "actual": "0 estouros",
+      "passed": true
+    }
+  ]
+}

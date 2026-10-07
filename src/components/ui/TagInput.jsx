@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { tagInputStyles } from "./TagInput.styles";
+import ProjectIcon from "./ProjectIcon";
 
 export default function TagInput({
   label = "Especialidades de Atendimento",
@@ -73,7 +74,7 @@ export default function TagInput({
       {availableSuggestions.length > 0 && (
         <div className={tagInputStyles.suggestionsSection}>
           <p className={tagInputStyles.suggestionsHeader}>
-            <span>💡</span>
+            <ProjectIcon name="Lightbulb" size={13} colorVariant="amber" />
             <span>Sugestões rápidas (clique para adicionar):</span>
           </p>
 
@@ -114,7 +115,7 @@ export default function TagInput({
                   className={tagInputStyles.removeBtn}
                   title={`Remover ${tag}`}
                 >
-                  ✕
+                  <ProjectIcon name="X" size={10} colorVariant="inherit" />
                 </button>
               </span>
             ))

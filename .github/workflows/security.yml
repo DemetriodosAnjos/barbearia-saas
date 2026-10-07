@@ -1,0 +1,203 @@
+name: DevSecOps Automated Security Audit (SAST, Secret Scanning & SCA)
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =========================================================================
+  # JOB 1: SECRET SCANNING (Gitleaks & TruffleHog)
+  # Detecta credenciais vazadas, tokens JWT, chaves privadas e API keys
+  # =========================================================================
+  secret-scanning:
+    name: 🛡️ Secret Scanning (Gitleaks & TruffleHog)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Code with Complete History
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks Detection
+        id: gitleaks
+        uses: zricethezav/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+        continue-on-error: false
+
+      - name: Run TruffleHog Deep History Scan
+        id: trufflehog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified=false --fail
+        continue-on-error: false
+
+  # =========================================================================
+  # JOB 2: STATIC APPLICATION SECURITY TESTING (SAST - Semgrep & SonarCloud)
+  # Bloqueia vulnerabilidades de código (Injeção, BOLA, XSS, SSRF) de severidade Alta/Crítica
+  # =========================================================================
+  sast-analysis:
+    name: 🔍 Static Code Analysis (SAST - Semgrep & SonarCloud)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Execute Semgrep SAST Rules (OWASP Top 10 & AppSec)
+        id: semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/javascript
+            p/typescript
+            p/secrets
+            p/react
+          generateSarif: "semgrep-results.sarif"
+          auditOn: "HIGH,CRITICAL"
+        env:
+          SEMGREP_RULES: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/javascript
+            p/typescript
+            p/secrets
+            p/react
+
+      - name: Upload Semgrep SARIF Report
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep-sast
+        continue-on-error: true
+
+      - name: SonarCloud SAST Quality Gate Scanner
+        id: sonarcloud
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=barbershop-saas
+            -Dsonar.projectKey=barbershop-saas-core
+            -Dsonar.sources=src
+            -Dsonar.tests=src/tests
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+
+  # =========================================================================
+  # JOB 3: SOFTWARE COMPOSITION ANALYSIS (SCA - npm audit & Snyk)
+  # Bloqueia dependências de terceiros com CVEs de severidade High e Critical
+  # =========================================================================
+  dependency-audit:
+    name: 📦 Dependency Vulnerability Audit (npm audit & Snyk)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Execute Native npm audit (Strict High & Critical Gate)
+        id: npm_audit
+        run: |
+          echo "=== Executando npm audit para severidades HIGH e CRITICAL ==="
+          npm audit --audit-level=high
+        continue-on-error: false
+
+      - name: Run Snyk Open Source SCA Scanner
+        id: snyk
+        if: env.SNYK_TOKEN != ''
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --json-file-output=snyk-report.json
+        continue-on-error: false
+
+      - name: Upload Snyk Security Audit Artifact
+        if: always() && steps.snyk.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-vulnerability-report
+          path: snyk-report.json
+          retention-days: 14
+
+  # =========================================================================
+  # JOB 4: ENFORCE BRANCH PROTECTION QUALITY GATE
+  # Consolida os resultados e falha o Pull Request se qualquer High/Critical for detectado
+  # =========================================================================
+  security-gate-verdict:
+    name: 🛑 DevSecOps Merge Quality Gate Enforcement
+    runs-on: ubuntu-latest
+    needs: [secret-scanning, sast-analysis, dependency-audit]
+    if: always()
+    steps:
+      - name: Evaluate Security Pipeline Status
+        run: |
+          echo "========================================================"
+          echo "VERIFICAÇÃO DE POLÍTICA DE SEGURANÇA DEVSECOPS"
+          echo "========================================================"
+          echo "Secret Scanning Status: ${{ needs.secret-scanning.result }}"
+          echo "SAST Analysis Status:   ${{ needs.sast-analysis.result }}"
+          echo "Dependency Audit Status:${{ needs.dependency-audit.result }}"
+          echo "========================================================"
+          
+          if [ "${{ needs.secret-scanning.result }}" != "success" ] || \
+             [ "${{ needs.sast-analysis.result }}" != "success" ] || \
+             [ "${{ needs.dependency-audit.result }}" != "success" ]; then
+            echo "❌ ERRO CRÍTICO DEVSECOPS: A pipeline de segurança detectou violações!"
+            echo "   - Vulnerabilidades de severidade ALTA ou CRÍTICA foram encontradas,"
+            echo "     ou segredos/credenciais foram expostos no histórico de commits."
+            echo "   - POLÍTICA DE MERGE: Bloqueio estrito ativado. O merge deste PR está proibido."
+            exit 1
+          fi
+          
+          echo "✅ SUCESSO: Todos os testes de segurança SAST, Secret Scanning e SCA foram aprovados."
+          echo "   Nenhuma vulnerabilidade High/Critical detectada. Código liberado para revisão."
+          exit 0

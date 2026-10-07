@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para persistência real de barbeiros no banco de dados]
 import { supabase } from "../../lib/supabase";
 import { teamStyles } from "./BarbersTeamView.styles";
@@ -9,7 +10,24 @@ import Select from "../../components/ui/Select";
 import Modal from "../../components/ui/Modal";
 import Avatar from "../../components/ui/Avatar";
 import TagInput from "../../components/ui/TagInput";
+import { SafeHtml } from "../../components/ui/SafeHtml";
 import WorkShiftSelector from "../../components/services/WorkShiftSelector";
+import { validateSchema, SCHEMAS, ALLOWED_BARBER_ROLES } from "../../utils/inputValidator";
+import {
+  Scissors,
+  Armchair,
+  ArrowLeft,
+  ArrowRight,
+  ShieldCheck,
+  FileText,
+  Check,
+  Star,
+  Clock,
+  User,
+  AlertTriangle,
+  Edit3,
+  Key,
+} from "lucide-react";
 
 // Escala padrão para inicialização
 const defaultWeeklySchedule = [
@@ -78,11 +96,26 @@ const defaultWeeklySchedule = [
   },
 ];
 
+const generateUUID = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+const isValidUUID = (str) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str || "");
+
 export default function BarbersTeamView({
-  barbers = [], // 👈 Recebe via props
-  onUpdateBarbers, // 👈 Atualiza o estado global
+  barbers = [], // Recebe via props
+  onUpdateBarbers, // Atualiza o estado global
   maxPlanChairs = 6,
   onBack,
+  tenant,
 }) {
   // ========================================================
   // ESTADOS DO MODAL "+ NOVO BARBEIRO" (COM 2 ABAS)
@@ -168,21 +201,46 @@ export default function BarbersTeamView({
 
     setIsSavingBarber(true);
 
-    // [Payload com suporte a colunas snake_case do Postgres e camelCase do React]
+    // Mapeamento e validação estrita da role para evitar escalada de privilégios (ex: role: 'admin')
+    const normalizedRole = (newBarberForm.role || "").toLowerCase().includes("assistente")
+      ? "assistant"
+      : (newBarberForm.role || "").toLowerCase().includes("recep")
+      ? "receptionist"
+      : "barber";
+
+    // Validação estrita de schema de membro da equipe
+    const memberValidation = validateSchema(
+      {
+        name: DOMPurify.sanitize(newBarberForm.name.trim(), { ALLOWED_TAGS: [] }),
+        display_name: DOMPurify.sanitize(newBarberForm.displayName.trim(), { ALLOWED_TAGS: [] }),
+        role: normalizedRole,
+        specialties: (newBarberForm.specialties || []).map((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [] })),
+      },
+      SCHEMAS.barberMember,
+      { rejectUnknown: true }
+    );
+
+    if (!memberValidation.isValid) {
+      setNewBarberErrors({ form: memberValidation.errors[0] });
+      setIsSavingBarber(false);
+      return;
+    }
+
+    // [Payload sanitizado com tipos e limites validados]
     const dbPayload = {
-      name: newBarberForm.name.trim(),
-      display_name: newBarberForm.displayName.trim(),
-      role: newBarberForm.role,
-      email: newBarberForm.email?.trim() || null,
-      phone: newBarberForm.phone.trim(),
-      pix_key: newBarberForm.pixKey?.trim() || null,
-      service_commission: Number(newBarberForm.serviceCommission || 50),
-      product_commission: Number(newBarberForm.productCommission || 10),
-      notes: newBarberForm.notes?.trim() || "",
+      name: memberValidation.sanitized.name,
+      display_name: memberValidation.sanitized.display_name,
+      role: memberValidation.sanitized.role, // Estritamente 'barber', 'assistant' ou 'receptionist'
+      email: newBarberForm.email?.trim() ? DOMPurify.sanitize(newBarberForm.email.trim(), { ALLOWED_TAGS: [] }) : null,
+      phone: DOMPurify.sanitize(newBarberForm.phone.trim(), { ALLOWED_TAGS: [] }),
+      pix_key: newBarberForm.pixKey?.trim() ? DOMPurify.sanitize(newBarberForm.pixKey.trim(), { ALLOWED_TAGS: [] }) : null,
+      service_commission: Math.min(100, Math.max(0, Number(newBarberForm.serviceCommission || 50))),
+      product_commission: Math.min(100, Math.max(0, Number(newBarberForm.productCommission || 10))),
+      notes: DOMPurify.sanitize((newBarberForm.notes?.trim() || "").slice(0, 500), { ALLOWED_TAGS: ["b", "i", "strong", "em"] }),
       status: "active",
       rating: 5.0,
       review_count: 0,
-      specialties: newBarberForm.specialties || [],
+      specialties: memberValidation.sanitized.specialties,
       schedule: newBarberSchedule,
     };
 
@@ -213,9 +271,9 @@ export default function BarbersTeamView({
       setIsNewBarberModalOpen(false);
     } catch (err) {
       console.error("Erro ao cadastrar barbeiro no Supabase:", err);
-      alert(
-        "Não foi possível salvar o barbeiro no banco de dados. Verifique a conexão.",
-      );
+      setNewBarberErrors({
+        form: "Não foi possível salvar o barbeiro no banco de dados. Verifique a conexão.",
+      });
     } finally {
       setIsSavingBarber(false);
     }
@@ -234,14 +292,14 @@ export default function BarbersTeamView({
     setIsSavingBarber(true);
 
     const updatePayload = {
-      display_name: editFormData.displayName || editFormData.name,
-      phone: editFormData.phone,
-      pix_key: editFormData.pixKey || null,
+      display_name: DOMPurify.sanitize((editFormData.displayName || editFormData.name || "").trim(), { ALLOWED_TAGS: [] }),
+      phone: DOMPurify.sanitize((editFormData.phone || "").trim(), { ALLOWED_TAGS: [] }),
+      pix_key: editFormData.pixKey ? DOMPurify.sanitize(editFormData.pixKey.trim(), { ALLOWED_TAGS: [] }) : null,
       role: editFormData.role,
       service_commission: Number(editFormData.serviceCommission || 50),
       product_commission: Number(editFormData.productCommission || 10),
       status: editFormData.status || "active",
-      specialties: editFormData.specialties || [],
+      specialties: (editFormData.specialties || []).map((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [] })),
     };
 
     try {
@@ -308,7 +366,7 @@ export default function BarbersTeamView({
       <div className={teamStyles.headerCard}>
         <div className={teamStyles.titleWrapper}>
           <h1 className={teamStyles.title}>
-            <span>💈</span>
+            <Scissors className="w-5 h-5 text-amber-500 inline-block mr-2" />
             <span>Equipe de Barbeiros & Profissionais</span>
           </h1>
           <p className={teamStyles.subtitle}>
@@ -319,7 +377,7 @@ export default function BarbersTeamView({
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
           <div className={teamStyles.capacityBadge}>
-            <span>🪑</span>
+            <Armchair className="w-3.5 h-3.5 text-amber-500 inline-block mr-1.5" />
             <span>
               {activeChairsCount} de {totalChairs} cadeiras ocupadas
             </span>
@@ -339,7 +397,10 @@ export default function BarbersTeamView({
               onClick={onBack}
               className="text-xs py-2 px-3"
             >
-              ← Voltar
+              <span className="flex items-center gap-1.5">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Voltar</span>
+              </span>
             </Button>
           )}
         </div>
@@ -375,13 +436,13 @@ export default function BarbersTeamView({
                   />
                   <div className={teamStyles.nameWrapper}>
                     <h3 className="text-sm font-bold text-white truncate flex items-center gap-1.5">
-                      <span>{barber.name}</span>
+                      <SafeHtml html={barber.name} />
                       {barber.notes && (
-                        <span title="Possui observações internas">📝</span>
+                        <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" title="Possui observações internas" />
                       )}
                     </h3>
                     <p className={teamStyles.barberRole}>
-                      "{barber.displayName}" • {barber.role}
+                      <SafeHtml html={`"${barber.displayName}" • ${barber.role}`} />
                     </p>
                   </div>
                 </div>
@@ -399,13 +460,14 @@ export default function BarbersTeamView({
                     ? "Inativo (Desligado)"
                     : isVacation
                       ? "Férias / Folga"
-                      : "✓ Ativo"}
+                      : "Ativo"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between text-xs text-neutral-400">
                 <span className="flex items-center gap-1 text-amber-400 font-bold">
-                  ★ {barber.rating}{" "}
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  <span>{barber.rating}</span>{" "}
                   <span className="text-neutral-500 font-normal">
                     ({barber.reviewCount})
                   </span>
@@ -461,7 +523,7 @@ export default function BarbersTeamView({
                   }}
                   className="w-full text-xs py-2 flex items-center justify-center gap-1.5"
                 >
-                  <span>⏰</span>
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
                   <span>Escala & Horários</span>
                 </Button>
               </div>
@@ -477,7 +539,7 @@ export default function BarbersTeamView({
         isOpen={isNewBarberModalOpen}
         size="xl" // Espaçoso para caber a escala confortavelmente!
         onClose={() => setIsNewBarberModalOpen(false)}
-        title="💈 Cadastrar Novo Barbeiro na Equipe"
+        title="Cadastrar Novo Barbeiro na Equipe"
         footer={
           <div className="w-full flex items-center justify-between gap-3">
             <span className="text-[11px] text-neutral-500">
@@ -500,14 +562,20 @@ export default function BarbersTeamView({
                   onClick={() => setNewBarberActiveTab("escala")}
                   className="bg-amber-600 hover:bg-amber-500"
                 >
-                  Avançar para Escala de Horários ➔
+                  <span className="flex items-center gap-1.5">
+                    <span>Avançar para Escala de Horários</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
                 </Button>
               ) : (
                 <Button
                   variant="secondary"
                   onClick={() => setNewBarberActiveTab("dados")}
                 >
-                  ← Voltar para Dados
+                  <span className="flex items-center gap-1.5">
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Voltar para Dados</span>
+                  </span>
                 </Button>
               )}
 
@@ -536,7 +604,7 @@ export default function BarbersTeamView({
                   : "text-neutral-400 hover:text-white"
               }`}
             >
-              <span>👤</span>
+              <User className="w-4 h-4 text-inherit" />
               <span>Aba 1: Dados & Comissões</span>
             </button>
 
@@ -549,7 +617,7 @@ export default function BarbersTeamView({
                   : "text-neutral-400 hover:text-white"
               }`}
             >
-              <span>⏰</span>
+              <Clock className="w-4 h-4 text-inherit" />
               <span>Aba 2: Escala de Horários & Almoço</span>
             </button>
           </div>
@@ -559,6 +627,12 @@ export default function BarbersTeamView({
           {/* ==================================================== */}
           {newBarberActiveTab === "dados" && (
             <div className="space-y-4 pt-1">
+              {newBarberErrors.form && (
+                <div className="p-3 bg-rose-950/50 border border-rose-800 text-rose-300 text-xs rounded-lg flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{newBarberErrors.form}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
                   label="Nome Completo (Documento)"
@@ -612,17 +686,37 @@ export default function BarbersTeamView({
                   error={newBarberErrors.phone}
                 />
 
-                <Input
-                  label="Chave PIX (Para repasse de comissões)"
-                  placeholder="CPF, E-mail ou Telefone"
-                  value={newBarberForm.pixKey}
-                  onChange={(e) =>
-                    setNewBarberForm({
-                      ...newBarberForm,
-                      pixKey: e.target.value,
-                    })
-                  }
-                />
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-neutral-300">
+                      Chave PIX (Para repasse de comissões)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNewBarberForm({
+                          ...newBarberForm,
+                          pixKey: generateUUID(),
+                        })
+                      }
+                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Gerar chave aleatória no formato padrão PIX (EVP)"
+                    >
+                      <Key className="w-3 h-3 text-amber-400" />
+                      <span>Gerar Aleatória</span>
+                    </button>
+                  </div>
+                  <Input
+                    placeholder="CPF, E-mail, Telefone ou Aleatória"
+                    value={newBarberForm.pixKey}
+                    onChange={(e) =>
+                      setNewBarberForm({
+                        ...newBarberForm,
+                        pixKey: e.target.value,
+                      })
+                    }
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -723,10 +817,13 @@ export default function BarbersTeamView({
           {/* ==================================================== */}
           {newBarberActiveTab === "escala" && (
             <div className="space-y-4 pt-1">
-              <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs text-neutral-400 leading-relaxed">
-                ⏰ Defina os dias de trabalho, expediente e horário de almoço
-                individual para este barbeiro. O sistema bloqueará agendamentos
-                automaticamente no intervalo de almoço.
+              <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs text-neutral-400 leading-relaxed flex items-start gap-2">
+                <Clock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <span>
+                  Defina os dias de trabalho, expediente e horário de almoço
+                  individual para este barbeiro. O sistema bloqueará agendamentos
+                  automaticamente no intervalo de almoço.
+                </span>
               </div>
 
               {/* Componente WorkShiftSelector integrado na Aba 2 */}
@@ -749,7 +846,7 @@ export default function BarbersTeamView({
         }}
         title={
           isEditMode
-            ? `✏️ Editando Dados: ${selectedBarberForDetails?.name}`
+            ? `Editando Dados: ${selectedBarberForDetails?.name}`
             : `Ficha do Profissional: ${selectedBarberForDetails?.name}`
         }
         footer={
@@ -771,7 +868,10 @@ export default function BarbersTeamView({
                 Fechar
               </Button>
               <Button variant="primary" onClick={() => setIsEditMode(true)}>
-                ✏️ Editar Dados
+                <span className="flex items-center gap-1.5">
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Editar Dados</span>
+                </span>
               </Button>
             </>
           )
@@ -800,7 +900,7 @@ export default function BarbersTeamView({
                     }`}
                   >
                     {selectedBarberForDetails.status === "active"
-                      ? "✓ Ativo (Trabalhando Normalmente)"
+                      ? "Ativo (Trabalhando Normalmente)"
                       : selectedBarberForDetails.status === "vacation"
                         ? "Férias / Folga"
                         : "Inativo (Desligado)"}
@@ -890,8 +990,9 @@ export default function BarbersTeamView({
 
                 {selectedBarberForDetails.notes && (
                   <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-1 text-xs">
-                    <span className="text-amber-400 font-bold block text-[10px] uppercase">
-                      📝 Observações Internas:
+                    <span className="text-amber-400 font-bold flex items-center gap-1.5 text-[10px] uppercase">
+                      <FileText className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Observações Internas:</span>
                     </span>
                     <p className="text-neutral-300 italic">
                       {selectedBarberForDetails.notes}
@@ -917,7 +1018,10 @@ export default function BarbersTeamView({
                           : "bg-neutral-900 text-neutral-400 border-neutral-800"
                       }`}
                     >
-                      ✓ Ativo
+                      <span className="flex items-center justify-center gap-1">
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Ativo</span>
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -973,16 +1077,37 @@ export default function BarbersTeamView({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    label="Chave PIX"
-                    value={editFormData.pixKey}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        pixKey: e.target.value,
-                      })
-                    }
-                  />
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-neutral-300">
+                        Chave PIX
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditFormData({
+                            ...editFormData,
+                            pixKey: generateUUID(),
+                          })
+                        }
+                        className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Gerar chave aleatória no formato padrão PIX (EVP)"
+                      >
+                        <Key className="w-3 h-3 text-amber-400" />
+                        <span>Gerar Aleatória</span>
+                      </button>
+                    </div>
+                    <Input
+                      placeholder="CPF, E-mail, Telefone ou Aleatória"
+                      value={editFormData.pixKey}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          pixKey: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
                   <Select
                     label="Cargo"
                     value={editFormData.role}
@@ -1050,7 +1175,7 @@ export default function BarbersTeamView({
         isOpen={!!barberForScheduleEdit}
         size="xl"
         onClose={() => setBarberForScheduleEdit(null)}
-        title={`⏰ Escala & Horário de Almoço: ${barberForScheduleEdit?.name}`}
+        title={`Escala & Horário de Almoço: ${barberForScheduleEdit?.name}`}
         footer={
           <>
             <Button

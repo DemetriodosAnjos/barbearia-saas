@@ -59,5 +59,10 @@ describe("Utility: theme", () => {
       expect(getBestContrastTextColor("#FFF")).toBe("#000000");
       expect(getBestContrastTextColor("#000")).toBe("#ffffff");
     });
+
+    it("should export OFFICIAL_PALETTE definitions", () => {
+      expect(OFFICIAL_PALETTE).toBeDefined();
+      expect(typeof OFFICIAL_PALETTE).toBe("object");
+    });
   });
 });

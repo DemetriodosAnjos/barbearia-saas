@@ -30,12 +30,12 @@ export const sidebarStyles = {
   navItemInactive:
     "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800/60 border border-transparent",
 
-  navItemIcon: "w-5 h-5 shrink-0 flex items-center justify-center text-base",
+  navItemIcon: "w-5 h-5 shrink-0 flex items-center justify-center text-amber-500",
   navItemLabel: "flex-1 truncate",
   navItemBadge:
     "text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-600 text-white shadow-xs",
 
-  // 👇 NOVOS ESTILOS PARA SUBMENUS
+  // Estilos para submenus
   chevronIcon:
     "w-4 h-4 text-neutral-500 transition-transform duration-200 shrink-0",
   chevronExpanded: "rotate-180 text-amber-400",

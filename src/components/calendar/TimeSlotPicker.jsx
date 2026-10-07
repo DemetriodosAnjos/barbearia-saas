@@ -1,3 +1,4 @@
+import { Sunrise, Sun, Moon, Clock, User } from "lucide-react";
 import { timeSlotPickerStyles } from "./TimeSlotPicker.styles";
 
 export default function TimeSlotPicker({
@@ -11,9 +12,9 @@ export default function TimeSlotPicker({
   className = "",
 }) {
   const periods = {
-    morning: { label: "Manhã", icon: "🌅", slots: [] },
-    afternoon: { label: "Tarde", icon: "☀️", slots: [] },
-    evening: { label: "Noite", icon: "🌙", slots: [] },
+    morning: { label: "Manhã", Icon: Sunrise, slots: [] },
+    afternoon: { label: "Tarde", Icon: Sun, slots: [] },
+    evening: { label: "Noite", Icon: Moon, slots: [] },
   };
 
   slots.forEach((slot) => {
@@ -54,7 +55,7 @@ export default function TimeSlotPicker({
       {/* Barra de Resumo */}
       <div className={timeSlotPickerStyles.summaryBar}>
         <div className={timeSlotPickerStyles.durationTag}>
-          <span>⏱️</span>
+          <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
           <span>
             Duração total dos serviços:{" "}
             <strong className="text-white font-bold">
@@ -79,11 +80,12 @@ export default function TimeSlotPicker({
       {/* Grade por Turnos */}
       {Object.entries(periods).map(([key, period]) => {
         if (period.slots.length === 0) return null;
+        const PeriodIcon = period.Icon;
 
         return (
           <div key={key} className={timeSlotPickerStyles.periodSection}>
             <div className={timeSlotPickerStyles.periodHeader}>
-              <span>{period.icon}</span>
+              <PeriodIcon className="w-4 h-4 text-amber-400 shrink-0" />
               <span>{period.label}</span>
               <span className="text-[10px] text-neutral-500 font-normal lowercase">
                 ({period.slots.filter((s) => s.status === "available").length}{" "}
@@ -120,8 +122,9 @@ export default function TimeSlotPicker({
                       </span>
                     )}
                     {slot.status === "occupied" && (
-                      <span className={timeSlotPickerStyles.subLabel}>
-                        Ocupado 👤
+                      <span className={`${timeSlotPickerStyles.subLabel} flex items-center justify-center gap-1`}>
+                        <span>Ocupado</span>
+                        <User className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
                       </span>
                     )}
                   </button>

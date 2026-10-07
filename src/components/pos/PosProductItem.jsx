@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Package, RotateCcw, Edit3, Trash2 } from "lucide-react";
 import { posProductStyles } from "./PosProductItem.styles";
 
 export default function PosProductItem({
@@ -11,6 +12,8 @@ export default function PosProductItem({
   onRestore,
   className = "",
 }) {
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+
   // [Defesa: se o produto for nulo ou inválido, não quebra a interface]
   if (!product || !product.name) return null;
 
@@ -18,7 +21,6 @@ export default function PosProductItem({
   const isInactive = product.active === false;
   const hasVariants =
     Array.isArray(product.variants) && product.variants.length > 0;
-  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
 
   const activeVariant = hasVariants
     ? product.variants[selectedVariantIndex]
@@ -56,7 +58,7 @@ export default function PosProductItem({
     >
       <div className={posProductStyles.header}>
         <div className={posProductStyles.productIcon}>
-          {product.icon || "📦"}
+          <Package className="w-5 h-5 text-amber-500" />
         </div>
 
         <div className={posProductStyles.infoWrapper}>
@@ -129,26 +131,28 @@ export default function PosProductItem({
               <button
                 type="button"
                 onClick={() => onRestore && onRestore(product)}
-                className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-emerald-600 text-neutral-200 hover:text-white border border-neutral-700 transition-all cursor-pointer shadow-sm active:scale-95"
+                className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-emerald-600 text-neutral-200 hover:text-white border border-neutral-700 transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center gap-1.5"
               >
-                ↺ Reativar
+                <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Reativar</span>
               </button>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => onEdit && onEdit(product)}
-                  className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors cursor-pointer"
+                  className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  ✏️ Editar
+                  <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Editar</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onDelete && onDelete(product)}
-                  className="text-xs font-bold p-1.5 rounded-xl bg-neutral-800 hover:bg-red-950/40 text-neutral-400 hover:text-red-400 border border-neutral-700 hover:border-red-800/60 transition-colors cursor-pointer"
+                  className="text-xs font-bold p-1.5 rounded-xl bg-neutral-800 hover:bg-red-950/40 text-neutral-400 hover:text-red-400 border border-neutral-700 hover:border-red-800/60 transition-colors cursor-pointer flex items-center justify-center"
                   title="Desativar produto"
                 >
-                  🗑️
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                 </button>
               </>
             )}

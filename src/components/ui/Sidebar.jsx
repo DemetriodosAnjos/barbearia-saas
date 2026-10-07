@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { sidebarStyles } from "./Sidebar.styles";
+import ProjectIcon from "./ProjectIcon";
 
 export default function Sidebar({
   tenantName = "Barbearia Dom Pedro",
@@ -31,6 +32,22 @@ export default function Sidebar({
     }));
   };
 
+  // Helper para renderizar ícone semântico via ProjectIcon SVG
+  const renderItemIcon = (icon, isParent = false) => {
+    if (!icon) return null;
+    if (typeof icon === "string") {
+      return (
+        <ProjectIcon
+          name={icon}
+          size={18}
+          colorVariant="inherit"
+          className="transition-colors"
+        />
+      );
+    }
+    return icon;
+  };
+
   return (
     <>
       {/* Backdrop no celular */}
@@ -53,7 +70,9 @@ export default function Sidebar({
         {/* Cabeçalho */}
         <div className={sidebarStyles.header}>
           <div className={sidebarStyles.brandWrapper}>
-            <div className={sidebarStyles.brandLogo}>💈</div>
+            <div className={sidebarStyles.brandLogo}>
+              <ProjectIcon name="Scissors" size={20} colorVariant="amber" />
+            </div>
             <div className={sidebarStyles.brandInfo}>
               <span className={sidebarStyles.brandTitle}>{tenantName}</span>
               <span className={sidebarStyles.brandPlan}>{tenantPlan}</span>
@@ -107,7 +126,7 @@ export default function Sidebar({
                     `}
                   >
                     <span className={sidebarStyles.navItemIcon}>
-                      {item.icon}
+                      {renderItemIcon(item.icon, true)}
                     </span>
                     <span className={sidebarStyles.navItemLabel}>
                       {item.label}
@@ -151,7 +170,9 @@ export default function Sidebar({
                               ${isChildActive ? sidebarStyles.subItemActive : sidebarStyles.subItemInactive}
                             `}
                           >
-                            <span className="text-sm">{child.icon}</span>
+                            <span className="text-sm shrink-0">
+                              {renderItemIcon(child.icon)}
+                            </span>
                             <span className="truncate">{child.label}</span>
                           </button>
                         );
@@ -178,7 +199,9 @@ export default function Sidebar({
                   ${isDirectActive ? sidebarStyles.navItemActive : sidebarStyles.navItemInactive}
                 `}
               >
-                <span className={sidebarStyles.navItemIcon}>{item.icon}</span>
+                <span className={sidebarStyles.navItemIcon}>
+                  {renderItemIcon(item.icon)}
+                </span>
                 <span className={sidebarStyles.navItemLabel}>{item.label}</span>
                 {item.badge && (
                   <span className={sidebarStyles.navItemBadge}>

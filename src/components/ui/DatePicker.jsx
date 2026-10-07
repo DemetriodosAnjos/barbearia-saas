@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { datePickerStyles } from "./DatePicker.styles";
 import IconButton from "./IconButton";
+import ProjectIcon from "./ProjectIcon";
 
 export default function DatePicker({
   selectedDate,
@@ -238,9 +239,13 @@ export default function DatePicker({
                   <button
                     key={day}
                     type="button"
+                    disabled={past}
+                    aria-label={`${day} de ${months[currentMonth]} de ${currentYear}${today ? ", hoje" : ""}${active ? ", selecionado" : ""}${past ? ", data passada" : ""}`}
+                    aria-pressed={active}
                     onClick={() => onSelectDate && onSelectDate(dayDate)}
                     className={`
                     ${datePickerStyles.dayButton}
+                    focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none
                     ${active ? datePickerStyles.daySelected : today ? datePickerStyles.dayToday : past ? datePickerStyles.dayPast : datePickerStyles.dayDefault}
                   `}
                   >
@@ -261,9 +266,13 @@ export default function DatePicker({
               <button
                 key={dayDate.toISOString()}
                 type="button"
+                disabled={past}
+                aria-label={`${dayDate.getDate()} de ${months[dayDate.getMonth()]}${today ? ", hoje" : ""}${active ? ", selecionado" : ""}${past ? ", data passada" : ""}`}
+                aria-pressed={active}
                 onClick={() => onSelectDate && onSelectDate(dayDate)}
                 className={`
                   ${datePickerStyles.dayButton}
+                  focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none
                   ${active ? datePickerStyles.daySelected : today ? datePickerStyles.dayToday : past ? datePickerStyles.dayPast : datePickerStyles.dayDefault}
                 `}
               >
@@ -290,9 +299,12 @@ export default function DatePicker({
 
           {/* Se a data for passada, exibe aviso sutil de consulta histórica */}
           {isPast(selectedDate) ? (
-            <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-400">
-              📅 Esta data já passou. Modo de{" "}
-              <strong>consulta de agendamentos passados</strong> ativado.
+            <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-400 flex items-center gap-1.5">
+              <ProjectIcon name="Calendar" size={14} colorVariant="amber" />
+              <span>
+                Esta data já passou. Modo de{" "}
+                <strong>consulta de agendamentos passados</strong> ativado.
+              </span>
             </div>
           ) : (
             <div className={datePickerStyles.timeGrid}>
@@ -303,9 +315,12 @@ export default function DatePicker({
                     key={slot.time}
                     type="button"
                     disabled={!slot.available}
+                    aria-label={`Horário ${slot.time}h, ${slot.available ? "disponível" : "indisponível"}${isTimeSelected ? ", selecionado" : ""}`}
+                    aria-pressed={isTimeSelected}
                     onClick={() => onSelectTime && onSelectTime(slot.time)}
                     className={`
                       ${datePickerStyles.timeButton}
+                      focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none
                       ${isTimeSelected ? datePickerStyles.timeSelected : slot.available ? datePickerStyles.timeDefault : datePickerStyles.timeUnavailable}
                     `}
                   >

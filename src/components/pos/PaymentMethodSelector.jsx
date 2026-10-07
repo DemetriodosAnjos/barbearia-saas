@@ -2,6 +2,7 @@ import { useState } from "react";
 import { paymentStyles } from "./PaymentMethodSelector.styles";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
+import ProjectIcon from "../ui/ProjectIcon";
 
 export default function PaymentMethodSelector({
   // [Remoção do total fixo de R$ 177, assumindo zero como base segura]
@@ -93,7 +94,7 @@ export default function PaymentMethodSelector({
           <span className={paymentStyles.totalLabel}>Status da Liquidação</span>
           {isFullyPaid ? (
             <span className={paymentStyles.balancePaid}>
-              ✓ TOTAL QUITADO (100%)
+              TOTAL QUITADO (100%)
             </span>
           ) : (
             <span className={paymentStyles.balancePending}>
@@ -113,7 +114,7 @@ export default function PaymentMethodSelector({
           }}
           className={`${paymentStyles.methodButton} ${activeMethod === "pix" ? paymentStyles.methodActive : paymentStyles.methodInactive}`}
         >
-          <span className="text-base">📱</span>
+          <ProjectIcon name="Smartphone" size={18} colorVariant="inherit" />
           <span className="text-[11px] font-bold">PIX</span>
         </button>
 
@@ -125,7 +126,7 @@ export default function PaymentMethodSelector({
           }}
           className={`${paymentStyles.methodButton} ${activeMethod === "card" ? paymentStyles.methodActive : paymentStyles.methodInactive}`}
         >
-          <span className="text-base">💳</span>
+          <ProjectIcon name="CreditCard" size={18} colorVariant="inherit" />
           <span className="text-[11px] font-bold">Cartão</span>
         </button>
 
@@ -137,7 +138,7 @@ export default function PaymentMethodSelector({
           }}
           className={`${paymentStyles.methodButton} ${activeMethod === "cash" ? paymentStyles.methodActive : paymentStyles.methodInactive}`}
         >
-          <span className="text-base">💵</span>
+          <ProjectIcon name="DollarSign" size={18} colorVariant="inherit" />
           <span className="text-[11px] font-bold">Dinheiro</span>
         </button>
 
@@ -149,7 +150,7 @@ export default function PaymentMethodSelector({
           }}
           className={`${paymentStyles.methodButton} ${activeMethod === "subscription" ? paymentStyles.methodActive : paymentStyles.methodInactive}`}
         >
-          <span className="text-base">👑</span>
+          <ProjectIcon name="Crown" size={18} colorVariant="inherit" />
           <span className="text-[11px] font-bold">Clube VIP</span>
         </button>
 
@@ -161,7 +162,7 @@ export default function PaymentMethodSelector({
           }}
           className={`${paymentStyles.methodButton} ${activeMethod === "credit_account" ? paymentStyles.methodActive : paymentStyles.methodInactive}`}
         >
-          <span className="text-base">📝</span>
+          <ProjectIcon name="FileText" size={18} colorVariant="inherit" />
           <span className="text-[11px] font-bold">Fiado</span>
         </button>
       </div>
@@ -173,7 +174,7 @@ export default function PaymentMethodSelector({
           {activeMethod === "pix" && (
             <div className="space-y-3">
               <div className={paymentStyles.panelTitle}>
-                <span>📱 Pagamento Instantâneo via PIX</span>
+                <span className="flex items-center gap-1.5"><ProjectIcon name="Smartphone" size={16} colorVariant="amber" /><span>Pagamento Instantâneo via PIX</span></span>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-neutral-900 border border-neutral-800 rounded-xl">
                 {/* QR Code Simulado */}
@@ -217,7 +218,7 @@ export default function PaymentMethodSelector({
           {activeMethod === "card" && (
             <div className="space-y-3">
               <div className={paymentStyles.panelTitle}>
-                <span>💳 Maquininha de Cartão</span>
+                <span className="flex items-center gap-1.5"><ProjectIcon name="CreditCard" size={16} colorVariant="amber" /><span>Maquininha de Cartão</span></span>
               </div>
               <div className="flex gap-2">
                 <button
@@ -263,7 +264,7 @@ export default function PaymentMethodSelector({
           {activeMethod === "cash" && (
             <div className="space-y-3">
               <div className={paymentStyles.panelTitle}>
-                <span>💵 Pagamento em Dinheiro Físico</span>
+                <span className="flex items-center gap-1.5"><ProjectIcon name="DollarSign" size={16} colorVariant="amber" /><span>Pagamento em Dinheiro Físico</span></span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
@@ -312,7 +313,7 @@ export default function PaymentMethodSelector({
           {activeMethod === "subscription" && (
             <div className="space-y-3">
               <div className={paymentStyles.panelTitle}>
-                <span>👑 Benefício do Plano de Assinatura</span>
+                <span className="flex items-center gap-1.5"><ProjectIcon name="Crown" size={16} colorVariant="gold" /><span>Benefício do Plano de Assinatura</span></span>
               </div>
               {/* [Validação real se o cliente possui assinatura cadastrada no banco] */}
               {hasSubscription ? (
@@ -346,7 +347,7 @@ export default function PaymentMethodSelector({
           {activeMethod === "credit_account" && (
             <div className="space-y-3">
               <div className={paymentStyles.panelTitle}>
-                <span>📝 Fiado / Débito em Conta</span>
+                <span className="flex items-center gap-1.5"><ProjectIcon name="FileText" size={16} colorVariant="amber" /><span>Fiado / Débito em Conta</span></span>
               </div>
               <div className="p-3 bg-red-950/20 border border-red-800/40 rounded-xl space-y-2">
                 <p className="text-xs text-red-300 font-bold">
@@ -406,7 +407,7 @@ export default function PaymentMethodSelector({
                   className={paymentStyles.removePaymentBtn}
                   title="Estornar lançamento"
                 >
-                  ✕
+                  <ProjectIcon name="X" size={10} colorVariant="inherit" />
                 </button>
               </div>
             </div>
@@ -432,7 +433,7 @@ export default function PaymentMethodSelector({
           className={`text-xs py-2.5 px-6 font-extrabold shadow-lg ${isFullyPaid ? "bg-emerald-600 hover:bg-emerald-500" : ""}`}
         >
           {isFullyPaid
-            ? "✓ Liquidar e Fechar Comanda"
+            ? "Liquidar e Fechar Comanda"
             : "Aguardando Cobertura Total"}
         </Button>
       </div>

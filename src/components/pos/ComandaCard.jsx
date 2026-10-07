@@ -1,5 +1,6 @@
 import { comandaStyles } from "./ComandaCard.styles";
 import Button from "../ui/Button";
+import ProjectIcon from "../ui/ProjectIcon";
 
 export default function ComandaCard({
   // [Remoção do mock estático de Rodrigo Faro / Cerveja e suporte a objeto real ou vazio]
@@ -8,6 +9,7 @@ export default function ComandaCard({
   onRemoveService,
   onRemoveProduct,
   onProceedToPayment,
+  onPayMercadoPago,
   onStatusChange,
   className = "",
 }) {
@@ -89,7 +91,7 @@ export default function ComandaCard({
 
   return (
     <div className={`${comandaStyles.container} ${className}`}>
-      {/* 1. CABEÇALHO DA COMANDA */}
+      {/* 1. CABEÇALHO DA COMANDA COM CONTROLE MANUAL DE STATUS */}
       <div className={comandaStyles.header}>
         <div className={comandaStyles.identityWrapper}>
           {/* [Exibição do identificador real da comanda] */}
@@ -112,12 +114,34 @@ export default function ComandaCard({
             </p>
           </div>
         </div>
+
+        {/* Seletor Manual de Status da Comanda / Atendimento */}
+        <div className="flex items-center gap-2 mt-2 sm:mt-0 bg-neutral-950/80 p-1.5 rounded-xl border border-neutral-800">
+          <span className={`w-2 h-2 rounded-full ${currentStatus.dot} shrink-0`} />
+          <label className="text-[10px] font-bold uppercase text-neutral-400 shrink-0">
+            Status:
+          </label>
+          <select
+            value={comanda.status || "pending_payment"}
+            onChange={(e) => onStatusChange && onStatusChange(e.target.value)}
+            className="bg-neutral-900 border border-neutral-700 hover:border-amber-500/50 text-xs font-bold text-amber-300 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer transition-colors"
+            aria-label={`Alterar status da comanda #${comandaId}`}
+          >
+            <option value="pending_payment">Pendente (Aguardando)</option>
+            <option value="open">Na Cadeira (Aberta)</option>
+            <option value="paid">Pago (Liquidado)</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
+        </div>
       </div>
 
       {/* 2. LISTAGEM DE SERVIÇOS EXECUTADOS */}
       <div className={comandaStyles.section}>
         <div className={comandaStyles.sectionTitle}>
-          <span>✂️ Serviços Executados ({comanda.services.length})</span>
+          <span className="flex items-center gap-1.5">
+            <ProjectIcon name="Scissors" size={14} colorVariant="amber" />
+            <span>Serviços Executados ({comanda.services.length})</span>
+          </span>
           <span className="text-neutral-200 font-mono">
             R$ {totalServices.toFixed(2).replace(".", ",")}
           </span>
@@ -145,7 +169,7 @@ export default function ComandaCard({
                     className={comandaStyles.itemDeleteBtn}
                     title="Remover serviço"
                   >
-                    ✕
+                    <ProjectIcon name="X" size={11} colorVariant="inherit" />
                   </button>
                 )}
               </div>
@@ -157,7 +181,10 @@ export default function ComandaCard({
       {/* 3. LISTAGEM DE PRODUTOS CONSUMIDOS (BAR & VITRINE) */}
       <div className={comandaStyles.section}>
         <div className={comandaStyles.sectionTitle}>
-          <span>🍺 Consumo de Bar & Vitrine ({comanda.products.length})</span>
+          <span className="flex items-center gap-1.5">
+            <ProjectIcon name="Beer" size={14} colorVariant="emerald" />
+            <span>Consumo de Bar & Vitrine ({comanda.products.length})</span>
+          </span>
           <span className="text-neutral-200 font-mono">
             R$ {totalProducts.toFixed(2).replace(".", ",")}
           </span>
@@ -187,7 +214,7 @@ export default function ComandaCard({
                     className={comandaStyles.itemDeleteBtn}
                     title="Remover produto"
                   >
-                    ✕
+                    <ProjectIcon name="X" size={11} colorVariant="inherit" />
                   </button>
                 )}
               </div>
@@ -233,9 +260,9 @@ export default function ComandaCard({
             <Button
               variant="secondary"
               onClick={onAddItem}
-              className="text-xs py-2 px-3.5"
+              className="text-xs py-2 px-3.5 flex items-center gap-1"
             >
-              + Adicionar Item
+              <span>+ Adicionar Item</span>
             </Button>
           )}
 
@@ -252,16 +279,38 @@ export default function ComandaCard({
           )}
 
           {comanda.status !== "paid" ? (
-            <Button
-              variant="primary"
-              onClick={() => onProceedToPayment && onProceedToPayment(comanda)}
-              className="text-xs py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-md"
-            >
-              💳 Ir para Pagamento
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                onClick={() => onPayMercadoPago && onPayMercadoPago(comanda)}
+                className="text-xs py-2 px-3.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 font-extrabold text-white shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <ProjectIcon name="CreditCard" size={13} colorVariant="inherit" />
+                <span>Pagar via Mercado Pago</span>
+              </Button>
+
+              <Button
+                variant="primary"
+                onClick={() => onProceedToPayment && onProceedToPayment(comanda)}
+                className="text-xs py-2 px-3.5 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <ProjectIcon name="DollarSign" size={13} colorVariant="inherit" />
+                <span>Quitar no Caixa</span>
+              </Button>
+            </div>
           ) : (
-            <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-              <span>✓</span> Comanda Liquidada no Caixa
+            <div className="flex items-center justify-between w-full">
+              <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <ProjectIcon name="CheckCircle2" size={14} colorVariant="emerald" />
+                <span>Comanda Liquidada no Caixa</span>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => onStatusChange && onStatusChange("pending_payment")}
+                className="text-xs text-neutral-400 hover:text-amber-400 py-1 px-2.5 ml-auto"
+              >
+                Reabrir Comanda
+              </Button>
             </div>
           )}
         </div>

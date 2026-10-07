@@ -1,3 +1,4 @@
+import { Crown, Clock, Megaphone, MessageSquare, Scissors, ShieldCheck } from "lucide-react";
 import { queueTicketStyles } from "./QueueTicket.styles";
 import Button from "../ui/Button";
 
@@ -60,13 +61,15 @@ export default function QueueTicket({
         {/* [Renderização condicional do selo de prioridade real da fila] */}
         <div>
           {priority === "vip" && (
-            <span className={queueTicketStyles.priorityBadges.vip}>
-              👑 Assinante VIP
+            <span className={`${queueTicketStyles.priorityBadges.vip} inline-flex items-center gap-1`}>
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>Assinante VIP</span>
             </span>
           )}
           {priority === "legal" && (
-            <span className={queueTicketStyles.priorityBadges.legal}>
-              ♿ Prioridade Legal
+            <span className={`${queueTicketStyles.priorityBadges.legal} inline-flex items-center gap-1`}>
+              <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+              <span>Prioridade Legal</span>
             </span>
           )}
           {priority === "normal" && (
@@ -80,7 +83,7 @@ export default function QueueTicket({
       {/* 2. METADADOS: Espera Estimada e Tempo que Chegou */}
       <div className={queueTicketStyles.metaGroup}>
         <div className={queueTicketStyles.metaItem}>
-          <span>⏱️</span>
+          <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
           {/* [Exibição do tempo estimado de espera calculado pelo sistema] */}
           <span>
             Espera:{" "}
@@ -98,8 +101,9 @@ export default function QueueTicket({
         </div>
 
         {isCalled && (
-          <span className="ml-auto text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/40">
-            Chamado no Painel 📢
+          <span className="ml-auto text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/40 inline-flex items-center gap-1">
+            <span>Chamado no Painel</span>
+            <Megaphone className="w-3 h-3 text-sky-300" />
           </span>
         )}
       </div>
@@ -111,11 +115,11 @@ export default function QueueTicket({
           <button
             type="button"
             onClick={() => onNotifyWhatsapp && onNotifyWhatsapp(ticket)}
-            className={queueTicketStyles.btnWhatsapp}
+            className={`${queueTicketStyles.btnWhatsapp} flex items-center justify-center`}
             title="Enviar mensagem no WhatsApp do cliente"
             aria-label="WhatsApp"
           >
-            💬
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
           </button>
 
           {/* Botão de Ausente */}
@@ -135,17 +139,19 @@ export default function QueueTicket({
           <Button
             variant="secondary"
             onClick={() => onCall && onCall(ticket)}
-            className="text-xs py-1.5 px-3"
+            className="text-xs py-1.5 px-3 flex items-center gap-1.5"
           >
-            📢 Chamar
+            <Megaphone className="w-3.5 h-3.5 text-amber-400" />
+            <span>Chamar</span>
           </Button>
         ) : (
           <Button
             variant="primary"
             onClick={() => onStartService && onStartService(ticket)}
-            className="text-xs py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500"
+            className="text-xs py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 flex items-center gap-1.5"
           >
-            💺 Iniciar na Cadeira
+            <Scissors className="w-3.5 h-3.5 text-white" />
+            <span>Iniciar na Cadeira</span>
           </Button>
         )}
       </div>

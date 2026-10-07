@@ -1,0 +1,7 @@
+# Semgrep Ignore Rules
+dist/
+reports/
+node_modules/
+.vitest/
+cypress/
+wrapper-*.zip

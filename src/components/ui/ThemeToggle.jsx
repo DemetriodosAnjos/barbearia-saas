@@ -1,25 +1,32 @@
 import { useState, useEffect } from "react";
 import { themeToggleStyles } from "./ThemeToggle.styles";
+import ProjectIcon from "./ProjectIcon";
+import { safeStorage } from "../../utils/safeStorage";
 
 export default function ThemeToggle({ showLabel = false, className = "" }) {
   // 1. Inicialização Preguiçosa (Lazy Initialization):
-  // Executa apenas uma vez na montagem inicial, eliminando renderizações em cascata.
+  // Executa apenas uma vez na montagem inicial com proteção de safeStorage e fallback padrão Dark (true).
   const [isDark, setIsDark] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const saved = localStorage.getItem("barbersaas_theme_mode");
-    // Se houver preferência salva, respeita. Caso contrário, o padrão inicial é SEMPRE Dark (true).
-    return saved ? saved === "dark" : true;
+    try {
+      const saved = safeStorage.getItem("barbersaas_theme_mode");
+      return saved ? saved === "dark" : true;
+    } catch {
+      return true;
+    }
   });
 
-  // 2. Efeito colateral puro: apenas sincroniza o DOM e o storage quando isDark mudar
-  // (Sem nenhuma chamada a setState aqui dentro)
+  // 2. Efeito colateral puro: apenas sincroniza o DOM e o storage seguro quando isDark mudar
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("barbersaas_theme_mode", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("barbersaas_theme_mode", "light");
+    try {
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+        safeStorage.setItem("barbersaas_theme_mode", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        safeStorage.setItem("barbersaas_theme_mode", "light");
+      }
+    } catch {
+      // Ignora erro silenciosamente
     }
   }, [isDark]);
 
@@ -43,7 +50,11 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
           ${isDark ? themeToggleStyles.iconActive : themeToggleStyles.iconInactive}
         `}
       >
-        🌙
+        <ProjectIcon
+          name="Moon"
+          size={14}
+          colorVariant={isDark ? "amber" : "neutral"}
+        />
       </span>
 
       {/* Ícone do Sol (Modo Claro) */}
@@ -53,7 +64,11 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
           ${!isDark ? themeToggleStyles.iconActive : themeToggleStyles.iconInactive}
         `}
       >
-        ☀️
+        <ProjectIcon
+          name="Sun"
+          size={14}
+          colorVariant={!isDark ? "amber" : "neutral"}
+        />
       </span>
 
       {showLabel && (

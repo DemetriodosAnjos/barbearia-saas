@@ -1,3 +1,4 @@
+import { Scissors, Clock, RotateCcw, Edit3, Trash2, Check, Plus } from "lucide-react";
 import { serviceCardStyles } from "./ServiceCard.styles";
 
 export default function ServiceCard({
@@ -22,7 +23,7 @@ export default function ServiceCard({
   const category = service.category || "Geral";
   const price = Number(service.price || 0);
 
-  // 👇 CORREÇÃO: No modo de gestão, NUNCA aplicamos pointer-events-none para permitir reativar!
+  // [Correção]: No modo de gestão, NUNCA aplicamos pointer-events-none para permitir reativar!
   const currentState = isInactive
     ? "opacity-60 bg-neutral-950 border-neutral-800"
     : disabled
@@ -31,14 +32,27 @@ export default function ServiceCard({
         ? serviceCardStyles.states.selected
         : serviceCardStyles.states.default;
 
+  const handleKeyDown = (e) => {
+    if (!isManagementMode && !disabled && !isInactive && (e.key === " " || e.key === "Enter")) {
+      e.preventDefault();
+      onToggleSelect && onToggleSelect(service);
+    }
+  };
+
   return (
     <div
+      role={isManagementMode ? undefined : "checkbox"}
+      aria-checked={isManagementMode ? undefined : isSelected}
+      aria-label={`Serviço ${service.name}, categoria ${category}, duração ${duration} minutos, valor R$ ${price.toFixed(2).replace(".", ",")}${isSelected ? ", selecionado" : ""}`}
+      tabIndex={isManagementMode || disabled || isInactive ? -1 : 0}
+      onKeyDown={handleKeyDown}
       onClick={() =>
-        !isManagementMode && onToggleSelect && onToggleSelect(service)
+        !isManagementMode && !disabled && !isInactive && onToggleSelect && onToggleSelect(service)
       }
       className={`
         ${serviceCardStyles.container}
         ${currentState}
+        focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none cursor-pointer select-none
         ${className}
       `}
     >
@@ -69,7 +83,7 @@ export default function ServiceCard({
         {/* [Exibição da comissão suportando tanto commission_percent quanto commissionPercent] */}
         {commission !== undefined && commission !== null && (
           <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
-            <span>✂️</span>
+            <Scissors className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>Comissão do Barbeiro: {commission}%</span>
           </div>
         )}
@@ -86,7 +100,7 @@ export default function ServiceCard({
             R$ {price.toFixed(2).replace(".", ",")}
           </span>
           <div className={serviceCardStyles.metaGroup}>
-            <span className={serviceCardStyles.durationIcon}>⏱️</span>
+            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 inline mr-1" />
             <span>{duration} min de cadeira</span>
           </div>
         </div>
@@ -97,26 +111,29 @@ export default function ServiceCard({
               <button
                 type="button"
                 onClick={() => onRestore && onRestore(service)}
-                className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-emerald-600 text-neutral-200 hover:text-white border border-neutral-700 transition-all cursor-pointer shadow-sm active:scale-95"
+                className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-emerald-600 text-neutral-200 hover:text-white border border-neutral-700 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
               >
-                ↺ Reativar
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reativar</span>
               </button>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => onEdit && onEdit(service)}
-                  className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors cursor-pointer"
+                  className="text-xs font-bold py-1.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  ✏️ Editar
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Editar</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onDelete && onDelete(service)}
-                  className="text-xs font-bold p-1.5 rounded-xl bg-neutral-800 hover:bg-red-950/40 text-neutral-400 hover:text-red-400 border border-neutral-700 hover:border-red-800/60 transition-colors cursor-pointer"
+                  className="text-xs font-bold p-1.5 rounded-xl bg-neutral-800 hover:bg-red-950/40 text-neutral-400 hover:text-red-400 border border-neutral-700 hover:border-red-800/60 transition-colors cursor-pointer flex items-center justify-center"
                   title="Desativar serviço"
+                  aria-label="Desativar serviço"
                 >
-                  🗑️
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </>
             )}
@@ -131,7 +148,17 @@ export default function ServiceCard({
               ${isSelected ? serviceCardStyles.btnSelected : serviceCardStyles.btnDefault}
             `}
           >
-            {isSelected ? "✓ Selecionado" : "+ Adicionar"}
+            {isSelected ? (
+              <>
+                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Selecionado</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-3.5 h-3.5" />
+                <span>Adicionar</span>
+              </>
+            )}
           </button>
         )}
       </div>

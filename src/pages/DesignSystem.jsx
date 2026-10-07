@@ -36,20 +36,57 @@ import ServiceMultiSelect from "../components/services/ServiceMultiSelect";
 import ProfessionalCard from "../components/services/ProfessionalCard";
 import WorkShiftSelector from "../components/services/WorkShiftSelector";
 import QueueTicket from "../components/pos/QueueTicket";
+import TurnstileWidget from "../components/security/TurnstileWidget";
 import PosProductItem from "../components/pos/PosProductItem";
 import ComandaCard from "../components/pos/ComandaCard";
 import PaymentMethodSelector from "../components/pos/PaymentMethodSelector";
 import LoyaltyCard from "../components/loyalty/LoyaltyCard";
 import SubscriptionBadge from "../components/loyalty/SubscriptionBadge";
 import ClientHistoryTimeline from "../components/loyalty/ClientHistoryTimeline";
+import TrialBanner from "../components/dashboard/TrialBanner";
 import StatCard from "../components/dashboard/StatCard";
 import FinancialChart from "../components/dashboard/FinancialChart";
 import CommissionBreakdownCard from "../components/dashboard/CommissionBreakdownCard";
 import Avatar from "../components/ui/Avatar";
 import Divider from "../components/ui/Divider";
 import Table from "../components/ui/Table";
+import ProjectIcon, { ICON_MAP, PROJECT_ICON_CATALOG } from "../components/ui/ProjectIcon";
 
 export default function DesignSystem() {
+  // Estados da Galeria de Ícones Oficiais (SVG lucide-react com Paleta Âmbar Nobre)
+  const [iconCategory, setIconCategory] = useState("ALL");
+  const [iconSearch, setIconSearch] = useState("");
+  const [iconColorVariant, setIconColorVariant] = useState("amber");
+  const [copiedIconName, setCopiedIconName] = useState(null);
+  const [iconSize, setIconSize] = useState(24);
+
+  // Mapeamento e filtragem de ícones para a Galeria Oficial
+  const allIconsList = (PROJECT_ICON_CATALOG || []).flatMap((cat) =>
+    cat.icons.map((ic) => ({ ...ic, categoryName: cat.category }))
+  );
+
+  const filteredIcons = allIconsList.filter((icon) => {
+    const matchesCategory =
+      iconCategory === "ALL" || icon.categoryName === iconCategory;
+    const term = (iconSearch || "").toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      icon.name.toLowerCase().includes(term) ||
+      icon.key.toLowerCase().includes(term) ||
+      icon.label.toLowerCase().includes(term) ||
+      (icon.tags && icon.tags.some((t) => t.toLowerCase().includes(term)));
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleCopyIconCode = (icon) => {
+    const code = `<ProjectIcon name="${icon.key}" size={${iconSize}} colorVariant="${iconColorVariant}" />`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(code).catch(() => {});
+    }
+    setCopiedIconName(icon.name);
+    setTimeout(() => setCopiedIconName(null), 2000);
+  };
+
   // Estado do tema White-Label da barbearia
   const [activeBrandTheme, setActiveBrandTheme] = useState("amber");
 
@@ -60,6 +97,17 @@ export default function DesignSystem() {
   const [whatsappNotify, setWhatsappNotify] = useState(true);
   const [onlineBooking, setOnlineBooking] = useState(false);
   const [testandoToggle, settestandoToggle] = useState(false);
+  const [isProbeDemoLoading, setIsProbeDemoLoading] = useState(false);
+  const [showProbeDemoModal, setShowProbeDemoModal] = useState(false);
+
+  const handleTestProbeDemo = () => {
+    setIsProbeDemoLoading(true);
+    setShowProbeDemoModal(true);
+    setTimeout(() => {
+      setIsProbeDemoLoading(false);
+      setShowProbeDemoModal(false);
+    }, 2000);
+  };
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentMonthIndex, setCurrentMonthIndex] = useState(2); // Começa em Março (índice 2)
   const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho"];
@@ -179,19 +227,19 @@ export default function DesignSystem() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const navigationMenuItems = [
-    { id: "agenda", label: "Agenda de Cortes", icon: "📅", badge: "3 novos" },
-    { id: "servicos", label: "Catálogo de Serviços", icon: "✂️" },
-    { id: "profissionais", label: "Equipe de Barbeiros", icon: "💈" },
-    { id: "clientes", label: "Clientes & Histórico", icon: "👥" },
-    { id: "financeiro", label: "Financeiro & Comissões", icon: "💰" },
-    { id: "configuracoes", label: "Configurações da Unidade", icon: "⚙️" },
+    { id: "agenda", label: "Agenda de Cortes", icon: "calendar", badge: "3 novos" },
+    { id: "servicos", label: "Catálogo de Serviços", icon: "scissors" },
+    { id: "profissionais", label: "Equipe de Barbeiros", icon: "barber" },
+    { id: "clientes", label: "Clientes & Histórico", icon: "users" },
+    { id: "financeiro", label: "Financeiro & Comissões", icon: "dollar" },
+    { id: "configuracoes", label: "Configurações da Unidade", icon: "settings" },
   ];
 
   const [activeClientTab, setActiveClientTab] = useState("inicio");
 
   const clientNavTabs = [
-    { id: "inicio", label: "Início", icon: "🏠" },
-    { id: "servicos", label: "Serviços", icon: "✂️" },
+    { id: "inicio", label: "Início", icon: "home" },
+    { id: "servicos", label: "Serviços", icon: "scissors" },
     {
       id: "agendar",
       label: "Agendar",
@@ -212,8 +260,8 @@ export default function DesignSystem() {
       ),
       isCenterAction: true, // Botão elevado central!
     },
-    { id: "meus-cortes", label: "Meus Cortes", icon: "📅", badge: "1" },
-    { id: "perfil", label: "Perfil", icon: "👤" },
+    { id: "meus-cortes", label: "Meus Cortes", icon: "calendar", badge: "1" },
+    { id: "perfil", label: "Perfil", icon: "user" },
   ];
 
   // Estados para testar a troca de abas
@@ -221,10 +269,10 @@ export default function DesignSystem() {
   const [activeFinanceTab, setActiveFinanceTab] = useState("comissoes");
 
   const settingsTabs = [
-    { id: "geral", label: "Dados Gerais", icon: "🏢" },
-    { id: "servicos", label: "Serviços & Preços", icon: "✂️", badge: "12" },
-    { id: "barbeiros", label: "Equipe de Barbeiros", icon: "💈", badge: "4" },
-    { id: "horarios", label: "Horários de Atendimento", icon: "⏰" },
+    { id: "geral", label: "Dados Gerais", icon: "store" },
+    { id: "servicos", label: "Serviços & Preços", icon: "scissors", badge: "12" },
+    { id: "barbeiros", label: "Equipe de Barbeiros", icon: "barber", badge: "4" },
+    { id: "horarios", label: "Horários de Atendimento", icon: "clock" },
   ];
 
   const financeTabs = [
@@ -413,7 +461,7 @@ export default function DesignSystem() {
       category: "Cabelo",
       durationMinutes: 40,
       price: 55,
-      tag: "Mais Pedido ⭐",
+      tag: "Mais Pedido",
     },
     {
       id: "s2",
@@ -624,7 +672,7 @@ export default function DesignSystem() {
       id: "p1",
       name: "Cerveja IPA Artesanal",
       category: "Bar",
-      icon: "🍺",
+      icon: "beer",
       price: 16,
       stock: 12,
       variants: [
@@ -636,7 +684,7 @@ export default function DesignSystem() {
       id: "p2",
       name: "Pomada Modeladora Efeito Matte",
       category: "Vitrine",
-      icon: "🧴",
+      icon: "product",
       price: 45,
       stock: 2, // Estoque Baixo!
       commissionPercent: 15,
@@ -649,7 +697,7 @@ export default function DesignSystem() {
       id: "p3",
       name: "Café Expresso Grão Especial",
       category: "Bar",
-      icon: "☕",
+      icon: "clock",
       price: 6,
       stock: 50,
     },
@@ -657,7 +705,7 @@ export default function DesignSystem() {
       id: "p4",
       name: "Óleo para Barba Wood & Spice",
       category: "Vitrine",
-      icon: "💧",
+      icon: "sparkles",
       price: 38,
       stock: 0, // Esgotado!
       commissionPercent: 10,
@@ -931,7 +979,7 @@ export default function DesignSystem() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className={designSystemStyles.sectionTitle}>
-                <span>🎨</span> Paleta de Cores Oficial & Tokens de Design
+                <ProjectIcon name="Palette" size={22} colorVariant="amber" className="mr-2 inline" /> Paleta de Cores Oficial & Tokens de Design
               </h2>
               <p className={designSystemStyles.sectionSubtitle}>
                 Escala cromática calibrada para acessibilidade WCAG, contraste
@@ -1095,11 +1143,285 @@ export default function DesignSystem() {
           </div>
         </section>
 
+                {/* ======================================================== */}
+        {/* GALERIA DE ÍCONES OFICIAIS (LUCIDE-REACT & ÂMBAR NOBRE)   */}
+        {/* ======================================================== */}
+        <section className={designSystemStyles.section}>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-800 pb-5">
+            <div>
+              <h2 className={designSystemStyles.sectionTitle}>
+                <ProjectIcon name="Scissors" size={24} colorVariant="amber" className="mr-1 inline-block" />
+                <span>Ícones Oficiais do Projeto (lucide-react & Paleta Âmbar Nobre)</span>
+              </h2>
+              <p className={designSystemStyles.sectionSubtitle}>
+                Biblioteca vetorial SVG unificada (<code className="text-amber-400 font-mono text-xs">lucide-react ^1.48.0</code>).
+                Todos os ícones herdam nativamente a Paleta de Cores Oficial &amp; Tokens de Design (<strong>Âmbar Nobre: #f59e0b / text-amber-500</strong>), eliminando 100% dos emojis da interface e garantindo nitidez vetorial e alto contraste WCAG.
+              </p>
+            </div>
+
+            {/* Badges de Status do Sistema de Ícones */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                <ProjectIcon name="Palette" size={13} colorVariant="amber" />
+                Âmbar Nobre Nativo
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-900 text-neutral-300 border border-neutral-800">
+                <ProjectIcon name="ShieldCheck" size={13} colorVariant="emerald" />
+                SVG Vetorial Limpo
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-900 text-neutral-300 border border-neutral-800">
+                <ProjectIcon name="Zap" size={13} colorVariant="gold" />
+                {filteredIcons.length} Ícones Mapeados
+              </span>
+            </div>
+          </div>
+
+          {/* PAINEL DE CONTROLE INTERATIVO (BUSCA, CATEGORIAS, CORES E TAMANHO) */}
+          <div className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-5 space-y-4 shadow-sm">
+            {/* Linha 1: Busca e Seletores de Aparência */}
+            <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
+              {/* Barra de Busca Rápida */}
+              <div className="relative flex-1 max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <ProjectIcon name="Search" size={16} colorVariant="neutral" />
+                </div>
+                <input
+                  type="text"
+                  value={iconSearch}
+                  onChange={(e) => setIconSearch(e.target.value)}
+                  placeholder="Pesquisar ícone por nome, função ou tag..."
+                  className="w-full pl-9 pr-8 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-500 transition-colors"
+                />
+                {iconSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setIconSearch("")}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-white cursor-pointer"
+                  >
+                    <ProjectIcon name="X" size={14} colorVariant="neutral" />
+                  </button>
+                )}
+              </div>
+
+              {/* Controles de Estilização: Paleta e Tamanho */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Seletor de Cores da Paleta */}
+                <div className="flex items-center gap-1.5 bg-neutral-950 border border-neutral-800 p-1 rounded-xl text-xs">
+                  <span className="text-neutral-400 font-bold px-2 text-[11px]">Cor:</span>
+                  <button
+                    type="button"
+                    onClick={() => setIconColorVariant("amber")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${iconColorVariant === "amber" ? "bg-amber-600 text-white shadow-xs" : "text-amber-400 hover:text-white"}`}
+                    title="Paleta Oficial: Âmbar Nobre (#f59e0b / text-amber-500)"
+                  >
+                    Âmbar Nobre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIconColorVariant("amber-dark")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${iconColorVariant === "amber-dark" ? "bg-amber-700 text-white shadow-xs" : "text-amber-500 hover:text-white"}`}
+                    title="Âmbar Escuro (#d97706 / text-amber-600)"
+                  >
+                    Âmbar Escuro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIconColorVariant("amber-light")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${iconColorVariant === "amber-light" ? "bg-amber-400 text-neutral-950 shadow-xs" : "text-amber-300 hover:text-white"}`}
+                    title="Âmbar Claro (#fbbf24 / text-amber-400)"
+                  >
+                    Âmbar Claro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIconColorVariant("gold")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${iconColorVariant === "gold" ? "bg-amber-500 text-neutral-950 shadow-xs" : "text-amber-300 hover:text-white"}`}
+                    title="Dourado Claro"
+                  >
+                    Dourado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIconColorVariant("emerald")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${iconColorVariant === "emerald" ? "bg-emerald-600 text-white shadow-xs" : "text-emerald-400 hover:text-white"}`}
+                    title="Esmeralda / Sucesso"
+                  >
+                    Esmeralda
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIconColorVariant("danger")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${iconColorVariant === "danger" ? "bg-red-600 text-white shadow-xs" : "text-rose-400 hover:text-white"}`}
+                    title="Rubi / Alerta"
+                  >
+                    Rubi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIconColorVariant("neutral")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${iconColorVariant === "neutral" ? "bg-neutral-700 text-white shadow-xs" : "text-neutral-400 hover:text-white"}`}
+                    title="Neutro / Secundário"
+                  >
+                    Neutro
+                  </button>
+                </div>
+
+                {/* Seletor de Tamanhos */}
+                <div className="flex items-center gap-1 bg-neutral-950 border border-neutral-800 p-1 rounded-xl text-xs">
+                  <span className="text-neutral-400 font-bold px-2 text-[11px]">Tamanho:</span>
+                  {[16, 20, 24, 32].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setIconSize(s)}
+                      className={`px-2 py-1 rounded-lg font-mono text-[11px] font-bold transition-all cursor-pointer ${iconSize === s ? "bg-amber-600 text-white shadow-xs" : "text-neutral-400 hover:text-white"}`}
+                    >
+                      {s}px
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Linha 2: Filtro por Categorias Temáticas */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-neutral-800/80">
+              <span className="text-xs font-bold text-neutral-400 mr-2 flex items-center gap-1">
+                <ProjectIcon name="Filter" size={12} colorVariant="amber" />
+                Categorias:
+              </span>
+              <button
+                type="button"
+                onClick={() => setIconCategory("ALL")}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${iconCategory === "ALL" ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" : "text-neutral-400 hover:text-neutral-200 bg-neutral-950/60 border border-neutral-800"}`}
+              >
+                Todas ({allIconsList.length})
+              </button>
+              {(PROJECT_ICON_CATALOG || []).map((cat) => (
+                <button
+                  key={cat.category}
+                  type="button"
+                  onClick={() => setIconCategory(cat.category)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${iconCategory === cat.category ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" : "text-neutral-400 hover:text-neutral-200 bg-neutral-950/60 border border-neutral-800"}`}
+                >
+                  {cat.category} ({cat.icons.length})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Feedback de Cópia Rápida */}
+          {copiedIconName && (
+            <div className="p-3 bg-emerald-950/60 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ProjectIcon name="CheckCircle2" size={16} colorVariant="emerald" />
+                <span>
+                  Snippet copiado para a área de transferência: <code className="font-mono bg-black/40 px-1.5 py-0.5 rounded text-white">&lt;ProjectIcon name=&quot;{copiedIconName}&quot; /&gt;</code>
+                </span>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-400">Pronto para colar!</span>
+            </div>
+          )}
+
+          {/* GRADE DOS ÍCONES VETORIAIS */}
+          {filteredIcons.length === 0 ? (
+            <div className="p-8 text-center bg-neutral-900 border border-neutral-800 rounded-2xl space-y-2">
+              <ProjectIcon name="Search" size={32} colorVariant="neutral" className="mx-auto" />
+              <p className="text-sm font-semibold text-neutral-300">Nenhum ícone encontrado</p>
+              <p className="text-xs text-neutral-500">Tente buscar por outro termo ou selecione a categoria &apos;Todas&apos;.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {filteredIcons.map((icon) => {
+                const isCopied = copiedIconName === icon.name;
+                return (
+                  <div
+                    key={`${icon.categoryName}-${icon.name}`}
+                    className="group bg-neutral-900/80 hover:bg-neutral-850 border border-neutral-800 hover:border-amber-500/50 rounded-2xl p-3.5 flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:shadow-amber-500/5"
+                  >
+                    {/* Visualização Centralizada do Ícone com Paleta Âmbar Nobre */}
+                    <div className="h-16 flex items-center justify-center bg-neutral-950/70 border border-neutral-800/80 rounded-xl group-hover:border-amber-500/30 transition-colors">
+                      <ProjectIcon
+                        name={icon.name}
+                        size={iconSize}
+                        colorVariant={iconColorVariant}
+                        className="transition-transform group-hover:scale-115 duration-200"
+                      />
+                    </div>
+
+                    {/* Metadados do Ícone */}
+                    <div className="mt-3 space-y-1 text-left">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-mono text-xs font-bold text-white truncate" title={icon.name}>
+                          {icon.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-amber-500 font-bold">
+                          {icon.key}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-400 truncate" title={icon.label}>
+                        {icon.label}
+                      </p>
+                    </div>
+
+                    {/* Botão de Copiar Código JSX */}
+                    <button
+                      type="button"
+                      onClick={() => handleCopyIconCode(icon)}
+                      className={`mt-3 w-full py-1.5 px-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${isCopied ? "bg-emerald-600 text-white" : "bg-neutral-800 hover:bg-amber-600 hover:text-white text-neutral-300"}`}
+                      title={`Copiar <ProjectIcon name="${icon.key}" />`}
+                    >
+                      {isCopied ? (
+                        <>
+                          <ProjectIcon name="Check" size={12} colorVariant="inherit" />
+                          <span>Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <ProjectIcon name="Copy" size={12} colorVariant="inherit" />
+                          <span>Copiar JSX</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Caixa de Referência Rápida de Código */}
+          <div className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <ProjectIcon name="Lightbulb" size={20} colorVariant="amber" />
+              <div>
+                <span className="font-bold text-neutral-200 block">Como usar em qualquer componente do projeto:</span>
+                <span className="text-neutral-400 text-[11px]">
+                  Basta importar <code className="text-amber-400 font-mono">import ProjectIcon from &apos;../components/ui/ProjectIcon&apos;</code> e utilizar <code className="text-amber-400 font-mono">&lt;ProjectIcon name=&quot;scissors&quot; /&gt;</code>. A cor Âmbar Nobre (#f59e0b) é herdada automaticamente!
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.clipboard) {
+                  navigator.clipboard.writeText(
+                    'import ProjectIcon from "../components/ui/ProjectIcon";\n\n<ProjectIcon name="scissors" size={20} colorVariant="amber" />'
+                  );
+                }
+                alert("Exemplo copiado!");
+              }}
+              className="shrink-0 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <ProjectIcon name="Copy" size={13} colorVariant="amber" />
+              <span>Copiar Exemplo</span>
+            </button>
+          </div>
+        </section>
+
         {/* 1. SEÇÃO DE BOTÕES */}
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>🔘</span> Botões (Buttons)
+              <ProjectIcon name="CircleDot" size={22} colorVariant="amber" className="mr-2 inline" /> Botões (Buttons)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Variantes visuais e estados interativos (Hover, Disabled,
@@ -1126,13 +1448,39 @@ export default function DesignSystem() {
               Testar Loading
             </Button>
           </div>
+
+          {/* Botão de Verificação Ativa (Sonda) - Padrão Oficial do Projeto */}
+          <div className="mt-4 p-4 rounded-xl bg-neutral-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-mono font-bold text-amber-500 uppercase tracking-wider block">
+                Botão de Verificação de Infraestrutura (Sonda Ativa)
+              </span>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Ícone vetorial <code className="text-amber-400 font-mono">SearchCheck / Loader2</code> (lucide-react), paleta Âmbar Nobre e modal spinner UX de 2s com status &quot;Verificando...&quot;.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleTestProbeDemo}
+              disabled={isProbeDemoLoading}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 font-bold text-xs flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 transition-all shrink-0"
+            >
+              <ProjectIcon
+                name={isProbeDemoLoading ? "Loader2" : "SearchCheck"}
+                size={16}
+                className={isProbeDemoLoading ? "animate-spin text-neutral-950" : "text-neutral-950"}
+                colorVariant="inherit"
+              />
+              <span>{isProbeDemoLoading ? "Verificando..." : "Verificar se foi solucionado"}</span>
+            </button>
+          </div>
         </section>
 
         {/* 2. SEÇÃO DE INPUTS */}
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>📝</span> Campos de Texto (Inputs)
+              <ProjectIcon name="Edit3" size={22} colorVariant="amber" className="mr-2 inline" /> Campos de Texto (Inputs)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Tratamento de labels, dicas de preenchimento, mensagens de erro e
@@ -1198,7 +1546,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>📦</span> Cartões (Cards)
+              <ProjectIcon name="Package" size={22} colorVariant="amber" className="mr-2 inline" /> Cartões (Cards)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Contêineres estruturais para agrupar informações relacionadas.
@@ -1229,7 +1577,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>🔔</span> Alertas & Mensagens de Feedback
+              <ProjectIcon name="Bell" size={22} colorVariant="amber" className="mr-2 inline" /> Alertas & Mensagens de Feedback
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Comunicação clara de erros, sucessos e avisos importantes de
@@ -1267,7 +1615,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>⚡</span> Chaves de Configuração (Toggles / Switches)
+              <ProjectIcon name="Zap" size={22} colorVariant="amber" className="mr-2 inline" /> Chaves de Configuração (Toggles / Switches)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Controles binários para ativação e desativação instantânea de
@@ -1310,7 +1658,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>🪟</span> Janelas Modais (Dialogs)
+              <ProjectIcon name="Layers" size={22} colorVariant="amber" className="mr-2 inline" /> Janelas Modais (Dialogs)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Caixas de diálogo para confirmações críticas, formulários rápidos
@@ -1378,7 +1726,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>↔️</span> Botões de Navegação (Setas de Calendário)
+              <ProjectIcon name="ArrowRight" size={22} colorVariant="amber" className="mr-2 inline" /> Botões de Navegação (Setas de Calendário)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Botões de ícone com área de toque acessível para alternar datas e
@@ -1425,7 +1773,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>🔘</span> Opção Única (Radio Buttons)
+              <ProjectIcon name="CircleDot" size={22} colorVariant="amber" className="mr-2 inline" /> Opção Única (Radio Buttons)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Seleção exclusiva de opções em formulários de agendamento e
@@ -1476,7 +1824,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>☑️</span> Múltipla Escolha (CheckBox)
+              <ProjectIcon name="CheckCircle2" size={22} colorVariant="amber" className="mr-2 inline" /> Múltipla Escolha (CheckBox)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Seleção independente de serviços, dias da semana e permissões.
@@ -1535,7 +1883,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>✂️</span> Botão Dividido (SplitButton)
+              <ProjectIcon name="Scissors" size={22} colorVariant="amber" className="mr-2 inline" /> Botão Dividido (SplitButton)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Executa a ação primária ou abre atalhos rápidos com um único
@@ -1551,17 +1899,17 @@ export default function DesignSystem() {
               options={[
                 {
                   label: "Agendar e Notificar via WhatsApp",
-                  icon: "💬",
+                  icon: <ProjectIcon name="MessageSquare" size={16} colorVariant="neutral" />,
                   onClick: () => alert("Agendado + WhatsApp enviado!"),
                 },
                 {
                   label: "Salvar como Rascunho",
-                  icon: "📝",
+                  icon: "edit",
                   onClick: () => alert("Rascunho salvo temporariamente!"),
                 },
                 {
                   label: "Repetir Semanalmente (Recorrente)",
-                  icon: "🔁",
+                  icon: "refresh",
                   onClick: () => alert("Agendamento recorrente ativado!"),
                 },
               ]}
@@ -1576,12 +1924,12 @@ export default function DesignSystem() {
               options={[
                 {
                   label: "Exportar como PDF",
-                  icon: "📄",
+                  icon: "fileText",
                   onClick: () => alert("Baixando PDF..."),
                 },
                 {
                   label: "Exportar como Excel (.xlsx)",
-                  icon: "📊",
+                  icon: "barChart",
                   onClick: () => alert("Baixando Excel..."),
                 },
               ]}
@@ -1595,7 +1943,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>✨</span> Botão Flutuante (FAB)
+              <ProjectIcon name="Sparkles" size={22} colorVariant="amber" className="mr-2 inline" /> Botão Flutuante (FAB)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Ação primária de alta prioridade acessível de qualquer ponto da
@@ -1612,14 +1960,14 @@ export default function DesignSystem() {
           </div>
         </section>
 
-        {/* 👇 AQUI ESTÁ ELE! Coloque logo abaixo da última section: */}
+        {/* AQUI ESTÁ ELE! Coloque logo abaixo da última section: */}
         <Fab label="Novo Agendamento" onClick={() => setIsModalOpen(true)} />
 
         {/* 12. SEÇÃO DE SELECT / DROPDOWN */}
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>📋</span> Caixas de Seleção (Select / Dropdown)
+              <ProjectIcon name="FileText" size={22} colorVariant="amber" className="mr-2 inline" /> Caixas de Seleção (Select / Dropdown)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Seleção de opções em listas fechadas com suporte a erro e
@@ -1673,7 +2021,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>📅</span> Calendário & Grade de Horários (Date & Time
+              <ProjectIcon name="Calendar" size={22} colorVariant="amber" className="mr-2 inline" /> Calendário & Grade de Horários (Date & Time
               Picker)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
@@ -1737,7 +2085,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>🔍</span> Campo de Busca Inteligente (SearchInput)
+              <ProjectIcon name="Search" size={22} colorVariant="amber" className="mr-2 inline" /> Campo de Busca Inteligente (SearchInput)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Filtro em tempo real com botão de limpeza rápida e atalho visual.
@@ -1787,7 +2135,7 @@ export default function DesignSystem() {
         <section className={designSystemStyles.section}>
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>🧭</span> Menu Lateral de Gestão (Sidebar &
+              <ProjectIcon name="Menu" size={22} colorVariant="amber" className="mr-2 inline" /> Menu Lateral de Gestão (Sidebar &
               NavigationDrawer)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
@@ -1800,7 +2148,7 @@ export default function DesignSystem() {
             {/* Botão para testar o Drawer Mobile */}
             <div className="flex items-center gap-3">
               <Button variant="primary" onClick={() => setIsSidebarOpen(true)}>
-                <span>🍔</span> Abrir Sidebar no Modo Gaveta (Mobile Drawer)
+                <ProjectIcon name="Menu" size={16} colorVariant="inherit" className="mr-1.5 inline" /> Abrir Sidebar no Modo Gaveta (Mobile Drawer)
               </Button>
               <span className="text-xs text-neutral-400">
                 Item selecionado agora:{" "}
@@ -1818,8 +2166,8 @@ export default function DesignSystem() {
                 items={navigationMenuItems}
                 activeItem={activeMenuItem}
                 onSelect={setActiveMenuItem}
-                user={{ name: "Carlos Barbeiro", role: "Master Barber" }}
-                onLogout={() => alert("Simulação de Logout!")}
+                user={{ name: "Gestor da Unidade", role: "Administrador" }}
+                onLogout={() => {}}
               />
             </div>
           </div>
@@ -1835,8 +2183,8 @@ export default function DesignSystem() {
           items={navigationMenuItems}
           activeItem={activeMenuItem}
           onSelect={setActiveMenuItem}
-          user={{ name: "Carlos Barbeiro", role: "Master Barber" }}
-          onLogout={() => alert("Logout!")}
+          user={{ name: "Gestor da Unidade", role: "Administrador" }}
+          onLogout={() => {}}
         />
       </div>
 
@@ -1844,7 +2192,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>🧭</span> Barra de Navegação Superior (Navbar)
+            <ProjectIcon name="Sliders" size={22} colorVariant="amber" className="mr-2 inline" /> Barra de Navegação Superior (Navbar)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Duas experiências especializadas: Painel de Gestão Operacional e
@@ -1912,7 +2260,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>📱</span> Menu Inferior Mobile (BottomNavigation)
+            <ProjectIcon name="Smartphone" size={22} colorVariant="amber" className="mr-2 inline" /> Menu Inferior Mobile (BottomNavigation)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Navegação ergonômica voltada para a zona do polegar no celular do
@@ -1941,8 +2289,9 @@ export default function DesignSystem() {
               </div>
 
               <div className="p-3 bg-amber-600/10 border border-amber-500/20 rounded-xl">
-                <span className="text-xs font-bold text-amber-400">
-                  ⭐ Clube Fidelidade
+                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <ProjectIcon name="Star" size={14} colorVariant="amber" />
+                  <span>Clube Fidelidade</span>
                 </span>
                 <p className="text-[11px] text-neutral-300 mt-0.5">
                   Faltam apenas 2 cortes para você ganhar um corte grátis!
@@ -1974,7 +2323,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>📑</span> Abas de Navegação Local (Tabs)
+            <ProjectIcon name="Layers" size={22} colorVariant="amber" className="mr-2 inline" /> Abas de Navegação Local (Tabs)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Divisão de fluxos densos em blocos instantâneos sem recarregar a
@@ -2001,7 +2350,7 @@ export default function DesignSystem() {
               {activeSettingsTab === "geral" && (
                 <div>
                   <h4 className="font-bold text-white mb-1">
-                    🏢 Dados da Unidade
+                    <ProjectIcon name="Store" size={16} colorVariant="inherit" className="mr-1.5 inline" /> Dados da Unidade
                   </h4>
                   <p className="text-xs text-neutral-400">
                     Edite o nome comercial, CNPJ, telefone e endereço físico da
@@ -2012,7 +2361,7 @@ export default function DesignSystem() {
               {activeSettingsTab === "servicos" && (
                 <div>
                   <h4 className="font-bold text-white mb-1">
-                    ✂️ Gestão do Catálogo (12 Serviços)
+                    <ProjectIcon name="Scissors" size={16} colorVariant="inherit" className="mr-1.5 inline" /> Gestão do Catálogo (12 Serviços)
                   </h4>
                   <p className="text-xs text-neutral-400">
                     Configure preços, tempos estimados e se o serviço pode ser
@@ -2023,7 +2372,7 @@ export default function DesignSystem() {
               {activeSettingsTab === "barbeiros" && (
                 <div>
                   <h4 className="font-bold text-white mb-1">
-                    💈 Equipe Cadastrada (4 Barbeiros)
+                    <ProjectIcon name="Users" size={16} colorVariant="inherit" className="mr-1.5 inline" /> Equipe Cadastrada (4 Barbeiros)
                   </h4>
                   <p className="text-xs text-neutral-400">
                     Defina comissões individuais (ex: 50%), pausas para almoço e
@@ -2033,8 +2382,9 @@ export default function DesignSystem() {
               )}
               {activeSettingsTab === "horarios" && (
                 <div>
-                  <h4 className="font-bold text-white mb-1">
-                    ⏰ Grade de Funcionamento
+                  <h4 className="font-bold text-white mb-1 flex items-center gap-1.5">
+                    <ProjectIcon name="Clock" size={16} colorVariant="amber" />
+                    <span>Grade de Funcionamento</span>
                   </h4>
                   <p className="text-xs text-neutral-400">
                     Configure horário de abertura, fechamento e regras de
@@ -2079,7 +2429,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>🧭</span> Trilha Estrutural (Breadcrumb)
+            <ProjectIcon name="ChevronRight" size={22} colorVariant="amber" className="mr-2 inline" /> Trilha Estrutural (Breadcrumb)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Hierarquia visual de navegação com separadores acessíveis e atalhos
@@ -2100,7 +2450,7 @@ export default function DesignSystem() {
                 items={[
                   {
                     label: "Painel",
-                    icon: "🏠",
+                    icon: <ProjectIcon name="Home" size={14} colorVariant="inherit" />,
                     onClick: () => alert("Voltar ao Painel"),
                   },
                   {
@@ -2129,7 +2479,7 @@ export default function DesignSystem() {
                 items={[
                   {
                     label: "Clientes",
-                    icon: "👥",
+                    icon: <ProjectIcon name="Users" size={14} colorVariant="inherit" />,
                     onClick: () => alert("Ir para Clientes"),
                   },
                   {
@@ -2152,7 +2502,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>📄</span> Paginação de Dados (Pagination)
+            <ProjectIcon name="FileText" size={22} colorVariant="amber" className="mr-2 inline" /> Paginação de Dados (Pagination)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Navegação previsível com truncamento por elipses, fatiamento e
@@ -2202,7 +2552,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>🏷️</span> Selos de Status (Badge / Tag)
+            <ProjectIcon name="Tag" size={22} colorVariant="amber" className="mr-2 inline" /> Selos de Status (Badge / Tag)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Mapeamento semântico visual e controle do ciclo de vida do
@@ -2296,7 +2646,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>⏳</span> Feedback de Carregamento (Skeleton & Spinner)
+            <ProjectIcon name="RefreshCw" size={22} colorVariant="amber" className="mr-2 inline" /> Feedback de Carregamento (Skeleton & Spinner)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Retenção visual estrutural (Skeleton) e prevenção de ações
@@ -2437,7 +2787,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>💈</span> Card de Agendamento da Agenda (AppointmentCard)
+            <ProjectIcon name="Scissors" size={22} colorVariant="amber" className="mr-2 inline" /> Card de Agendamento da Agenda (AppointmentCard)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Altura proporcional à duração, status de pagamento, cliente VIP e
@@ -2525,7 +2875,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>⏱️</span> Coluna Diária do Barbeiro (BarberTimelineColumn)
+            <ProjectIcon name="Clock" size={22} colorVariant="amber" className="mr-2 inline" /> Coluna Diária do Barbeiro (BarberTimelineColumn)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Linha do tempo com posicionamento matemático em pixels, intervalo de
@@ -2572,7 +2922,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>⏰</span> Grade de Horários Inteligente (TimeSlotPicker)
+            <ProjectIcon name="Clock" size={22} colorVariant="amber" className="mr-2 inline" /> Grade de Horários Inteligente (TimeSlotPicker)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Clique em um horário <strong>Livre</strong> para agendar ou em um
@@ -2591,7 +2941,7 @@ export default function DesignSystem() {
             // AÇÃO 1: Clique em Horário Livre -> Dispara simulação do Modal de Agendamento
             onAvailableClick={(slot) => {
               alert(
-                `📅 ABRIR MODAL DE NOVO AGENDAMENTO:\n\n` +
+                `ABRIR MODAL DE NOVO AGENDAMENTO:\n\n` +
                   `• Horário Selecionado: ${slot.time}h\n` +
                   `• Barbeiro Ativo: Carlos Silva\n` +
                   `• Duração Estimada: 50 minutos`,
@@ -2601,19 +2951,19 @@ export default function DesignSystem() {
             onOccupiedClick={(slot) => {
               if (slot.status === "held") {
                 alert(
-                  `⏳ HORÁRIO EM PROCESSO DE CHECKOUT (${slot.time}h):\n\n` +
+                  `[CHECKOUT EM ANDAMENTO] HORÁRIO (${slot.time}h):\n\n` +
                     `• Status: Reservado temporariamente (restam 3 minutos)\n` +
                     `• Canal: Aplicativo Web do Cliente\n` +
                     `• Observação: Aguardando confirmação do PIX.`,
                 );
               } else {
                 alert(
-                  `📋 FICHA DO CLIENTE AGENDADO (${slot.time}h):\n\n` +
-                    `• Cliente: Marcos Vinicius (VIP ★)\n` +
+                  `[FICHA DO CLIENTE AGENDADO] (${slot.time}h):\n\n` +
+                    `• Cliente: Marcos Vinicius (VIP)\n` +
                     `• Telefone: (11) 98765-4321\n` +
                     `• Serviço: Corte Degradê + Barboterapia\n` +
                     `• Valor: R$ 80,00 (Pendente no Caixa)\n` +
-                    `• Status: Confirmado ✓`,
+                    `• Status: Confirmado [OK]`,
                 );
               }
             }}
@@ -2625,7 +2975,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>📅</span> Visão Geral da Agenda (CalendarView)
+            <ProjectIcon name="Calendar" size={22} colorVariant="amber" className="mr-2 inline" /> Visão Geral da Agenda (CalendarView)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Orquestração diária multi-barbeiros, régua horária sincronizada e
@@ -2656,7 +3006,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>✂️</span> Catálogo de Serviços (ServiceCard)
+            <ProjectIcon name="Scissors" size={22} colorVariant="amber" className="mr-2 inline" /> Catálogo de Serviços (ServiceCard)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Cards para seleção no aplicativo do cliente com formatação
@@ -2675,7 +3025,7 @@ export default function DesignSystem() {
               category: "Cabelo",
               durationMinutes: 40,
               price: 55,
-              tag: "Mais Pedido ⭐",
+              tag: "Mais Pedido",
             }}
             isSelected={selectedServiceIds.includes("serv-1")}
             onToggleSelect={handleToggleService}
@@ -2718,7 +3068,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>🛍️</span> Seleção Encadeada de Serviços (ServiceMultiSelect)
+            <ProjectIcon name="ShoppingBag" size={22} colorVariant="amber" className="mr-2 inline" /> Seleção Encadeada de Serviços (ServiceMultiSelect)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Filtro dinâmico por categoria e barra de resumo (carrinho) com
@@ -2734,7 +3084,7 @@ export default function DesignSystem() {
             onContinue={() => {
               const nomes = cartServices.map((s) => s.name).join(", ");
               alert(
-                `🎉 AVANÇANDO PARA O PRÓXIMO PASSO!\n\n` +
+                `AVANÇANDO PARA O PRÓXIMO PASSO!\n\n` +
                   `• Serviços Selecionados: ${nomes}\n` +
                   `• Tempo Total: ${cartServices.reduce((a, c) => a + c.durationMinutes, 0)} minutos\n` +
                   `• Valor Total: R$ ${cartServices.reduce((a, c) => a + c.price, 0).toFixed(2)}\n\n` +
@@ -2749,7 +3099,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>💈</span> Seleção de Barbeiros (ProfessionalCard)
+            <ProjectIcon name="UserCheck" size={22} colorVariant="amber" className="mr-2 inline" /> Seleção de Barbeiros (ProfessionalCard)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Cards de perfil com avaliação por estrelas, selo de encaixe mais
@@ -2773,7 +3123,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>⏱️</span> Escala de Trabalho do Barbeiro (WorkShiftSelector)
+            <ProjectIcon name="Clock" size={22} colorVariant="amber" className="mr-2 inline" /> Escala de Trabalho do Barbeiro (WorkShiftSelector)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Configurador de expediente semanal, folgas e intervalos com cálculo
@@ -2793,7 +3143,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>🎟️</span> Fila de Espera em Tempo Real (QueueTicket /
+            <ProjectIcon name="Receipt" size={22} colorVariant="amber" className="mr-2 inline" /> Fila de Espera em Tempo Real (QueueTicket /
             Waitlist)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
@@ -2814,12 +3164,12 @@ export default function DesignSystem() {
                   ),
                 );
                 alert(
-                  `📢 Senha #${t.position} (${t.clientName}) chamada no painel da barbearia!`,
+                  `Senha #${t.position} (${t.clientName}) chamada no painel da barbearia!`,
                 );
               }}
               onStartService={(t) => {
                 alert(
-                  `💺 INICIANDO ATENDIMENTO:\n\n` +
+                  `INICIANDO ATENDIMENTO:\n\n` +
                     `• Cliente: ${t.clientName}\n` +
                     `• Serviço: ${t.serviceName}\n` +
                     `• Ação: Removido da fila e Comanda nº ${t.id} criada automaticamente!`,
@@ -2828,12 +3178,12 @@ export default function DesignSystem() {
               }}
               onNotifyWhatsapp={(t) => {
                 alert(
-                  `💬 Disparando mensagem WhatsApp para ${t.phone}:\n"Olá ${t.clientName}, sua cadeira está quase pronta na Barbearia!"`,
+                  `Disparando mensagem WhatsApp para ${t.phone}:\n"Olá ${t.clientName}, sua cadeira está quase pronta na Barbearia!"`,
                 );
               }}
               onMarkAbsent={(t) => {
                 alert(
-                  `⚠️ Cliente ${t.clientName} movido para o final da fila.`,
+                  `Atenção: Cliente ${t.clientName} movido para o final da fila.`,
                 );
               }}
             />
@@ -2845,7 +3195,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>🍺</span> Produtos do Bar & Vitrine (PosProductItem)
+            <ProjectIcon name="Beer" size={22} colorVariant="amber" className="mr-2 inline" /> Produtos do Bar & Vitrine (PosProductItem)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Lançamento rápido na comanda com validação de estoque zero, taxa de
@@ -2865,7 +3215,7 @@ export default function DesignSystem() {
                   [p.id]: (prev[p.id] || 0) + 1,
                 }));
                 alert(
-                  `🛒 PRODUTO LANÇADO NA COMANDA!\n\n` +
+                  `PRODUTO LANÇADO NA COMANDA!\n\n` +
                     `• Item: ${p.name}\n` +
                     `• Variação: ${p.selectedVariant ? p.selectedVariant.name : "Padrão"}\n` +
                     `• Valor: R$ ${p.finalPrice.toFixed(2)}\n` +
@@ -2881,7 +3231,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>🧾</span> Comanda Aberta do Caixa (ComandaCard)
+            <ProjectIcon name="Receipt" size={22} colorVariant="amber" className="mr-2 inline" /> Comanda Aberta do Caixa (ComandaCard)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Consolidação de serviços executados, consumo de bar/vitrine e rateio
@@ -2912,7 +3262,7 @@ export default function DesignSystem() {
             }}
             onProceedToPayment={(cmd) => {
               alert(
-                `💳 ABRINDO TELA DE LIQUIDAÇÃO NO CAIXA:\n\n` +
+                `ABRINDO TELA DE LIQUIDAÇÃO NO CAIXA:\n\n` +
                   `• Comanda: #${cmd.id} (${cmd.clientName})\n` +
                   `• Total a Pagar: R$ ${(
                     cmd.services.reduce((a, s) => a + s.price, 0) +
@@ -2933,7 +3283,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>💳</span> Quitação & Split Payment (PaymentMethodSelector)
+            <ProjectIcon name="CreditCard" size={22} colorVariant="amber" className="mr-2 inline" /> Quitação & Split Payment (PaymentMethodSelector)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Divisão de pagamentos (PIX + Cartão + Dinheiro), cálculo automático
@@ -2952,7 +3302,7 @@ export default function DesignSystem() {
             }}
             onFinishPayment={(resumo) => {
               alert(
-                `🎉 COMANDA CMD-1042 LIQUIDADA COM SUCESSO!\n\n` +
+                `COMANDA CMD-1042 LIQUIDADA COM SUCESSO!\n\n` +
                   `• Pagamentos Recebidos:\n` +
                   resumo
                     .map((r) => `  - ${r.method}: R$ ${r.amount.toFixed(2)}`)
@@ -2970,7 +3320,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>⭐</span> Cartão Fidelidade Digital (LoyaltyCard)
+            <ProjectIcon name="Award" size={22} colorVariant="amber" className="mr-2 inline" /> Cartão Fidelidade Digital (LoyaltyCard)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Acúmulo de carimbos digitais, barra de progresso, trava de validade
@@ -2993,7 +3343,7 @@ export default function DesignSystem() {
               clientName="Rodrigo Faro"
               onRedeem={() => {
                 alert(
-                  "🎉 PARABÉNS!\n\nVocê resgatou 1 Corte Grátis na comanda!\nSeu cartão foi reiniciado com 0 selos para uma nova rodada.",
+                  "PARABÉNS!\n\nVocê resgatou 1 Corte Grátis na comanda!\nSeu cartão foi reiniciado com 0 selos para uma nova rodada.",
                 );
                 setUserStamps(0); // Zera o cartão após o resgate
               }}
@@ -3045,7 +3395,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>👑</span> Planos de Assinatura & Franquia (SubscriptionBadge)
+            <ProjectIcon name="Crown" size={22} colorVariant="amber" className="mr-2 inline" /> Planos de Assinatura & Franquia (SubscriptionBadge)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Identificação de assinantes recorrentes, cotas mensais (franquia) e
@@ -3131,7 +3481,7 @@ export default function DesignSystem() {
                 }}
                 onSettleDebt={() => {
                   alert(
-                    "💳 ABRINDO TERMINAL DE COBRANÇA:\n\nCobrar mensalidade de R$ 89,90 no balcão da barbearia para reativar o plano.",
+                    "ABRINDO TERMINAL DE COBRANÇA:\n\nCobrar mensalidade de R$ 89,90 no balcão da barbearia para reativar o plano.",
                   );
                 }}
               />
@@ -3144,7 +3494,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>📜</span> Prontuário & Ficha Técnica (ClientHistoryTimeline)
+            <ProjectIcon name="FileText" size={22} colorVariant="amber" className="mr-2 inline" /> Prontuário & Ficha Técnica (ClientHistoryTimeline)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Histórico cronológico unificado, métricas de frequência/ticket médio
@@ -3171,10 +3521,38 @@ export default function DesignSystem() {
             events={mockClientTimelineEvents}
             onAddTechnicalNote={() => {
               alert(
-                "📝 ABRIR FORMULÁRIO:\n\nAdicionar nova observação técnica de corte para o cliente Rodrigo Faro.",
+                "ABRIR FORMULÁRIO:\n\nAdicionar nova observação técnica de corte para o cliente Rodrigo Faro.",
               );
             }}
           />
+        </div>
+      </section>
+
+      {/* SEÇÃO: BARRA DE PERÍODO DE TESTE & UPGRADE (TrialBanner) */}
+      <section className={designSystemStyles.section}>
+        <div>
+          <h2 className={designSystemStyles.sectionTitle}>
+            <ProjectIcon name="Clock" size={22} colorVariant="amber" className="mr-2 inline" /> Banner de Período de Testes &amp; Upgrade (TrialBanner)
+          </h2>
+          <p className={designSystemStyles.sectionSubtitle}>
+            Contagem regressiva do período de avaliação com alertas, modais de planos (Solo, Pro, Redes) e integração segura de checkout.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-2xl overflow-hidden border border-neutral-800 shadow-md">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block bg-neutral-950 px-4 py-1.5 border-b border-neutral-800">
+              Estado 1: Teste Ativo (4 dias restantes)
+            </span>
+            <TrialBanner trialDaysLeft={4} />
+          </div>
+
+          <div className="rounded-2xl overflow-hidden border border-neutral-800 shadow-md">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block bg-neutral-950 px-4 py-1.5 border-b border-neutral-800">
+              Estado 2: Teste Expirado (0 dias restantes)
+            </span>
+            <TrialBanner trialDaysLeft={0} />
+          </div>
         </div>
       </section>
 
@@ -3183,7 +3561,7 @@ export default function DesignSystem() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>📊</span> Indicadores Financeiros & Operacionais (StatCard /
+              <ProjectIcon name="BarChart3" size={22} colorVariant="amber" className="mr-2 inline" /> Indicadores Financeiros & Operacionais (StatCard /
               KPI)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
@@ -3198,7 +3576,7 @@ export default function DesignSystem() {
             onClick={() => setIsPrivacyModeActive((prev) => !prev)}
             className="text-xs py-1.5 px-3 self-start sm:self-auto"
           >
-            <span>{isPrivacyModeActive ? "👁️‍🗨️" : "👁️"}</span>
+            <ProjectIcon name="Eye" size={16} colorVariant="inherit" />
             <span>
               {isPrivacyModeActive
                 ? "Revelar Valores"
@@ -3212,7 +3590,7 @@ export default function DesignSystem() {
           <StatCard
             title="Faturamento do Dia"
             value="R$ 1.840,00"
-            icon="💰"
+            icon={<ProjectIcon name="DollarSign" size={20} colorVariant="amber" />}
             theme="gold"
             isMasked={isPrivacyModeActive}
             delta={{
@@ -3226,7 +3604,7 @@ export default function DesignSystem() {
           <StatCard
             title="Cortes Realizados"
             value="24 atendimentos"
-            icon="✂️"
+            icon={<ProjectIcon name="Scissors" size={20} colorVariant="amber" />}
             theme="green"
             isMasked={isPrivacyModeActive}
             delta={{
@@ -3240,7 +3618,7 @@ export default function DesignSystem() {
           <StatCard
             title="Ticket Médio"
             value="R$ 76,66"
-            icon="📈"
+            icon={<ProjectIcon name="TrendingUp" size={20} colorVariant="amber" />}
             theme="blue"
             isMasked={isPrivacyModeActive}
             delta={{
@@ -3254,7 +3632,7 @@ export default function DesignSystem() {
           <StatCard
             title="Comissões da Equipe"
             value="R$ 920,00"
-            icon="💈"
+            icon={<ProjectIcon name="UserCheck" size={20} colorVariant="amber" />}
             theme="purple"
             isMasked={isPrivacyModeActive}
             delta={{
@@ -3270,7 +3648,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>📈</span> Gráfico de Receita & Vendas (FinancialChart)
+            <ProjectIcon name="TrendingUp" size={22} colorVariant="amber" className="mr-2 inline" /> Gráfico de Receita & Vendas (FinancialChart)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Barras empilhadas (Serviços vs. Bar/Vitrine), alternância de período
@@ -3291,7 +3669,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>💈</span> Fechamento de Comissões da Equipe
+            <ProjectIcon name="Percent" size={22} colorVariant="amber" className="mr-2 inline" /> Fechamento de Comissões da Equipe
             (CommissionBreakdownCard)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
@@ -3318,7 +3696,7 @@ export default function DesignSystem() {
               summary={carlosCommission}
               onExportReport={() => {
                 alert(
-                  `📄 GERANDO RELATÓRIO DE PRESTAÇÃO DE CONTAS:\n\n` +
+                  `GERANDO RELATÓRIO DE PRESTAÇÃO DE CONTAS:\n\n` +
                     `• Profissional: Carlos Silva\n` +
                     `• Total Bruto Gerado: R$ 2.780,00\n` +
                     `• Comissão Serviços: + R$ 1.200,00\n` +
@@ -3330,7 +3708,7 @@ export default function DesignSystem() {
               }}
               onSettlePayment={() => {
                 alert(
-                  `💸 QUITAÇÃO DE COMISSÃO REALIZADA!\n\n` +
+                  `QUITAÇÃO DE COMISSÃO REALIZADA!\n\n` +
                     `• Beneficiário: Carlos Silva\n` +
                     `• Chave PIX: carlos.barbeiro@saas.com\n` +
                     `• Valor Transferido: R$ 1.105,50\n\n` +
@@ -3379,7 +3757,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>👤</span> Identidade & Divisores (Avatar & Divider)
+            <ProjectIcon name="User" size={22} colorVariant="amber" className="mr-2 inline" /> Identidade & Divisores (Avatar & Divider)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Iniciais automáticas com cores fixas via hash, pontos de status
@@ -3427,7 +3805,7 @@ export default function DesignSystem() {
                 <Avatar name="Rodrigo Faro" size="lg" isVip={true} />
                 <div className="text-xs text-left">
                   <p className="font-bold text-white">Rodrigo Faro</p>
-                  <span className="text-amber-400">Cliente VIP 👑</span>
+                  <span className="text-amber-400 flex items-center gap-1">Cliente VIP <ProjectIcon name="Crown" size={14} colorVariant="gold" /></span>
                 </div>
               </div>
             </div>
@@ -3466,7 +3844,7 @@ export default function DesignSystem() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className={designSystemStyles.sectionTitle}>
-              <span>📋</span> Tabela de Dados Operacionais (Table)
+              <ProjectIcon name="FileText" size={22} colorVariant="amber" className="mr-2 inline" /> Tabela de Dados Operacionais (Table)
             </h2>
             <p className={designSystemStyles.sectionSubtitle}>
               Ordenação por coluna, seleção em massa com barra flutuante e
@@ -3505,7 +3883,7 @@ export default function DesignSystem() {
                 }
                 className="text-xs py-1 px-3 bg-amber-500 text-neutral-950 font-black"
               >
-                💬 Enviar WhatsApp em Lote
+                <ProjectIcon name="MessageSquare" size={14} colorVariant="inherit" className="mr-1.5 inline" /> Enviar WhatsApp em Lote
               </Button>
             }
             // Configuração das Colunas
@@ -3569,22 +3947,22 @@ export default function DesignSystem() {
             actions={[
               {
                 label: "Visualizar Comanda",
-                icon: "👁️",
+                icon: <ProjectIcon name="Eye" size={16} colorVariant="neutral" />,
                 onClick: (row) =>
                   alert(`Abrindo detalhes da Comanda ${row.id}`),
               },
               {
                 label: "Conversar no WhatsApp",
-                icon: "💬",
+                icon: "message",
                 onClick: (row) =>
                   alert(`Abrindo chat do WhatsApp de ${row.clientName}`),
               },
               {
                 label: "Estornar / Cancelar",
-                icon: "✕",
+                icon: <ProjectIcon name="X" size={16} colorVariant="danger" />,
                 isDanger: true,
                 onClick: (row) =>
-                  alert(`⚠️ Deseja realmente estornar a comanda ${row.id}?`),
+                  alert(`Atenção: Deseja realmente estornar a comanda ${row.id}?`),
               },
             ]}
           />
@@ -3595,7 +3973,7 @@ export default function DesignSystem() {
       <section className={designSystemStyles.section}>
         <div>
           <h2 className={designSystemStyles.sectionTitle}>
-            <span>🌓</span> Iluminação & White-Label da Barbearia (ThemeToggle)
+            <ProjectIcon name="Palette" size={22} colorVariant="amber" className="mr-2 inline" /> Iluminação & White-Label da Barbearia (ThemeToggle)
           </h2>
           <p className={designSystemStyles.sectionSubtitle}>
             Alternância Dark/Light para usuários e personalização de paleta da
@@ -3664,7 +4042,7 @@ export default function DesignSystem() {
                       setActiveBrandTheme(key);
                       setBrandTheme(key);
                       alert(
-                        `🎨 IDENTIDADE DA MARCA APLICADA!\n\n• Paleta: ${name}\n• Cor Primária: ${primaryColor}\n• Validação WCAG: Aprovada com Contraste Seguro.`,
+                        `IDENTIDADE DA MARCA APLICADA!\n\n• Paleta: ${name}\n• Cor Primária: ${primaryColor}\n• Validação WCAG: Aprovada com Contraste Seguro.`,
                       );
                     }}
                     className={`
@@ -3688,6 +4066,68 @@ export default function DesignSystem() {
           </div>
         </div>
       </section>
+
+      {/* 41. SEÇÃO DE SEGURANÇA & ANTI-AUTOMAÇÃO (TURNSTILE WIDGET) */}
+      <section className={designSystemStyles.section}>
+        <div>
+          <h2 className={designSystemStyles.sectionTitle}>
+            <ProjectIcon name="ShieldCheck" size={22} colorVariant="amber" className="mr-2 inline" /> Desafio de Segurança & Anti-Automação (TurnstileWidget)
+          </h2>
+          <p className={designSystemStyles.sectionSubtitle}>
+            Componente de proteção contra bots, brute-force e automação não autorizada com suporte a Cloudflare Turnstile e hCaptcha, integrado à paleta Âmbar Nobre.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+          <div className="p-5 bg-neutral-900/60 border border-neutral-800 rounded-2xl">
+            <h4 className="text-xs font-bold text-neutral-300 mb-2 flex items-center gap-1.5">
+              <ProjectIcon name="ShieldCheck" size={16} colorVariant="amber" />
+              <span>Provedor: Cloudflare Turnstile</span>
+            </h4>
+            <TurnstileWidget
+              provider="turnstile"
+              action="login"
+            />
+          </div>
+
+          <div className="p-5 bg-neutral-900/60 border border-neutral-800 rounded-2xl">
+            <h4 className="text-xs font-bold text-neutral-300 mb-2 flex items-center gap-1.5">
+              <ProjectIcon name="Lock" size={16} colorVariant="amber" />
+              <span>Provedor: hCaptcha Enterprise</span>
+            </h4>
+            <TurnstileWidget
+              provider="hcaptcha"
+              action="checkout"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Modal Spinner UX Demo (2s com status Verificando...) */}
+      {showProbeDemoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-neutral-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+            <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin" />
+              <ProjectIcon name="SearchCheck" size={28} className="text-amber-500 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white font-mono tracking-wide">
+                Verificando...
+              </h3>
+              <p className="text-xs text-neutral-400 mt-1">
+                Consultando integridade e status da infraestrutura em nuvem...
+              </p>
+            </div>
+            <div className="w-full bg-neutral-800 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-gradient-to-r from-amber-500 to-amber-400 h-full animate-pulse w-full" />
+            </div>
+            <span className="text-[10px] font-mono text-amber-400 uppercase tracking-widest block font-bold">
+              Tokens de Design • Âmbar Nobre
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para persistência real no banco de dados]
 import { supabase } from "../../lib/supabase";
 import { settingsStyles } from "./BarbershopSettingsView.styles";
@@ -8,6 +9,22 @@ import Button from "../../components/ui/Button";
 import Select from "../../components/ui/Select";
 import Alert from "../../components/ui/Alert";
 import Toggle from "../../components/ui/Toggle";
+import { SafeHtml } from "../../components/ui/SafeHtml";
+import {
+  Building2,
+  Clock,
+  Calendar,
+  MessageSquare,
+  CreditCard,
+  Settings,
+  ArrowLeft,
+  ShieldCheck,
+  Shield,
+  Smartphone,
+  Lightbulb,
+  BarChart3,
+  FileText,
+} from "lucide-react";
 
 // [Função componente: recebe tenant real e callback de sincronização]
 export default function BarbershopSettingsView({
@@ -133,12 +150,12 @@ export default function BarbershopSettingsView({
     // [Objeto templates: utiliza o nome dinâmico da barbearia cadastrada no sistema]
     templates: {
       booking:
-        "Olá {cliente}! 👋 Seu agendamento de {servico} com {barbeiro} foi confirmado para {data} às {horario}h. Caso precise reagendar, acesse: {link_cancelar}",
+        "Olá {cliente}! Seu agendamento de {servico} com {barbeiro} foi confirmado para {data} às {horario}h. Caso precise reagendar, acesse: {link_cancelar}",
       reminder2h:
-        "Fala {cliente}, beleza? Passando para lembrar que seu corte é hoje às {horario}h com {barbeiro}. Te esperamos na cadeira! 💈",
-      nps: "Olá {cliente}! O que achou do seu corte com {barbeiro}? Deixe sua avaliação de 1 a 5 estrelas aqui: {link_avaliar} ⭐",
+        "Fala {cliente}, beleza? Passando para lembrar que seu corte é hoje às {horario}h com {barbeiro}. Te esperamos na cadeira!",
+      nps: "Olá {cliente}! O que achou do seu corte com {barbeiro}? Deixe sua avaliação de 1 a 5 estrelas aqui: {link_avaliar}",
       birthday:
-        "Parabéns {cliente}! 🎉 Nossa equipe te deseja um feliz aniversário! Ganhe 15% de desconto no seu corte este mês com o cupom NIVER15.",
+        "Parabéns {cliente}! Nossa equipe te deseja um feliz aniversário! Ganhe 15% de desconto no seu corte este mês com o cupom NIVER15.",
     },
   });
 
@@ -202,22 +219,26 @@ export default function BarbershopSettingsView({
   const handleSaveTab1 = () => {
     saveSettingsToSupabase(
       {
-        name: businessData.tradeName,
-        corporate_name: businessData.corporateName,
-        cnpj: businessData.cnpj,
-        phone: businessData.phone,
-        slug: businessData.slug,
-        street: businessData.street,
-        city: businessData.city,
-        state: businessData.state,
+        name: DOMPurify.sanitize((businessData.tradeName || "").trim(), { ALLOWED_TAGS: [] }),
+        corporate_name: DOMPurify.sanitize((businessData.corporateName || "").trim(), { ALLOWED_TAGS: [] }),
+        cnpj: DOMPurify.sanitize((businessData.cnpj || "").trim(), { ALLOWED_TAGS: [] }),
+        phone: DOMPurify.sanitize((businessData.phone || "").trim(), { ALLOWED_TAGS: [] }),
+        slug: DOMPurify.sanitize((businessData.slug || "").trim(), { ALLOWED_TAGS: [] }),
+        street: DOMPurify.sanitize((businessData.street || "").trim(), { ALLOWED_TAGS: [] }),
+        city: DOMPurify.sanitize((businessData.city || "").trim(), { ALLOWED_TAGS: [] }),
+        state: DOMPurify.sanitize((businessData.state || "").trim(), { ALLOWED_TAGS: [] }),
       },
       "Dados do estabelecimento salvos com sucesso!",
     );
   };
 
   const handleSaveTab2 = () => {
+    const cleanRules = {
+      ...bookingRules,
+      cancellationPolicyText: DOMPurify.sanitize((bookingRules.cancellationPolicyText || "").trim(), { ALLOWED_TAGS: ["b", "i", "strong", "em"] }),
+    };
     saveSettingsToSupabase(
-      { booking_rules: bookingRules },
+      { booking_rules: cleanRules },
       "Regras de agendamento salvas com sucesso!",
     );
   };
@@ -230,8 +251,12 @@ export default function BarbershopSettingsView({
   };
 
   const handleSaveTab4 = () => {
+    const cleanTemplates = {};
+    Object.keys(whatsappSettings.templates || {}).forEach((k) => {
+      cleanTemplates[k] = DOMPurify.sanitize(whatsappSettings.templates[k] || "", { ALLOWED_TAGS: [] });
+    });
     saveSettingsToSupabase(
-      { whatsapp_settings: whatsappSettings },
+      { whatsapp_settings: { ...whatsappSettings, templates: cleanTemplates } },
       "Automações do WhatsApp salvas com sucesso!",
     );
   };
@@ -244,11 +269,11 @@ export default function BarbershopSettingsView({
   };
 
   const settingsTabs = [
-    { id: "estabelecimento", label: "Estabelecimento", icon: "🏢" },
-    { id: "agendamento", label: "Regras de Agenda", icon: "⏰" },
-    { id: "horarios", label: "Funcionamento", icon: "📅" },
-    { id: "whatsapp", label: "Notificações WhatsApp", icon: "💬" },
-    { id: "financeiro", label: "Políticas & Sinal", icon: "💳" },
+    { id: "estabelecimento", label: "Estabelecimento", icon: "building2" },
+    { id: "agendamento", label: "Regras de Agenda", icon: "clock" },
+    { id: "horarios", label: "Funcionamento", icon: "calendar" },
+    { id: "whatsapp", label: "Notificações WhatsApp", icon: "messageSquare" },
+    { id: "financeiro", label: "Políticas & Sinal", icon: "creditCard" },
   ];
 
   return (
@@ -257,7 +282,7 @@ export default function BarbershopSettingsView({
       <div className={settingsStyles.headerCard}>
         <div>
           <h1 className={settingsStyles.headerTitle}>
-            <span>⚙️</span>
+            <Settings className="w-5 h-5 text-amber-500 inline-block mr-2" />
             <span>Configurações da Barbearia</span>
           </h1>
           <p className={settingsStyles.headerSubtitle}>
@@ -272,7 +297,10 @@ export default function BarbershopSettingsView({
             onClick={onBack}
             className="text-xs py-1.5 px-3 shrink-0"
           >
-            ← Voltar ao Painel
+            <span className="flex items-center gap-1.5">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Voltar ao Painel</span>
+            </span>
           </Button>
         )}
       </div>
@@ -293,13 +321,13 @@ export default function BarbershopSettingsView({
         {/* [Feedback nativo de sucesso ou erro do Supabase] */}
         {successMessage && (
           <Alert variant="success" title="Configurações Atualizadas!">
-            {successMessage}
+            <SafeHtml html={successMessage} />
           </Alert>
         )}
 
         {errorMessage && (
           <Alert variant="error" title="Atenção">
-            {errorMessage}
+            <SafeHtml html={errorMessage} />
           </Alert>
         )}
 
@@ -308,8 +336,9 @@ export default function BarbershopSettingsView({
         {/* ======================================================== */}
         {activeTab === "estabelecimento" && (
           <div className="space-y-6">
-            <h3 className={settingsStyles.sectionTitle}>
-              <span>🏢</span> Dados da Empresa
+            <h3 className={`${settingsStyles.sectionTitle} flex items-center gap-2`}>
+              <Building2 className="w-4 h-4 text-amber-500" />
+              <span>Dados da Empresa</span>
             </h3>
             <div className={settingsStyles.gridTwoCols}>
               <Input
@@ -351,8 +380,9 @@ export default function BarbershopSettingsView({
         {/* ======================================================== */}
         {activeTab === "agendamento" && (
           <div className="space-y-6">
-            <h3 className={settingsStyles.sectionTitle}>
-              <span>⏰</span> Regras de Agenda
+            <h3 className={`${settingsStyles.sectionTitle} flex items-center gap-2`}>
+              <Clock className="w-4 h-4 text-amber-500" />
+              <span>Regras de Agenda</span>
             </h3>
             <div className={settingsStyles.gridThreeCols}>
               <Select
@@ -407,8 +437,9 @@ export default function BarbershopSettingsView({
         {/* ======================================================== */}
         {activeTab === "horarios" && (
           <div className="space-y-6">
-            <h3 className={settingsStyles.sectionTitle}>
-              <span>📅</span> Horário Oficial da Unidade
+            <h3 className={`${settingsStyles.sectionTitle} flex items-center gap-2`}>
+              <Calendar className="w-4 h-4 text-amber-500" />
+              <span>Horário Oficial da Unidade</span>
             </h3>
             <div className="space-y-2">
               {storeHours.map((d) => (
@@ -441,11 +472,15 @@ export default function BarbershopSettingsView({
         {/* ======================================================== */}
         {activeTab === "whatsapp" && (
           <div className="space-y-6">
-            <h3 className={settingsStyles.sectionTitle}>
-              <span>💬</span> Automações de Mensagens via WhatsApp
+            <h3 className={`${settingsStyles.sectionTitle} flex items-center gap-2`}>
+              <MessageSquare className="w-4 h-4 text-amber-500" />
+              <span>Automações de Mensagens via WhatsApp</span>
             </h3>
             <div className="p-4 bg-neutral-950 rounded-2xl flex justify-between items-center text-xs">
-              <span>📱 Confirmação Imediata de Agendamento</span>
+              <span className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-amber-500" />
+                <span>Confirmação Imediata de Agendamento</span>
+              </span>
               <Toggle
                 checked={whatsappSettings.notifyOnBooking}
                 onChange={(val) =>
@@ -475,8 +510,9 @@ export default function BarbershopSettingsView({
         {activeTab === "financeiro" && (
           <div className="space-y-6">
             <div>
-              <h3 className={settingsStyles.sectionTitle}>
-                <span>💳</span> Políticas de Cobrança, Sinal & Taxas do PDV
+              <h3 className={`${settingsStyles.sectionTitle} flex items-center gap-2`}>
+                <CreditCard className="w-4 h-4 text-amber-500" />
+                <span>Políticas de Cobrança, Sinal & Taxas do PDV</span>
               </h3>
               <p className={settingsStyles.sectionSubtitle}>
                 Proteja o caixa da barbearia contra no-shows e defina o rateio
@@ -489,7 +525,8 @@ export default function BarbershopSettingsView({
               <div className="flex items-center justify-between pb-3 border-b border-neutral-800/80">
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>🛡️</span> Exigir Sinal de Reserva Online (Anti-Falta)
+                    <Shield className="w-4 h-4 text-amber-500" />
+                    <span>Exigir Sinal de Reserva Online (Anti-Falta)</span>
                   </h4>
                   <p className="text-[11px] text-neutral-400">
                     O cliente paga uma entrada via PIX no ato do agendamento
@@ -550,8 +587,9 @@ export default function BarbershopSettingsView({
 
                   {/* Simulador Visual do Sinal */}
                   <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl text-xs space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
-                      💡 Exemplo Prático de Agendamento:
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Exemplo Prático de Agendamento:</span>
                     </span>
                     <p className="text-neutral-300">
                       Para um corte de <strong>R$ 60,00</strong> com sinal de{" "}
@@ -584,7 +622,8 @@ export default function BarbershopSettingsView({
             <div className="p-5 bg-neutral-950 border border-neutral-800 rounded-3xl space-y-4">
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                  <span>📊</span> Política de Taxas da Maquininha de Cartão
+                  <BarChart3 className="w-4 h-4 text-amber-500" />
+                  <span>Política de Taxas da Maquininha de Cartão</span>
                 </h4>
                 <p className="text-[11px] text-neutral-400">
                   Define se a barbearia assume 100% dos custos bancários ou se
@@ -646,7 +685,8 @@ export default function BarbershopSettingsView({
               <div className="flex items-center justify-between pb-3 border-b border-neutral-800/80">
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>📝</span> Permitir Fiado / Débito em Conta
+                    <FileText className="w-4 h-4 text-amber-500" />
+                    <span>Permitir Fiado / Débito em Conta</span>
                   </h4>
                   <p className="text-[11px] text-neutral-400">
                     Autoriza a recepção a fechar a comanda lançando saldo

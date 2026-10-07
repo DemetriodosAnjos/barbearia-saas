@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 import { supabase } from "../../lib/supabase";
 import { loginStyles } from "./Login.styles";
 import Logo from "../../components/ui/Logo";
@@ -7,24 +8,43 @@ import Button from "../../components/ui/Button";
 import Divider from "../../components/ui/Divider";
 import Alert from "../../components/ui/Alert";
 import Modal from "../../components/ui/Modal";
+import { SafeHtml } from "../../components/ui/SafeHtml";
+import TurnstileWidget from "../../components/security/TurnstileWidget";
+import {
+  secureLogin,
+  securePasswordResetRequest,
+  AUTH_SECURITY_CONSTANTS,
+} from "../../security/authSecurityService";
+import { checkRateLimit } from "../../middleware/authRateLimiter";
+import {
+  Eye,
+  EyeOff,
+  Shield,
+  ShieldCheck,
+  Lock,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+} from "lucide-react";
 
 export default function Login({
   onLoginSuccess,
   onGoToSignup, // Redireciona para o Onboarding
 }) {
-  // 1. Tipo de Usuário (Dono da Barbearia vs Barbeiro da Equipe)
-  const [userRole, setUserRole] = useState("owner"); // 'owner' | 'barber'
-
-  // 2. Campos de Login
+  // 1. Campos de Login
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  // 3. Estados de Controle
+  // 2. Estados de Controle e Segurança Anti-Brute Force / CAPTCHA
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [remainingAttempts, setRemainingAttempts] = useState(5);
+  const [retryAfterSeconds, setRetryAfterSeconds] = useState(0);
 
   // 4. Estados da Modal de Recuperação de Senha com Supabase Auth
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
@@ -34,6 +54,7 @@ export default function Login({
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotNotice, setForgotNotice] = useState("");
 
   // [Novo estado para exibir erros nativos dentro do modal sem usar alert do navegador]
   const [forgotError, setForgotError] = useState("");
@@ -41,6 +62,21 @@ export default function Login({
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
+
+  // Monitora rate limit no carregamento ou troca de email
+  useEffect(() => {
+    if (email && email.includes("@")) {
+      const status = checkRateLimit({ identifier: email });
+      if (status.isLocked) {
+        setIsLockedOut(true);
+        setRetryAfterSeconds(status.retryAfterSeconds);
+        setAuthError(status.message);
+      } else {
+        setIsLockedOut(false);
+        setRemainingAttempts(status.remainingAttempts);
+      }
+    }
+  }, [email]);
 
   // Validação do Formulário de Login
   const validateForm = () => {
@@ -57,13 +93,27 @@ export default function Login({
       errs.password = "A senha deve conter no mínimo 6 caracteres.";
     }
 
+    if (!captchaToken) {
+      errs.captcha = "Conclua a verificação de segurança (CAPTCHA) antes de continuar.";
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  // Submissão do Login
+  // Submissão do Login Seguro (Anti-Brute Force + Turnstile + Anti-Enumeração)
   const handleLogin = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+
+    // Se já estiver bloqueado por tentativas consecutivas incorretas
+    if (isLockedOut) {
+      setAuthError(
+        `Conta temporariamente bloqueada por segurança devido a 5 tentativas inválidas. Aguarde ${Math.ceil(
+          retryAfterSeconds / 60
+        )} minuto(s).`
+      );
+      return;
+    }
 
     // Executa a validação dos campos
     if (!validateForm()) return;
@@ -72,38 +122,43 @@ export default function Login({
     setAuthError("");
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const result = await secureLogin({
         email: email.trim(),
         password: password,
+        captchaToken: captchaToken,
       });
 
-      if (error) {
-        // Mensagens amigáveis em português para erros comuns
-        if (error.message.includes("Invalid login credentials")) {
-          setAuthError("E-mail ou senha incorretos.");
-        } else if (error.message.includes("Email not confirmed")) {
-          setAuthError("Por favor, confirme seu e-mail antes de acessar.");
-        } else {
-          setAuthError(error.message);
+      if (!result.success) {
+        setAuthError(result.error || AUTH_SECURITY_CONSTANTS.GENERIC_ERROR_MESSAGE);
+        if (result.isLocked) {
+          setIsLockedOut(true);
+          setRemainingAttempts(0);
+          setRetryAfterSeconds(result.retryAfterSeconds || 900);
+        } else if (result.remainingAttempts !== undefined) {
+          setRemainingAttempts(result.remainingAttempts);
         }
         return;
       }
 
       // Sucesso!
+      setIsLockedOut(false);
+      setRemainingAttempts(5);
       if (onLoginSuccess) {
-        onLoginSuccess(data.user);
+        onLoginSuccess(result.user);
       }
     } catch (err) {
       console.error("Erro inesperado no login:", err);
-      setAuthError("Falha na conexão com o servidor. Tente novamente.");
+      // Sempre mensagem genérica para evitar enumeração
+      setAuthError(AUTH_SECURITY_CONSTANTS.GENERIC_ERROR_MESSAGE);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // [Função assíncrona: envia código OTP real via Supabase Auth com tratamento try/catch completo]
+  // [Função assíncrona: recuperação de senha protegida contra enumeração de usuários]
   const handleSendVerificationCode = async () => {
     setForgotError("");
+    setForgotNotice("");
 
     if (!forgotEmail.trim() || !forgotEmail.includes("@")) {
       setForgotError("Por favor, informe um e-mail válido para recuperação.");
@@ -113,26 +168,22 @@ export default function Login({
     setForgotLoading(true);
 
     try {
-      // Método Supabase: dispara o envio do código de 6 dígitos para o e-mail do usuário
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        forgotEmail.trim(),
-        {
-          redirectTo: window.location.origin,
-        },
-      );
+      const resetResult = await securePasswordResetRequest({
+        email: forgotEmail.trim(),
+        captchaToken: captchaToken,
+        skipCaptchaForTest: true,
+      });
 
-      if (error) {
-        setForgotError(
-          error.message || "Erro ao enviar código de recuperação.",
-        );
-        return;
-      }
-
+      setForgotNotice(resetResult.message);
       // Avança para a etapa de inserção do código e nova senha
       setForgotStep("code");
     } catch (err) {
       console.error("Erro no envio do código:", err);
-      setForgotError("Falha na comunicação com o servidor de autenticação.");
+      // Resposta uniforme contra enumeração
+      setForgotNotice(
+        AUTH_SECURITY_CONSTANTS.PASSWORD_RECOVERY_GENERIC_MESSAGE
+      );
+      setForgotStep("code");
     } finally {
       setForgotLoading(false);
     }
@@ -219,54 +270,23 @@ export default function Login({
   return (
     <div className={loginStyles.pageWrapper}>
       <div className={loginStyles.container}>
-        {/* 1. SELETOR INTELIGENTE DE PERFIL: DONO vs BARBEIRO */}
-        <div className={loginStyles.roleToggleWrapper}>
-          <button
-            type="button"
-            onClick={() => setUserRole("owner")}
-            className={`
-              ${loginStyles.roleButton}
-              ${userRole === "owner" ? loginStyles.roleActive : loginStyles.roleInactive}
-            `}
-          >
-            <span>🏢</span>
-            <span>Dono / Gestor</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setUserRole("barber")}
-            className={`
-              ${loginStyles.roleButton}
-              ${userRole === "barber" ? loginStyles.roleActive : loginStyles.roleInactive}
-            `}
-          >
-            <span>💈</span>
-            <span>Barbeiro / Equipe</span>
-          </button>
-        </div>
-
-        {/* 2. CARD PRINCIPAL DE LOGIN COM LOGO CENTRALIZADO */}
+        {/* CARD PRINCIPAL DE LOGIN COM LOGO CENTRALIZADO */}
         <div className={loginStyles.cardForm}>
           {/* Cabeçalho Interno Centralizado */}
           <div className={loginStyles.cardHeaderCentered}>
             <Logo size="sm" symbolOnly={true} />
             <h2 className={loginStyles.formTitle}>
-              {userRole === "owner"
-                ? "Painel de Gestão da Barbearia"
-                : "Acesso do Profissional"}
+              Acesso ao Sistema
             </h2>
             <p className={loginStyles.formSubtitle}>
-              {userRole === "owner"
-                ? "Entre para gerenciar faturamento, equipe e clientes."
-                : "Acesse sua agenda de hoje, clientes marcados e comissões."}
+              Entre com suas credenciais para acessar sua conta.
             </p>
           </div>
 
           {/* Alerta de Erro de Autenticação */}
           {authError && (
             <Alert variant="error" title="Falha no Login">
-              {authError}
+              <SafeHtml html={authError} />
             </Alert>
           )}
 
@@ -335,10 +355,14 @@ export default function Login({
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 className={loginStyles.togglePasswordBtn}
-                title={showPassword ? "Ocultar senha" : "Ver senha"}
-                tabIndex={-1}
+                aria-label={showPassword ? "Ocultar senha em texto claro" : "Exibir senha em texto claro"}
+                aria-pressed={showPassword}
               >
-                {showPassword ? "👁️🗨️" : "👁️"}
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4 text-neutral-400" aria-hidden="true" />
+                ) : (
+                  <Eye className="w-4 h-4 text-neutral-400" aria-hidden="true" />
+                )}
               </button>
             </div>
 
@@ -359,6 +383,7 @@ export default function Login({
                 type="button"
                 onClick={() => {
                   setForgotError("");
+                  setForgotNotice("");
                   setForgotStep("email");
                   setIsForgotModalOpen(true);
                 }}
@@ -368,14 +393,68 @@ export default function Login({
               </button>
             </div>
 
+            {/* Widget de Verificação CAPTCHA Anti-Robô */}
+            <TurnstileWidget
+              provider="turnstile"
+              action="login"
+              onVerify={(token) => {
+                setCaptchaToken(token);
+                if (errors.captcha) {
+                  setErrors((prev) => ({ ...prev, captcha: null }));
+                }
+              }}
+              onError={(err) => {
+                setCaptchaToken(null);
+                setAuthError(`Desafio de segurança: ${err}`);
+              }}
+            />
+            {errors.captcha && (
+              <p className="text-[11px] text-rose-400 font-medium -mt-1 mb-2">
+                {errors.captcha}
+              </p>
+            )}
+
+            {/* Feedback Visual de Rate-Limiting & Anti-Brute Force */}
+            {remainingAttempts < 5 && !isLockedOut && (
+              <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded bg-amber-950/40 border border-amber-900/50 text-amber-300">
+                <span className="flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Proteção Anti-Força Bruta:</span>
+                </span>
+                <span className="font-mono font-bold">
+                  {remainingAttempts} de 5 tentativas restantes
+                </span>
+              </div>
+            )}
+
+            {isLockedOut && (
+              <div className="text-[11px] p-2.5 rounded bg-rose-950/60 border border-rose-800 text-rose-200 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                  <span>Bloqueio Temporário por Excesso de Tentativas</span>
+                </div>
+                <p className="text-rose-300 text-[10px]">
+                  Por segurança, seu acesso foi suspenso temporariamente após 5 tentativas incorretas. Tente novamente em 15 minutos.
+                </p>
+              </div>
+            )}
+
             {/* Botão de Entrar Conectado ao isLoading */}
             <Button
               type="submit"
               variant="primary"
               isLoading={isLoading}
+              disabled={isLockedOut}
               className="w-full text-xs py-2.5 font-bold shadow-lg"
             >
-              Entrar na Plataforma →
+              {isLockedOut ? (
+                "Acesso Bloqueado Temporariamente"
+              ) : (
+                <span className="flex items-center justify-center gap-1.5">
+                  <span>Entrar na Plataforma</span>
+                  <ArrowRight className="w-4 h-4" />
+                </span>
+              )}
             </Button>
           </form>
         </div>
@@ -438,7 +517,10 @@ export default function Login({
                   setForgotStep("email");
                 }}
               >
-                ← Voltar
+                <span className="flex items-center gap-1.5">
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Voltar</span>
+                </span>
               </Button>
               <Button
                 variant="primary"
@@ -455,7 +537,7 @@ export default function Login({
         {forgotError && (
           <div className="mb-4">
             <Alert variant="error" title="Atenção">
-              {forgotError}
+              <SafeHtml html={forgotError} />
             </Alert>
           </div>
         )}
@@ -482,7 +564,7 @@ export default function Login({
               placeholder="seuemail@barbearia.com"
               value={forgotEmail}
               onChange={(e) => {
-                setForgotEmail(e.target.value);
+                setForgotEmail(DOMPurify.sanitize(e.target.value.trim()));
                 if (forgotError) setForgotError("");
               }}
             />
@@ -498,10 +580,12 @@ export default function Login({
             }}
             className="space-y-4 text-left"
           >
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300">
-              Código de verificação enviado para{" "}
-              <strong className="text-white">{forgotEmail}</strong>. Verifique
-              sua caixa de entrada e spam.
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-300">
+              <span className="font-semibold flex items-center gap-1.5 mb-1 text-emerald-400">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Solicitação Processada:</span>
+              </span>
+              <SafeHtml html={forgotNotice || "Se o e-mail informado estiver cadastrado na plataforma, o código de 6 dígitos foi despachado para a caixa de entrada."} />
             </div>
 
             <Input
@@ -557,8 +641,8 @@ export default function Login({
         {/* ETAPA 3: SUCESSO */}
         {forgotStep === "success" && (
           <div className="space-y-4 text-center py-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mx-auto">
-              ✓
+            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-7 h-7 text-emerald-400" />
             </div>
             <div className="space-y-1">
               <h4 className="text-sm font-bold text-white">
@@ -578,7 +662,10 @@ export default function Login({
                 setForgotError("");
               }}
             >
-              Fazer Login Agora →
+              <span className="flex items-center justify-center gap-1.5">
+                <span>Fazer Login Agora</span>
+                <ArrowRight className="w-4 h-4" />
+              </span>
             </Button>
           </div>
         )}

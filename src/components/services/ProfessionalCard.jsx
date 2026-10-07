@@ -1,3 +1,4 @@
+import { Dices, Star, Check, Scissors } from "lucide-react";
 import { professionalCardStyles } from "./ProfessionalCard.styles";
 
 export default function ProfessionalCard({
@@ -18,7 +19,7 @@ export default function ProfessionalCard({
     professional.isAnyProfessional || professional.is_any_professional,
   );
   const avatar =
-    professional.avatar || (name ? name.slice(0, 2).toUpperCase() : "💈");
+    professional.avatar || (name ? name.slice(0, 2).toUpperCase() : null);
   const rating =
     professional.rating !== undefined && professional.rating !== null
       ? Number(professional.rating)
@@ -48,12 +49,25 @@ export default function ProfessionalCard({
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (!disabled && (e.key === " " || e.key === "Enter")) {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
   return (
     <div
+      role="radio"
+      aria-checked={isSelected}
+      aria-label={`Selecionar profissional ${name}, ${role}${rating ? `, avaliação ${rating} estrelas` : ""}${isSelected ? ", selecionado" : ""}`}
+      tabIndex={disabled ? -1 : 0}
+      onKeyDown={handleKeyDown}
       onClick={handleClick}
       className={`
         ${professionalCardStyles.container}
         ${currentState}
+        focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none cursor-pointer select-none
         ${className}
       `}
     >
@@ -68,7 +82,13 @@ export default function ProfessionalCard({
                 : professionalCardStyles.avatar
             }
           >
-            {isAny ? "🎲" : avatar}
+            {isAny ? (
+              <Dices className="w-6 h-6 text-amber-400" />
+            ) : avatar ? (
+              avatar
+            ) : (
+              <Scissors className="w-5 h-5 text-amber-400" />
+            )}
           </div>
 
           <div className={professionalCardStyles.nameWrapper}>
@@ -84,7 +104,7 @@ export default function ProfessionalCard({
             className={professionalCardStyles.ratingBadge}
             title={`Nota ${rating.toFixed(1)} de 5.0`}
           >
-            <span className={professionalCardStyles.starIcon}>★</span>
+            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0 inline mr-0.5" />
             <span className={professionalCardStyles.ratingScore}>
               {rating.toFixed(1)}
             </span>
@@ -139,7 +159,7 @@ export default function ProfessionalCard({
         >
           {isSelected ? (
             <>
-              <span>✓</span>
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Escolhido</span>
             </>
           ) : (

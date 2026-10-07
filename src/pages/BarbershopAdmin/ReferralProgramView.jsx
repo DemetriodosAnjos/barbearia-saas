@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para buscar indicações reais associadas à barbearia]
 import { supabase } from "../../lib/supabase";
 import { referralStyles } from "./ReferralProgramView.styles";
 import Button from "../../components/ui/Button";
+import ProjectIcon from "../../components/ui/ProjectIcon";
+import { SafeHtml } from "../../components/ui/SafeHtml";
 
 // [Função componente: consome o tenant real sem dados fictícios de fallback]
 export default function ReferralProgramView({ tenant, onBack }) {
@@ -72,10 +75,10 @@ export default function ReferralProgramView({ tenant, onBack }) {
   const handleShareWhatsApp = () => {
     const barbershopTitle = tenant?.name || "minha barbearia";
     const text = encodeURIComponent(
-      `Fala meu amigo! 💈\n\n` +
+      `Fala meu amigo!\n\n` +
         `Estou usando o BarberSaaS aqui na ${barbershopTitle} e o sistema é sensacional (agenda, lembretes automáticos no WhatsApp e comissões calculadas na hora).\n\n` +
         `Consegui um presente pra você: acessando pelo meu link exclusivo, você ganha 14 DIAS GRÁTIS de teste (o dobro do padrão):\n\n` +
-        `👉 ${referralLink}\n\n` +
+        `${referralLink}\n\n` +
         `Testa aí no seu salão, você vai curtir demais!`,
     );
     window.open(`https://wa.me/?text=${text}`, "_blank");
@@ -100,7 +103,7 @@ export default function ReferralProgramView({ tenant, onBack }) {
     }
 
     alert(
-      `🎉 CUPOM DE 50% DE DESCONTO RESGATADO!\n\n` +
+      `CUPOM DE 50% DE DESCONTO RESGATADO!\n\n` +
         `• Indicação Premiada: ${barbershopName}\n` +
         `• Benefício: 50% de abatimento aplicado na sua próxima fatura da BarberSaaS!\n\n` +
         `Obrigado por fortalecer nossa comunidade de barbearias!`,
@@ -113,7 +116,8 @@ export default function ReferralProgramView({ tenant, onBack }) {
       <div className={referralStyles.heroCard}>
         <div className={referralStyles.heroInfo}>
           <span className={referralStyles.heroBadge}>
-            🎁 Programa Indique & Ganhe
+            <ProjectIcon name="Gift" size={14} className="mr-1.5 text-amber-400" />
+            Programa Indique & Ganhe
           </span>
           <h1 className={referralStyles.heroTitle}>
             Indique uma Barbearia Amiga e Ganhe 50% de Desconto!
@@ -140,7 +144,10 @@ export default function ReferralProgramView({ tenant, onBack }) {
       {/* 2. CARD DE COMPARTILHAMENTO DO LINK */}
       <div className={referralStyles.shareCard}>
         <span className={referralStyles.shareTitle}>
-          <span>🔗</span> Seu Link Exclusivo de Indicação:
+          <span className="flex items-center gap-2">
+            <ProjectIcon name="ExternalLink" size={16} className="text-amber-500" />
+            Seu Link Exclusivo de Indicação:
+          </span>
         </span>
 
         <div className={referralStyles.linkBox}>
@@ -157,7 +164,17 @@ export default function ReferralProgramView({ tenant, onBack }) {
               onClick={handleCopyLink}
               className="text-xs py-2 px-3.5 flex-1 sm:flex-initial"
             >
-              {copied ? "✓ Copiado!" : "📋 Copiar Link"}
+              {copied ? (
+                <span className="flex items-center gap-1.5">
+                  <ProjectIcon name="Check" size={14} colorVariant="inherit" />
+                  Copiado!
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <ProjectIcon name="Copy" size={14} colorVariant="inherit" />
+                  Copiar Link
+                </span>
+              )}
             </Button>
 
             <Button
@@ -165,7 +182,7 @@ export default function ReferralProgramView({ tenant, onBack }) {
               onClick={handleShareWhatsApp}
               className="text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 font-extrabold flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-md"
             >
-              <span>📲</span>
+              <ProjectIcon name="Send" size={14} colorVariant="inherit" />
               <span>Enviar no WhatsApp</span>
             </Button>
           </div>
@@ -202,7 +219,10 @@ export default function ReferralProgramView({ tenant, onBack }) {
         <div className={referralStyles.sectionHeader}>
           <div className="space-y-0.5">
             <h3 className={referralStyles.sectionTitle}>
-              <span>💈</span> Suas Indicações & Progresso da Recompensa
+              <span className="flex items-center gap-2">
+                <ProjectIcon name="Scissors" size={18} className="text-amber-500" />
+                Suas Indicações & Progresso da Recompensa
+              </span>
             </h3>
             <p className="text-xs text-neutral-400">
               Acompanhe cada mensalidade paga pelo seu amigo. A recompensa é
@@ -219,7 +239,9 @@ export default function ReferralProgramView({ tenant, onBack }) {
         <div className="space-y-4">
           {referrals.length === 0 ? (
             <div className="p-8 text-center bg-neutral-950 border border-neutral-800 rounded-3xl space-y-3">
-              <div className="text-3xl">🎁</div>
+              <div className="flex justify-center my-2">
+                <ProjectIcon name="Gift" size={36} className="text-amber-500" />
+              </div>
               <h4 className="text-sm font-bold text-white">
                 Você ainda não tem barbearias indicadas
               </h4>
@@ -233,7 +255,7 @@ export default function ReferralProgramView({ tenant, onBack }) {
                 onClick={handleShareWhatsApp}
                 className="text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 font-bold inline-flex items-center gap-2"
               >
-                <span>📲</span>
+                <ProjectIcon name="Send" size={14} colorVariant="inherit" />
                 <span>Convidar Primeira Barbearia</span>
               </Button>
             </div>
@@ -246,12 +268,14 @@ export default function ReferralProgramView({ tenant, onBack }) {
                   {/* Topo do Card */}
                   <div className={referralStyles.referredHeader}>
                     <div className={referralStyles.barberMeta}>
-                      <div className={referralStyles.barberIcon}>💈</div>
+                      <div className={referralStyles.barberIcon}>
+                        <ProjectIcon name="Scissors" size={18} className="text-amber-500" />
+                      </div>
                       <div>
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <span>{item.barbershopName}</span>
+                          <SafeHtml html={item.barbershopName} />
                           <span className="text-xs text-neutral-400 font-normal">
-                            (Dono: {item.ownerName})
+                            (Dono: <SafeHtml html={item.ownerName} />)
                           </span>
                         </h4>
                         <p className="text-[11px] text-neutral-500 font-mono">
@@ -262,12 +286,14 @@ export default function ReferralProgramView({ tenant, onBack }) {
 
                     {/* Selo de Status */}
                     {item.rewardClaimed ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">
-                        ✓ Desconto Já Utilizado
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 flex items-center gap-1">
+                        <ProjectIcon name="Check" size={12} colorVariant="inherit" />
+                        Desconto Já Utilizado
                       </span>
                     ) : isRewardReady ? (
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-neutral-950 animate-pulse">
-                        🎁 50% OFF Disponível!
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-neutral-950 animate-pulse flex items-center gap-1">
+                        <ProjectIcon name="Gift" size={12} className="text-neutral-950" />
+                        50% OFF Disponível!
                       </span>
                     ) : item.monthsPaid === 0 ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
@@ -286,7 +312,10 @@ export default function ReferralProgramView({ tenant, onBack }) {
                     <div
                       className={`${referralStyles.stepBox} ${referralStyles.stepCompleted}`}
                     >
-                      <span>✓ Cadastrou</span>
+                      <span className="flex items-center justify-center gap-1">
+                        <ProjectIcon name="Check" size={12} colorVariant="inherit" />
+                        Cadastrou
+                      </span>
                       <span className="text-[9px] font-normal opacity-80">
                         14 dias grátis
                       </span>
@@ -299,9 +328,14 @@ export default function ReferralProgramView({ tenant, onBack }) {
                       `}
                     >
                       <span>
-                        {item.monthsPaid >= 1
-                          ? "✓ Mês 1 Pago"
-                          : "1ª Mensalidade"}
+                        {item.monthsPaid >= 1 ? (
+                          <span className="flex items-center justify-center gap-1">
+                            <ProjectIcon name="Check" size={12} colorVariant="inherit" />
+                            Mês 1 Pago
+                          </span>
+                        ) : (
+                          "1ª Mensalidade"
+                        )}
                       </span>
                       <span className="text-[9px] font-normal opacity-80">
                         {item.monthsPaid >= 1 ? "Confirmado" : "Aguardando"}
@@ -315,9 +349,14 @@ export default function ReferralProgramView({ tenant, onBack }) {
                       `}
                     >
                       <span>
-                        {item.monthsPaid >= 2
-                          ? "✓ Mês 2 Pago"
-                          : "2ª Mensalidade"}
+                        {item.monthsPaid >= 2 ? (
+                          <span className="flex items-center justify-center gap-1">
+                            <ProjectIcon name="Check" size={12} colorVariant="inherit" />
+                            Mês 2 Pago
+                          </span>
+                        ) : (
+                          "2ª Mensalidade"
+                        )}
                       </span>
                       <span className="text-[9px] font-normal opacity-80">
                         {item.monthsPaid >= 2 ? "Confirmado" : "Pendente"}
@@ -331,9 +370,14 @@ export default function ReferralProgramView({ tenant, onBack }) {
                       `}
                     >
                       <span>
-                        {item.monthsPaid >= 3
-                          ? "🎉 50% OFF!"
-                          : "3ª Mensalidade"}
+                        {item.monthsPaid >= 3 ? (
+                          <span className="flex items-center justify-center gap-1">
+                            <ProjectIcon name="Sparkles" size={12} colorVariant="inherit" />
+                            50% OFF!
+                          </span>
+                        ) : (
+                          "3ª Mensalidade"
+                        )}
                       </span>
                       <span className="text-[9px] font-normal opacity-80">
                         {item.monthsPaid >= 3
@@ -364,7 +408,10 @@ export default function ReferralProgramView({ tenant, onBack }) {
                         }
                         className="text-xs py-2 px-4 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black shadow-lg"
                       >
-                        Resgatar 50% de Desconto Agora 🎁
+                        <span className="flex items-center justify-center gap-1.5">
+                          Resgatar 50% de Desconto Agora
+                          <ProjectIcon name="Gift" size={14} className="text-neutral-950" />
+                        </span>
                       </Button>
                     </div>
                   )}

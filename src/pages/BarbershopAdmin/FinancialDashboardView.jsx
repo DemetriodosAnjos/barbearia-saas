@@ -1,10 +1,13 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 import { financialStyles } from "./FinancialDashboardView.styles";
 import StatCard from "../../components/dashboard/StatCard";
 import FinancialChart from "../../components/dashboard/FinancialChart";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
+import ProjectIcon from "../../components/ui/ProjectIcon";
+import { SafeHtml } from "../../components/ui/SafeHtml";
 
 // [Função componente: recebe appointments, barbers e comandas reais para cálculo dinâmico]
 export default function FinancialDashboardView({
@@ -159,7 +162,7 @@ export default function FinancialDashboardView({
       <div className={financialStyles.headerCard}>
         <div className={financialStyles.titleWrapper}>
           <h1 className={financialStyles.title}>
-            <span>📊</span>
+            <ProjectIcon name="BarChart3" size={24} className="text-amber-500" />
             <span>Dashboard Financeiro & Big Numbers</span>
           </h1>
           <p className={financialStyles.subtitle}>
@@ -188,7 +191,11 @@ export default function FinancialDashboardView({
             className="text-xs py-2 px-3"
             title="Ocultar valores monetários na tela"
           >
-            <span>{isPrivacyActive ? "👁️‍🗨️" : "👁️"}</span>
+            {isPrivacyActive ? (
+              <ProjectIcon name="EyeOff" size={15} colorVariant="inherit" />
+            ) : (
+              <ProjectIcon name="Eye" size={15} colorVariant="inherit" />
+            )}
             <span className="hidden sm:inline">
               {isPrivacyActive ? "Revelar" : "Privacidade"}
             </span>
@@ -200,7 +207,7 @@ export default function FinancialDashboardView({
             onClick={() => setIsExportModalOpen(true)}
             className="text-xs py-2 px-3"
           >
-            <span>📄</span>
+            <ProjectIcon name="FileText" size={15} colorVariant="inherit" />
             <span>Exportar Relatório</span>
           </Button>
 
@@ -210,7 +217,10 @@ export default function FinancialDashboardView({
               onClick={onBack}
               className="text-xs py-2 px-3"
             >
-              ← Voltar
+              <span className="flex items-center gap-1.5">
+                <ProjectIcon name="ArrowLeft" size={14} colorVariant="inherit" />
+                Voltar
+              </span>
             </Button>
           )}
         </div>
@@ -222,7 +232,7 @@ export default function FinancialDashboardView({
         <StatCard
           title="Faturamento Bruto"
           value={`R$ ${financialData.grossRevenue.toFixed(2).replace(".", ",")}`}
-          icon="💰"
+          icon="DollarSign"
           theme="gold"
           isMasked={isPrivacyActive}
           delta={{
@@ -236,7 +246,7 @@ export default function FinancialDashboardView({
         <StatCard
           title="Comissões a Pagar"
           value={`R$ ${financialData.commissionsPayable.toFixed(2).replace(".", ",")}`}
-          icon="💈"
+          icon="Scissors"
           theme="purple"
           isMasked={isPrivacyActive}
           delta={{
@@ -250,7 +260,7 @@ export default function FinancialDashboardView({
         <StatCard
           title="Lucro Líquido (Casa)"
           value={`R$ ${financialData.netProfit.toFixed(2).replace(".", ",")}`}
-          icon="🏦"
+          icon="Building2"
           theme="green"
           isMasked={isPrivacyActive}
           delta={{
@@ -264,7 +274,7 @@ export default function FinancialDashboardView({
         <StatCard
           title="Ticket Médio"
           value={`R$ ${financialData.averageTicket.toFixed(2).replace(".", ",")}`}
-          icon="📈"
+          icon="TrendingUp"
           theme="blue"
           isMasked={isPrivacyActive}
           delta={{
@@ -278,7 +288,7 @@ export default function FinancialDashboardView({
         <StatCard
           title="Ocupação das Cadeiras"
           value={`${financialData.occupancyRate}%`}
-          icon="🪑"
+          icon="Armchair"
           theme="gold"
           isMasked={isPrivacyActive}
           delta={{
@@ -301,7 +311,10 @@ export default function FinancialDashboardView({
         <div className={financialStyles.sectionHeader}>
           <div>
             <h2 className={financialStyles.sectionTitle}>
-              <span>💈</span> Fechamento de Comissões da Equipe
+              <span className="flex items-center gap-2">
+                <ProjectIcon name="Scissors" size={18} className="text-amber-500" />
+                Fechamento de Comissões da Equipe
+              </span>
             </h2>
             <p className="text-xs text-neutral-400">
               Resumo individual de repasses acumulados para quitação semanal ou
@@ -324,14 +337,16 @@ export default function FinancialDashboardView({
               <div className="flex items-start justify-between">
                 <div>
                   <h4 className="text-sm font-bold text-white">
-                    {barber.name}
+                    <SafeHtml html={barber.name} />
                   </h4>
-                  <p className="text-xs text-neutral-400">{barber.role}</p>
+                  <p className="text-xs text-neutral-400">
+                    <SafeHtml html={barber.role} />
+                  </p>
                 </div>
 
                 <Badge
                   status={barber.status === "paid" ? "completed" : "waiting"}
-                  label={barber.status === "paid" ? "Liquidado ✓" : "Pendente"}
+                  label={barber.status === "paid" ? "Liquidado" : "Pendente"}
                   size="sm"
                 />
               </div>
@@ -364,7 +379,7 @@ export default function FinancialDashboardView({
                   alert(
                     barber.status === "paid"
                       ? `Comprovante de repasse de ${barber.name} disponível no arquivo.`
-                      : `💸 Quitando comissão de R$ ${barber.commissionPayable.toFixed(2)} via PIX para ${barber.name}!`,
+                      : `Quitando comissão de R$ ${barber.commissionPayable.toFixed(2)} via PIX para ${barber.name}!`,
                   )
                 }
                 className="w-full text-xs py-1.5"
@@ -398,7 +413,7 @@ export default function FinancialDashboardView({
               variant="primary"
               onClick={() => {
                 alert(
-                  "📊 RELATÓRIO EXPORTADO COM SUCESSO!\n\nArquivo DRE_Setembro_2026.pdf gerado e baixado na sua máquina.",
+                  "RELATÓRIO EXPORTADO COM SUCESSO!\n\nArquivo DRE_Setembro_2026.pdf gerado e baixado na sua máquina.",
                 );
                 setIsExportModalOpen(false);
               }}
@@ -418,7 +433,7 @@ export default function FinancialDashboardView({
           <div className="space-y-2">
             <label className="flex items-center justify-between p-3 rounded-xl border border-neutral-800 bg-neutral-950 cursor-pointer hover:border-neutral-700">
               <div className="flex items-center gap-2.5">
-                <span>📄</span>
+                <ProjectIcon name="FileText" size={20} className="text-amber-500" />
                 <div>
                   <p className="text-xs font-bold text-white">
                     Demonstrativo DRE Completo (PDF)
@@ -438,7 +453,7 @@ export default function FinancialDashboardView({
 
             <label className="flex items-center justify-between p-3 rounded-xl border border-neutral-800 bg-neutral-950 cursor-pointer hover:border-neutral-700">
               <div className="flex items-center gap-2.5">
-                <span>📊</span>
+                <ProjectIcon name="BarChart3" size={20} className="text-amber-500" />
                 <div>
                   <p className="text-xs font-bold text-white">
                     Planilha Detalhada de Vendas (Excel / CSV)

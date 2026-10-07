@@ -1,8 +1,11 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 import { barbershopStyles } from "./BarbershopDashboard.styles";
 import Sidebar from "../../components/ui/Sidebar";
 import Navbar from "../../components/ui/Navbar";
 import TrialBanner from "../../components/dashboard/TrialBanner";
+import ErrorBoundary from "../../components/ui/ErrorBoundary";
+import { SafeHtml } from "../../components/ui/SafeHtml";
 import ScheduleView from "./ScheduleView";
 import ServicesAndProductsView from "./ServicesAndProductsView";
 import BarbersTeamView from "./BarbersTeamView";
@@ -13,6 +16,8 @@ import ReferralProgramView from "./ReferralProgramView";
 import ClientsDirectoryView from "./ClientsDirectoryView";
 import CashierPosView from "./CashierPosView";
 import FinancialDashboardView from "./FinancialDashboardView";
+import SkeletonDashboard from "../../components/resilience/SkeletonDashboard";
+import ProjectIcon from "../../components/ui/ProjectIcon";
 
 export default function BarbershopDashboard({
   tenant, // Objeto real da barbearia vindo do Supabase
@@ -27,7 +32,16 @@ export default function BarbershopDashboard({
   onUpdateComandas,
   services = [],
   onAddService,
+  onUpdateService,
+  onUpdateServices,
+  onDeleteService,
+  products = [],
+  onAddProduct,
+  onUpdateProduct,
+  onUpdateProducts,
+  onDeleteProduct,
   onLogout,
+  isLoading = false,
 }) {
   const [activeMenuTab, setActiveMenuTab] = useState("agenda");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -52,34 +66,34 @@ export default function BarbershopDashboard({
     {
       id: "agenda",
       label: "Agenda de Atendimentos",
-      icon: "📅",
+      icon: "calendar",
       badge: `${appointments.length} hoje`,
     },
-    { id: "servicos", label: "Serviços & Produtos", icon: "✂️" },
-    { id: "profissionais", label: "Equipe de Barbeiros", icon: "💈" },
+    { id: "servicos", label: "Serviços & Produtos", icon: "scissors" },
+    { id: "profissionais", label: "Equipe de Barbeiros", icon: "barber" },
     {
       id: "clientes",
       label: "Clientes & Prontuário",
-      icon: "👥",
+      icon: "users",
       badge: `${clients.length}`,
     },
     {
       id: "financeiro_group",
       label: "Financeiro",
-      icon: "💰",
+      icon: "dollar",
       children: [
-        { id: "caixa", label: "Frente de Caixa (PDV)", icon: "🧾" },
+        { id: "caixa", label: "Frente de Caixa (PDV)", icon: "receipt" },
         {
           id: "dashboard_financeiro",
           label: "Dashboard & Big Numbers",
-          icon: "📊",
+          icon: "barChart",
         },
       ],
     },
     {
       id: "indicacoes",
       label: "Indique & Ganhe 50%",
-      icon: "🎁",
+      icon: "gift",
       badge: "Ganhe 50%",
     },
   ];
@@ -95,8 +109,8 @@ export default function BarbershopDashboard({
       <div className={barbershopStyles.layoutBody}>
         {/* SIDEBAR com dados dinâmicos da barbearia e do usuário logado */}
         <Sidebar
-          tenantName={tenant?.name || "Minha Barbearia"}
-          tenantPlan={tenant?.subscription_plan || tenant?.plan || "Plano Pro"}
+          tenantName={DOMPurify.sanitize(tenant?.name || "Minha Barbearia")}
+          tenantPlan={DOMPurify.sanitize(tenant?.subscription_plan || tenant?.plan || "Plano Pro")}
           items={barbershopMenuItems}
           activeItem={activeMenuTab}
           onSelect={setActiveMenuTab}
@@ -104,7 +118,7 @@ export default function BarbershopDashboard({
           onClose={() => setIsMobileSidebarOpen(false)}
           user={
             user || {
-              name: tenant?.name ? `Admin ${tenant.name}` : "Administrador",
+              name: tenant?.name ? `Admin ${DOMPurify.sanitize(tenant.name)}` : "Administrador",
               role: "Proprietário",
             }
           }
@@ -115,6 +129,12 @@ export default function BarbershopDashboard({
         <div className="flex-1 flex flex-col min-w-0">
           <Navbar
             variant="admin"
+            user={
+              user || {
+                name: tenant?.name ? `Gestor ${DOMPurify.sanitize(tenant.name)}` : "Administrador",
+                role: "Proprietário",
+              }
+            }
             breadcrumbs={["Painel da Barbearia", activeMenuTab.toUpperCase()]}
             barberStatus={barberPresenceStatus}
             onStatusChange={setBarberPresenceStatus}
@@ -128,79 +148,122 @@ export default function BarbershopDashboard({
           />
 
           <main className={barbershopStyles.mainContent}>
-            {/* 1. AGENDA: Consome 'appointments' e 'onUpdateAppointments' */}
-            {activeMenuTab === "agenda" && (
-              <ScheduleView
-                barbers={barbers}
-                appointments={appointments}
-                onUpdateAppointments={onUpdateAppointments}
-                services={services}
-                onAddService={onAddService}
-                onNavigateToCashier={() => setActiveMenuTab("caixa")}
-              />
-            )}
+            {isLoading ? (
+              <SkeletonDashboard latencyNotice={true} />
+            ) : (
+              <>
+                {/* 1. AGENDA: Consome 'appointments' e 'onUpdateAppointments' */}
+                {activeMenuTab === "agenda" && (
+                  <ErrorBoundary componentName="Agenda de Atendimentos">
+                    <ScheduleView
+                      tenant={tenant}
+                      barbers={barbers}
+                      appointments={appointments}
+                      onUpdateAppointments={onUpdateAppointments}
+                      services={services}
+                      onAddService={onAddService}
+                      onNavigateToCashier={() => setActiveMenuTab("caixa")}
+                    />
+                  </ErrorBoundary>
+                )}
 
             {/* 2. SERVIÇOS & PRODUTOS */}
             {activeMenuTab === "servicos" && (
-              <ServicesAndProductsView
-                services={services}
-                onAddService={onAddService}
-              />
+              <ErrorBoundary componentName="Catálogo de Serviços & Produtos">
+                <ServicesAndProductsView
+                  services={services}
+                  onAddService={onAddService}
+                  onUpdateService={onUpdateService}
+                  onUpdateServices={onUpdateServices}
+                  onDeleteService={onDeleteService}
+                  products={products}
+                  onAddProduct={onAddProduct}
+                  onUpdateProduct={onUpdateProduct}
+                  onUpdateProducts={onUpdateProducts}
+                  onDeleteProduct={onDeleteProduct}
+                  tenant={tenant}
+                />
+              </ErrorBoundary>
             )}
 
             {/* 3. EQUIPE DE BARBEIROS: Atualiza a lista oficial */}
             {activeMenuTab === "profissionais" && (
-              <BarbersTeamView
-                barbers={barbers}
-                onUpdateBarbers={onUpdateBarbers}
-                onBack={() => setActiveMenuTab("agenda")}
-              />
+              <ErrorBoundary componentName="Equipe de Barbeiros">
+                <BarbersTeamView
+                  barbers={barbers}
+                  onUpdateBarbers={onUpdateBarbers}
+                  tenant={tenant}
+                  onBack={() => setActiveMenuTab("agenda")}
+                />
+              </ErrorBoundary>
             )}
 
             {/* 4. CLIENTES: Consome 'clients' e 'onUpdateClients' */}
             {activeMenuTab === "clientes" && (
-              <ClientsDirectoryView
-                clientsList={clients}
-                onUpdateClients={onUpdateClients}
-                onNavigateToBooking={() => setActiveMenuTab("agenda")}
-                onBack={() => setActiveMenuTab("agenda")}
-              />
+              <ErrorBoundary componentName="Diretório de Clientes">
+                <ClientsDirectoryView
+                  clientsList={clients}
+                  onUpdateClients={onUpdateClients}
+                  onNavigateToBooking={() => setActiveMenuTab("agenda")}
+                  onBack={() => setActiveMenuTab("agenda")}
+                />
+              </ErrorBoundary>
             )}
 
-            {/* 5. FRENTE DE CAIXA (PDV): Consome 'comandas' e 'onUpdateComandas' */}
+            {/* 5. FRENTE DE CAIXA (PDV): Consome 'comandas', 'appointments' e 'onUpdateAppointments' */}
             {activeMenuTab === "caixa" && (
-              <CashierPosView
-                sharedComandas={comandas}
-                onUpdateComandas={onUpdateComandas}
-                onBack={() => setActiveMenuTab("agenda")}
-              />
+              <ErrorBoundary componentName="Frente de Caixa (PDV)">
+                <CashierPosView
+                  sharedComandas={comandas}
+                  onUpdateComandas={onUpdateComandas}
+                  appointments={appointments}
+                  onUpdateAppointments={onUpdateAppointments}
+                  tenant={tenant}
+                  barbers={barbers}
+                  products={products}
+                  onUpdateProducts={onUpdateProducts}
+                  onBack={() => setActiveMenuTab("agenda")}
+                />
+              </ErrorBoundary>
             )}
 
             {/* 6. DASHBOARD FINANCEIRO */}
             {activeMenuTab === "dashboard_financeiro" && (
-              <FinancialDashboardView
-                onBack={() => setActiveMenuTab("caixa")}
-              />
+              <ErrorBoundary componentName="Dashboard Financeiro & Comissões">
+                <FinancialDashboardView
+                  onBack={() => setActiveMenuTab("caixa")}
+                />
+              </ErrorBoundary>
             )}
 
             {/* Telas secundárias */}
             {activeMenuTab === "indicacoes" && (
-              <ReferralProgramView onBack={() => setActiveMenuTab("agenda")} />
+              <ErrorBoundary componentName="Programa de Indicações">
+                <ReferralProgramView onBack={() => setActiveMenuTab("agenda")} />
+              </ErrorBoundary>
             )}
             {activeMenuTab === "perfil" && (
-              <UserProfileView
-                user={user}
-                tenant={tenant}
-                onBack={() => setActiveMenuTab("agenda")}
-              />
+              <ErrorBoundary componentName="Perfil do Usuário">
+                <UserProfileView
+                  user={user}
+                  tenant={tenant}
+                  onBack={() => setActiveMenuTab("agenda")}
+                />
+              </ErrorBoundary>
             )}
             {activeMenuTab === "configuracoes" && (
-              <BarbershopSettingsView
-                onBack={() => setActiveMenuTab("agenda")}
-              />
+              <ErrorBoundary componentName="Configurações da Barbearia">
+                <BarbershopSettingsView
+                  onBack={() => setActiveMenuTab("agenda")}
+                />
+              </ErrorBoundary>
             )}
             {activeMenuTab === "suporte" && (
-              <SupportView onBack={() => setActiveMenuTab("agenda")} />
+              <ErrorBoundary componentName="Central de Suporte">
+                <SupportView onBack={() => setActiveMenuTab("agenda")} />
+              </ErrorBoundary>
+            )}
+              </>
             )}
           </main>
         </div>

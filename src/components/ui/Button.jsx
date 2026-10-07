@@ -13,11 +13,20 @@ export default function Button({
   const currentVariant =
     buttonStyles.variants[variant] || buttonStyles.variants.primary;
 
+  const handleClick = (e) => {
+    if (disabled || isLoading) return;
+    if (onClick) {
+      onClick(e);
+    }
+  };
+
   return (
     <button
       type={type}
       disabled={disabled || isLoading}
-      onClick={onClick}
+      aria-busy={isLoading ? "true" : undefined}
+      aria-disabled={disabled || isLoading ? "true" : undefined}
+      onClick={handleClick}
       className={`${buttonStyles.base} ${currentVariant} ${className}`}
       {...props}
     >

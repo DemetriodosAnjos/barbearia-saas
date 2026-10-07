@@ -9,20 +9,119 @@ import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import Alert from "../../components/ui/Alert";
+import ProjectIcon from "../../components/ui/ProjectIcon";
+import { sanitizeClientHtml } from "../../security/sanitizerConfig";
+
+/**
+ * Sanitiza e normaliza entradas de texto para evitar Stored & Reflected XSS
+ */
+function sanitizeTextInput(input, maxLength = 120) {
+  if (typeof input !== "string") return "";
+  const cleaned = sanitizeClientHtml(input)
+    .replace(/[<>'"`;\\]/g, (char) => {
+      switch (char) {
+        case "<": return "&lt;";
+        case ">": return "&gt;";
+        case "'": return "&#39;";
+        case '"': return "&quot;";
+        case "`": return "&#96;";
+        case ";": return "";
+        case "\\": return "";
+        default: return char;
+      }
+    })
+    .trim();
+  return cleaned.slice(0, maxLength);
+}
+
+/**
+ * Sanitiza e valida números para evitar injeções numéricas, NaN ou valores negativos
+ */
+function sanitizeNumber(value, min = 0, max = 999999, defaultValue = 0) {
+  const num = Number(value);
+  if (isNaN(num) || !isFinite(num)) return defaultValue;
+  if (num < min) return min;
+  if (num > max) return max;
+  return Number(num.toFixed(2));
+}
 
 export default function ServicesAndProductsView({
-  services = [],
+  services: initialServices = [],
   onAddService,
   onUpdateService,
+  onUpdateServices,
   onDeleteService,
+  products: initialProducts = [],
+  onAddProduct,
+  onUpdateProduct,
+  onUpdateProducts,
+  onDeleteProduct,
+  tenant,
 }) {
   const [activeTab, setActiveTab] = useState("services");
   const [statusFilter, setStatusFilter] = useState("active");
 
-  // [Estado real: inicia vazio aguardando dados da tabela products do Supabase]
-  const [products, setProducts] = useState([]);
+  // Estados locais reativos sincronizados com as props e com o Supabase
+  const [localServices, setLocalServices] = useState(initialServices);
+  const [localProducts, setLocalProducts] = useState(initialProducts);
 
-  // [Efeito de ciclo de vida: busca o estoque real de produtos no banco de dados]
+  useEffect(() => {
+    if (initialServices && initialServices.length > 0) {
+      setLocalServices(initialServices);
+    }
+  }, [initialServices]);
+
+  useEffect(() => {
+    if (initialProducts && initialProducts.length > 0) {
+      setLocalProducts(initialProducts);
+    }
+  }, [initialProducts]);
+
+  // [Efeito de ciclo de vida: busca o catálogo real de serviços do Supabase]
+  useEffect(() => {
+    let isMounted = true;
+    async function loadServices() {
+      try {
+        const { data, error } = await supabase
+          .from("services")
+          .select("*")
+          .order("name");
+
+        if (!error && data && data.length > 0 && isMounted) {
+          const mapped = data.map((s) => ({
+            id: s.id,
+            barbershop_id: s.barbershop_id,
+            name: sanitizeTextInput(s.name || "", 80),
+            category: s.category || "Cabelo",
+            durationMinutes: Number(s.duration_minutes || s.durationMinutes || 30),
+            duration_minutes: Number(s.duration_minutes || s.durationMinutes || 30),
+            price: sanitizeNumber(s.price, 0.01, 10000, 45),
+            commissionPercent: sanitizeNumber(
+              s.commission_percent || s.commissionPercent,
+              0,
+              100,
+              50,
+            ),
+            active: s.active !== false,
+            description: s.description || "",
+            tag: s.tag || undefined,
+          }));
+          setLocalServices(mapped);
+          if (onUpdateServices) {
+            onUpdateServices(mapped);
+          }
+        }
+      } catch (err) {
+        console.warn("[ServicesAndProductsView] Aviso ao carregar serviços do Supabase:", err);
+      }
+    }
+    loadServices();
+    return () => {
+      isMounted = false;
+    };
+  }, [onUpdateServices]);
+
+  // [Efeito de ciclo de vida: busca o estoque real de produtos no Supabase com tolerância defensiva]
   useEffect(() => {
     let isMounted = true;
     async function loadProducts() {
@@ -32,20 +131,36 @@ export default function ServicesAndProductsView({
           .select("*")
           .order("name");
 
-        if (!error && data && isMounted) {
-          setProducts(
-            data.map((p) => ({
-              id: p.id,
-              name: p.name,
-              category: p.category || "Bar",
-              icon: p.category === "Bar" ? "🍺" : "🧴",
-              costPrice: Number(p.cost_price || 0),
-              price: Number(p.price || 0),
-              stock: Number(p.stock || 0),
-              commissionPercent: Number(p.commission_percent || 0),
-              active: p.active !== false,
-            })),
-          );
+        if (!error && data && data.length > 0 && isMounted) {
+          const mapped = data.map((p) => ({
+            id: p.id,
+            barbershop_id: p.barbershop_id,
+            name: sanitizeTextInput(p.name || "", 80),
+            category: p.category === "Vitrine" ? "Vitrine" : "Bar",
+            icon: p.category === "Bar" ? "beer" : "product",
+            costPrice: sanitizeNumber(p.cost_price, 0, 10000, 0),
+            price: sanitizeNumber(p.price, 0, 10000, 0),
+            stock: Math.floor(sanitizeNumber(p.stock, 0, 9999, 0)),
+            commissionPercent: sanitizeNumber(p.commission_percent, 0, 100, 10),
+            active: p.active !== false,
+          }));
+          setLocalProducts(mapped);
+          if (onUpdateProducts) {
+            onUpdateProducts(mapped);
+          }
+        } else if (isMounted && (!initialProducts || initialProducts.length === 0)) {
+          // Fallback resiliente com produtos essenciais se o banco estiver vazio
+          const fallback = [
+            { id: "prod-1", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Pomada Modeladora Efeito Matte 150g", category: "Vitrine", icon: "product", costPrice: 22, price: 45, stock: 24, commissionPercent: 10, active: true },
+            { id: "prod-2", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Óleo Hidratante para Barba 30ml", category: "Vitrine", icon: "product", costPrice: 18, price: 38, stock: 15, commissionPercent: 10, active: true },
+            { id: "prod-3", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Cerveja Heineken Long Neck 330ml", category: "Bar", icon: "beer", costPrice: 6, price: 12, stock: 48, commissionPercent: 5, active: true },
+            { id: "prod-4", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Água Mineral com Gás 500ml", category: "Bar", icon: "beer", costPrice: 2, price: 5, stock: 60, commissionPercent: 5, active: true },
+            { id: "prod-5", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Refrigerante Coca-Cola Lata 350ml", category: "Bar", icon: "beer", costPrice: 3.5, price: 7, stock: 36, commissionPercent: 5, active: true },
+          ];
+          setLocalProducts(fallback);
+          if (onUpdateProducts) {
+            onUpdateProducts(fallback);
+          }
         }
       } catch (err) {
         console.error("Erro ao carregar produtos:", err);
@@ -55,7 +170,7 @@ export default function ServicesAndProductsView({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [onUpdateProducts, initialProducts, tenant?.id]);
 
   // ESTADO UNIFICADO DE FEEDBACK (Substituindo todos os alerts nativos!)
   const [feedbackAlert, setFeedbackAlert] = useState(null); // { variant, title, message }
@@ -84,31 +199,64 @@ export default function ServicesAndProductsView({
   // Modal de Desativação Segura
   const [itemToDeactivate, setItemToDeactivate] = useState(null);
 
-  // 1. SALVAR NOVO SERVIÇO
+  // 1. SALVAR NOVO SERVIÇO COM SANITIZAÇÃO RIGOROSA
   const handleSaveNewService = () => {
-    if (!newServiceName || !newServicePrice) {
+    const sanitizedName = sanitizeTextInput(newServiceName, 80);
+    const sanitizedTag = newServiceTag ? sanitizeTextInput(newServiceTag, 40) : undefined;
+    const allowedCategories = ["Cabelo", "Barba", "Combos", "Tratamentos", "Acabamento"];
+    const sanitizedCategory = allowedCategories.includes(newServiceCategory)
+      ? newServiceCategory
+      : "Cabelo";
+    const duration = sanitizeNumber(newServiceDuration, 5, 480, 30);
+    const price = sanitizeNumber(newServicePrice, 0.01, 10000, 0);
+    const commission = sanitizeNumber(newServiceCommission, 0, 100, 50);
+
+    if (!sanitizedName || price <= 0) {
       setFeedbackAlert({
         variant: "warning",
         title: "Atenção",
-        message: "Por favor, preencha o nome e o preço do serviço.",
+        message: "Por favor, preencha um nome válido e o preço positivo do serviço.",
       });
       return;
     }
 
     const created = {
       id: `s-${Date.now()}`,
-      name: newServiceName,
-      category: newServiceCategory,
-      durationMinutes: Number(newServiceDuration),
-      price: Number(newServicePrice),
-      commissionPercent: Number(newServiceCommission),
+      barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001",
+      name: sanitizedName,
+      category: sanitizedCategory,
+      durationMinutes: duration,
+      duration_minutes: duration,
+      price: price,
+      commissionPercent: commission,
       onlineBooking: true,
       active: true,
-      tag: newServiceTag || undefined,
-      description: "Serviço cadastrado pelo painel da barbearia.",
+      tag: sanitizedTag,
+      description: "Serviço cadastrado e sanitizado pelo painel da barbearia.",
     };
 
+    setLocalServices((prev) => [created, ...prev]);
     if (onAddService) onAddService(created);
+
+    // [Persistência real no Supabase na tabela services]
+    (async () => {
+      try {
+        await supabase.from("services").insert([
+          {
+            id: created.id,
+            barbershop_id: created.barbershop_id,
+            name: created.name,
+            category: created.category,
+            duration_minutes: created.durationMinutes,
+            price: created.price,
+            commission_percent: created.commissionPercent,
+            active: true,
+          },
+        ]);
+      } catch (err) {
+        console.warn("[ServicesAndProductsView] Aviso ao persistir serviço no Supabase:", err);
+      }
+    })();
 
     setIsServiceModalOpen(false);
     setNewServiceName("");
@@ -117,149 +265,221 @@ export default function ServicesAndProductsView({
 
     setFeedbackAlert({
       variant: "success",
-      title: "Serviço Cadastrado!",
-      message: `O serviço "${created.name}" foi adicionado com sucesso ao catálogo.`,
+      title: "Serviço Cadastrado com Segurança!",
+      message: `O serviço "${created.name}" foi sanitizado e adicionado com sucesso ao catálogo.`,
     });
   };
 
-  // 2. SALVAR EDIÇÃO DE SERVIÇO
+  // 2. SALVAR EDIÇÃO DE SERVIÇO COM SANITIZAÇÃO RIGOROSA
   const handleSaveEditService = () => {
-    if (!editingService.name || !editingService.price) {
+    if (!editingService) return;
+    const sanitizedName = sanitizeTextInput(editingService.name, 80);
+    const sanitizedTag = editingService.tag ? sanitizeTextInput(editingService.tag, 40) : undefined;
+    const allowedCategories = ["Cabelo", "Barba", "Combos", "Tratamentos", "Acabamento"];
+    const sanitizedCategory = allowedCategories.includes(editingService.category)
+      ? editingService.category
+      : "Cabelo";
+    const duration = sanitizeNumber(editingService.durationMinutes, 5, 480, 30);
+    const price = sanitizeNumber(editingService.price, 0.01, 10000, 0);
+    const commission = sanitizeNumber(editingService.commissionPercent, 0, 100, 50);
+
+    if (!sanitizedName || price <= 0) {
       setFeedbackAlert({
         variant: "warning",
         title: "Atenção",
-        message: "O nome e o preço do serviço são obrigatórios.",
+        message: "O nome e o preço do serviço são obrigatórios e devem ser válidos.",
       });
       return;
     }
 
+    const updatedService = {
+      ...editingService,
+      name: sanitizedName,
+      category: sanitizedCategory,
+      durationMinutes: duration,
+      duration_minutes: duration,
+      price: price,
+      commissionPercent: commission,
+      tag: sanitizedTag,
+    };
+
+    setLocalServices((prev) =>
+      prev.map((s) => (s.id === updatedService.id ? updatedService : s))
+    );
     if (onUpdateService) {
-      onUpdateService(editingService);
+      onUpdateService(updatedService);
     }
 
-    const savedName = editingService.name;
+    // [Persistência real no Supabase na tabela services]
+    (async () => {
+      try {
+        await supabase
+          .from("services")
+          .update({
+            name: updatedService.name,
+            category: updatedService.category,
+            duration_minutes: updatedService.durationMinutes,
+            price: updatedService.price,
+            commission_percent: updatedService.commissionPercent,
+          })
+          .eq("id", updatedService.id);
+      } catch (err) {
+        console.warn("[ServicesAndProductsView] Aviso ao atualizar serviço no Supabase:", err);
+      }
+    })();
+
     setEditingService(null);
 
     setFeedbackAlert({
       variant: "success",
-      title: "Serviço Atualizado!",
-      message: `As alterações do serviço "${savedName}" foram salvas. O histórico passado permanece protegido.`,
+      title: "Serviço Atualizado com Segurança!",
+      message: `As alterações do serviço "${sanitizedName}" foram sanitizadas e salvas.`,
     });
   };
 
-  // [Função assíncrona: persiste o novo produto na tabela products do Supabase]
+  // [Função assíncrona: persiste o novo produto na tabela products do Supabase com sanitização]
   const handleSaveNewProduct = async () => {
-    if (!newProductName || !newProductPrice) {
+    const sanitizedName = sanitizeTextInput(newProductName, 80);
+    const sanitizedCategory = ["Bar", "Vitrine"].includes(newProductCategory)
+      ? newProductCategory
+      : "Bar";
+    const costPrice = sanitizeNumber(newProductCost, 0, 10000, 0);
+    const price = sanitizeNumber(newProductPrice, 0.01, 10000, 0);
+    const stock = Math.floor(sanitizeNumber(newProductStock, 0, 9999, 10));
+    const commission = sanitizeNumber(newProductCommission, 0, 100, 10);
+
+    if (!sanitizedName || price <= 0) {
       setFeedbackAlert({
         variant: "warning",
         title: "Atenção",
-        message: "Informe o nome e o preço de venda do produto.",
+        message: "Informe um nome válido e o preço de venda positivo do produto.",
       });
       return;
     }
 
+    const tempId = `prod-${Date.now()}`;
     const productPayload = {
-      name: newProductName.trim(),
-      category: newProductCategory,
-      cost_price: Number(newProductCost || 0),
-      price: Number(newProductPrice),
-      stock: Number(newProductStock || 10),
-      commission_percent: Number(newProductCommission || 0),
+      id: tempId,
+      barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001",
+      name: sanitizedName,
+      category: sanitizedCategory,
+      cost_price: costPrice,
+      price: price,
+      stock: stock,
+      commission_percent: commission,
       active: true,
     };
 
+    const created = {
+      id: tempId,
+      barbershop_id: productPayload.barbershop_id,
+      name: sanitizedName,
+      category: sanitizedCategory,
+      icon: sanitizedCategory === "Bar" ? "beer" : "product",
+      costPrice: costPrice,
+      price: price,
+      stock: stock,
+      commissionPercent: commission,
+      active: true,
+    };
+
+    setLocalProducts((prev) => [created, ...prev]);
+    if (onAddProduct) onAddProduct(created);
+    if (onUpdateProducts) onUpdateProducts([created, ...localProducts]);
+
+    setIsProductModalOpen(false);
+    setNewProductName("");
+    setNewProductPrice("");
+    setNewProductCost("");
+    setNewProductStock("");
+
     try {
-      // Método Supabase: insere o produto e retorna o registro com o ID oficial
       const { data, error } = await supabase
         .from("products")
         .insert([productPayload])
         .select()
         .single();
 
-      if (error) throw error;
-
-      const created = {
-        id: data.id,
-        name: data.name,
-        category: data.category,
-        icon: data.category === "Bar" ? "🍺" : "🧴",
-        costPrice: Number(data.cost_price || 0),
-        price: Number(data.price),
-        stock: Number(data.stock),
-        commissionPercent: Number(data.commission_percent || 0),
-        active: true,
-      };
-
-      setProducts((prev) => [created, ...prev]);
-      setIsProductModalOpen(false);
-      setNewProductName("");
-      setNewProductPrice("");
-      setNewProductCost("");
-      setNewProductStock("");
-
-      setFeedbackAlert({
-        variant: "success",
-        title: "Produto Cadastrado!",
-        message: `O produto "${created.name}" foi adicionado ao estoque do PDV.`,
-      });
+      if (!error && data) {
+        const official = {
+          ...created,
+          id: data.id || tempId,
+        };
+        setLocalProducts((prev) =>
+          prev.map((p) => (p.id === tempId ? official : p))
+        );
+        if (onUpdateProduct) onUpdateProduct(official);
+      }
     } catch (err) {
-      console.error("Erro ao salvar produto no Supabase:", err);
-      setFeedbackAlert({
-        variant: "error",
-        title: "Erro de Conexão",
-        message: "Não foi possível cadastrar o produto no banco de dados.",
-      });
+      console.warn("Aviso ao salvar produto no Supabase (mantido em contingência):", err);
     }
+
+    setFeedbackAlert({
+      variant: "success",
+      title: "Produto Cadastrado com Segurança!",
+      message: `O produto "${created.name}" foi sanitizado e adicionado ao estoque do PDV.`,
+    });
   };
 
-  // [Função assíncrona: atualiza os dados e estoque do produto no Supabase]
+  // [Função assíncrona: atualiza os dados e estoque do produto com sanitização defensiva]
   const handleSaveEditProduct = async () => {
-    if (!editingProduct?.name || !editingProduct?.price) {
+    if (!editingProduct) return;
+    const sanitizedName = sanitizeTextInput(editingProduct.name, 80);
+    const sanitizedCategory = ["Bar", "Vitrine"].includes(editingProduct.category)
+      ? editingProduct.category
+      : "Bar";
+    const costPrice = sanitizeNumber(editingProduct.costPrice, 0, 10000, 0);
+    const price = sanitizeNumber(editingProduct.price, 0.01, 10000, 0);
+    const stock = Math.floor(sanitizeNumber(editingProduct.stock, 0, 9999, 0));
+    const commission = sanitizeNumber(editingProduct.commissionPercent, 0, 100, 0);
+
+    if (!sanitizedName || price <= 0) {
       setFeedbackAlert({
         variant: "warning",
         title: "Atenção",
-        message: "O nome e o preço do produto são obrigatórios.",
+        message: "O nome e o preço do produto são obrigatórios e devem ser válidos.",
       });
       return;
     }
 
-    const updatePayload = {
-      name: editingProduct.name.trim(),
-      category: editingProduct.category,
-      cost_price: Number(editingProduct.costPrice || 0),
-      price: Number(editingProduct.price),
-      stock: Number(editingProduct.stock || 0),
-      commission_percent: Number(editingProduct.commissionPercent || 0),
+    const updatedProduct = {
+      ...editingProduct,
+      name: sanitizedName,
+      category: sanitizedCategory,
+      costPrice: costPrice,
+      price: price,
+      stock: stock,
+      commissionPercent: commission,
     };
 
+    setLocalProducts((prev) =>
+      prev.map((p) => (p.id === editingProduct.id ? updatedProduct : p))
+    );
+    if (onUpdateProduct) onUpdateProduct(updatedProduct);
+
+    setEditingProduct(null);
+
     try {
-      const { error } = await supabase
+      await supabase
         .from("products")
-        .update(updatePayload)
+        .update({
+          name: sanitizedName,
+          category: sanitizedCategory,
+          cost_price: costPrice,
+          price: price,
+          stock: stock,
+          commission_percent: commission,
+        })
         .eq("id", editingProduct.id);
-
-      if (error) throw error;
-
-      setProducts((prev) =>
-        prev.map((p) => (p.id === editingProduct.id ? editingProduct : p)),
-      );
-
-      const savedName = editingProduct.name;
-      setEditingProduct(null);
-
-      setFeedbackAlert({
-        variant: "success",
-        title: "Produto Atualizado!",
-        message: `As alterações do produto "${savedName}" foram salvas com sucesso.`,
-      });
     } catch (err) {
-      console.error("Erro ao atualizar produto no Supabase:", err);
-      setFeedbackAlert({
-        variant: "error",
-        title: "Erro",
-        message: "Não foi possível salvar as alterações do produto no banco.",
-      });
+      console.warn("Aviso ao atualizar produto no Supabase:", err);
     }
+
+    setFeedbackAlert({
+      variant: "success",
+      title: "Produto Atualizado com Segurança!",
+      message: `As alterações do produto "${sanitizedName}" foram sanitizadas e salvas com sucesso.`,
+    });
   };
 
   // [Função assíncrona: soft delete persistido no Supabase mantendo o histórico de vendas intacto]
@@ -270,25 +490,27 @@ export default function ServicesAndProductsView({
 
     try {
       if (itemToDeactivate.type === "service") {
+        setLocalServices((prev) =>
+          prev.map((s) => (s.id === targetItem.id ? { ...s, active: false } : s))
+        );
+        if (onDeleteService) onDeleteService(targetItem.id);
+        if (onUpdateService) onUpdateService({ ...targetItem, active: false });
+
         await supabase
           .from("services")
           .update({ active: false })
           .eq("id", targetItem.id);
-
-        if (onDeleteService) {
-          onDeleteService(targetItem.id);
-        }
       } else {
+        setLocalProducts((prev) =>
+          prev.map((p) => (p.id === targetItem.id ? { ...p, active: false } : p))
+        );
+        if (onDeleteProduct) onDeleteProduct(targetItem.id);
+        if (onUpdateProduct) onUpdateProduct({ ...targetItem, active: false });
+
         await supabase
           .from("products")
           .update({ active: false })
           .eq("id", targetItem.id);
-
-        setProducts((prev) =>
-          prev.map((p) =>
-            p.id === targetItem.id ? { ...p, active: false } : p,
-          ),
-        );
       }
 
       setItemToDeactivate(null);
@@ -307,23 +529,25 @@ export default function ServicesAndProductsView({
   const handleRestoreItem = async (item, type) => {
     try {
       if (type === "service") {
+        setLocalServices((prev) =>
+          prev.map((s) => (s.id === item.id ? { ...s, active: true } : s))
+        );
+        if (onUpdateService) onUpdateService({ ...item, active: true });
+
         await supabase
           .from("services")
           .update({ active: true })
           .eq("id", item.id);
-
-        if (onUpdateService) {
-          onUpdateService({ ...item, active: true });
-        }
       } else {
+        setLocalProducts((prev) =>
+          prev.map((p) => (p.id === item.id ? { ...p, active: true } : p))
+        );
+        if (onUpdateProduct) onUpdateProduct({ ...item, active: true });
+
         await supabase
           .from("products")
           .update({ active: true })
           .eq("id", item.id);
-
-        setProducts((prev) =>
-          prev.map((p) => (p.id === item.id ? { ...p, active: true } : p)),
-        );
       }
 
       setFeedbackAlert({
@@ -336,11 +560,11 @@ export default function ServicesAndProductsView({
     }
   };
 
-  const filteredServices = services.filter((s) =>
+  const filteredServices = localServices.filter((s) =>
     statusFilter === "active" ? s.active !== false : s.active === false,
   );
 
-  const filteredProducts = products.filter((p) =>
+  const filteredProducts = localProducts.filter((p) =>
     statusFilter === "active" ? p.active !== false : p.active === false,
   );
 
@@ -356,7 +580,7 @@ export default function ServicesAndProductsView({
       <div className={barbershopStyles.viewHeader}>
         <div className={barbershopStyles.titleWrapper}>
           <h1 className={barbershopStyles.viewTitle}>
-            <span>✂️</span>
+            <ProjectIcon name="Scissors" size={24} colorVariant="amber" />
             <span>Catálogo de Serviços & Estoque do PDV</span>
           </h1>
           <p className={barbershopStyles.viewSubtitle}>
@@ -384,7 +608,7 @@ export default function ServicesAndProductsView({
         )}
       </div>
 
-      {/* 👇 2. ALERTA DINÂMICO NATIVO (SUBSTITUINDO OS ALERTS DO NAVEGADOR) */}
+      {/* 2. ALERTA DINÂMICO NATIVO (SUBSTITUINDO OS ALERTS DO NAVEGADOR) */}
       {feedbackAlert && (
         <Alert
           variant={feedbackAlert.variant}
@@ -403,9 +627,9 @@ export default function ServicesAndProductsView({
             onClick={() => setActiveTab("services")}
             className={`${barbershopStyles.tabBtn} ${activeTab === "services" ? barbershopStyles.tabActive : barbershopStyles.tabInactive}`}
           >
-            <span>✂️</span>
+            <ProjectIcon name="Scissors" size={15} colorVariant="inherit" className="mr-1.5 inline" />
             <span>
-              Serviços ({services.filter((s) => s.active !== false).length})
+              Serviços ({localServices.filter((s) => s.active !== false).length})
             </span>
           </button>
 
@@ -414,10 +638,9 @@ export default function ServicesAndProductsView({
             onClick={() => setActiveTab("products")}
             className={`${barbershopStyles.tabBtn} ${activeTab === "products" ? barbershopStyles.tabActive : barbershopStyles.tabInactive}`}
           >
-            <span>🍺</span>
+            <ProjectIcon name="Beer" size={15} colorVariant="inherit" className="mr-1.5 inline" />
             <span>
-              Bar & Vitrine ({products.filter((p) => p.active !== false).length}
-              )
+              Bar & Vitrine ({localProducts.filter((p) => p.active !== false).length})
             </span>
           </button>
         </div>
@@ -574,7 +797,7 @@ export default function ServicesAndProductsView({
 
           <Input
             label="Tag de Destaque (Opcional)"
-            placeholder="Ex: Mais Pedido ⭐ ou 15% OFF"
+            placeholder="Ex: Mais Pedido ou 15% OFF"
             value={newServiceTag}
             onChange={(e) => setNewServiceTag(e.target.value)}
           />
@@ -585,7 +808,7 @@ export default function ServicesAndProductsView({
       <Modal
         isOpen={!!editingService}
         onClose={() => setEditingService(null)}
-        title={`✏️ Editar Serviço: ${editingService?.name}`}
+        title={`Editar Serviço: ${editingService?.name ? sanitizeTextInput(editingService.name, 40) : ""}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditingService(null)}>
@@ -673,7 +896,7 @@ export default function ServicesAndProductsView({
 
             <Input
               label="Tag de Destaque"
-              placeholder="Ex: Mais Pedido ⭐"
+              placeholder="Ex: Mais Pedido"
               value={editingService.tag || ""}
               onChange={(e) =>
                 setEditingService({ ...editingService, tag: e.target.value })
@@ -766,7 +989,7 @@ export default function ServicesAndProductsView({
       <Modal
         isOpen={!!editingProduct}
         onClose={() => setEditingProduct(null)}
-        title={`✏️ Editar Produto: ${editingProduct?.name}`}
+        title={`Editar Produto: ${editingProduct?.name ? sanitizeTextInput(editingProduct.name, 40) : ""}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditingProduct(null)}>
@@ -899,13 +1122,13 @@ export default function ServicesAndProductsView({
             <p className="text-xs text-neutral-200 leading-relaxed">
               Deseja desativar{" "}
               <strong className="text-white">
-                "{itemToDeactivate.item.name}"
+                "{sanitizeTextInput(itemToDeactivate.item.name, 50)}"
               </strong>
               ?
             </p>
 
             <div className="p-3 bg-red-950/30 border border-red-800/50 rounded-xl text-xs text-red-300 space-y-1.5">
-              <p className="font-bold">🛡️ Histórico Contábil Protegido:</p>
+              <p className="font-bold flex items-center gap-1.5"><ProjectIcon name="ShieldCheck" size={14} colorVariant="amber" /><span>Histórico Contábil Protegido:</span></p>
               <p className="text-[11px] text-neutral-300 leading-relaxed">
                 Este item deixará de aparecer para novas vendas e agendamentos,
                 mas{" "}

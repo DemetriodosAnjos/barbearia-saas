@@ -1,4 +1,5 @@
 import { logoStyles } from "./Logo.styles";
+import ProjectIcon from "./ProjectIcon";
 
 export default function Logo({
   src, // URL da imagem da logo (se houver)
@@ -23,7 +24,11 @@ export default function Logo({
         {src ? (
           <img src={src} alt={name} className={logoStyles.image} />
         ) : (
-          <span>💈</span>
+          <ProjectIcon
+            name="Scissors"
+            size={size === "xs" ? 14 : size === "lg" ? 24 : 18}
+            colorVariant="amber"
+          />
         )}
       </div>
 

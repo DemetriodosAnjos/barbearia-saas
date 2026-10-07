@@ -22,7 +22,83 @@
 }
 
 /* ======================================================== */
-/* ☀️ MODO CLARO GLOBAL (LIGHT MODE AUTOMÁTICO)            */
+/* ACESSIBILIDADE GLOBAL (WCAG 2.2 AA)                      */
+/* ======================================================== */
+
+/* 1. Indicador Visual Claro de Foco (:focus-visible) - WCAG 2.4.7 e 2.4.11 */
+:focus-visible {
+  outline: 2px solid #f59e0b !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.25) !important;
+}
+
+/* Evita anéis de foco indesejados ao clicar com mouse/toque, mantendo apenas para teclado */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 2. Link de Acessibilidade 'Pular para Conteúdo' (Skip Link) - WCAG 2.4.1 */
+.skip-to-content {
+  position: absolute;
+  top: -9999px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #f59e0b;
+  color: #0a0a0a;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 0 0 0.5rem 0.5rem;
+  z-index: 9999;
+  text-decoration: none;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  transition: top 0.2s ease-in-out;
+}
+
+.skip-to-content:focus {
+  top: 0;
+  outline: 3px solid #000000;
+}
+
+/* 3. Utilitário Screen Reader Only (sr-only) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* 4. Respeito a Preferências de Redução de Movimento - WCAG 2.3.3 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 5. Alvo Mínimo de Toque e Clique (Target Size) - WCAG 2.2 Critério 2.5.8 (Mínimo 24x24px) */
+button,
+a,
+input,
+select,
+[role="button"],
+[role="checkbox"],
+[role="radio"] {
+  min-height: 24px;
+  min-width: 24px;
+}
+
+/* ======================================================== */
+/* MODO CLARO GLOBAL (LIGHT MODE AUTOMÁTICO)                */
 /* Ativado quando a tag <html> NÃO tem a classe .dark       */
 /* ======================================================== */
 

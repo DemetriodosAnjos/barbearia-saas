@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { chartStyles } from "./FinancialChart.styles";
+import ProjectIcon from "../ui/ProjectIcon";
 
 export default function FinancialChart({
   weeklyData = [],
@@ -44,7 +45,7 @@ export default function FinancialChart({
       <div className={chartStyles.header}>
         <div className={chartStyles.titleWrapper}>
           <h3 className={chartStyles.title}>
-            <span>📈</span>
+            <ProjectIcon name="TrendingUp" size={20} colorVariant="amber" />
             <span>Evolução de Faturamento & Vendas</span>
           </h3>
           <p className={chartStyles.subtitle}>
@@ -143,12 +144,18 @@ export default function FinancialChart({
                   <strong className="text-white border-b border-neutral-800 pb-1 mb-1">
                     {item.fullLabel || item.label}
                   </strong>
-                  <div className="flex justify-between text-amber-400">
-                    <span>✂️ Serviços:</span>
+                  <div className="flex justify-between items-center text-amber-400">
+                    <span className="flex items-center gap-1">
+                      <ProjectIcon name="Scissors" size={12} colorVariant="amber" />
+                      <span>Serviços:</span>
+                    </span>
                     <strong className="font-mono">R$ {item.services}</strong>
                   </div>
-                  <div className="flex justify-between text-emerald-400">
-                    <span>🍺 Produtos:</span>
+                  <div className="flex justify-between items-center text-emerald-400">
+                    <span className="flex items-center gap-1">
+                      <ProjectIcon name="Beer" size={12} colorVariant="emerald" />
+                      <span>Produtos:</span>
+                    </span>
                     <strong className="font-mono">R$ {item.products}</strong>
                   </div>
                   <div className="flex justify-between text-white font-extrabold border-t border-neutral-800 pt-1 mt-1">

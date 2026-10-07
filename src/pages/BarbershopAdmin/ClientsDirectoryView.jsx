@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para cadastro e sincronização real de clientes]
 import { supabase } from "../../lib/supabase";
 import { clientsStyles } from "./ClientsDirectoryView.styles";
@@ -11,7 +12,20 @@ import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import Alert from "../../components/ui/Alert";
+import { SafeHtml } from "../../components/ui/SafeHtml";
 import ClientHistoryTimeline from "../../components/loyalty/ClientHistoryTimeline";
+import { validateSchema, SCHEMAS } from "../../utils/inputValidator";
+import {
+  Users,
+  ArrowLeft,
+  Star,
+  Scissors,
+  Bell,
+  FileText,
+  Calendar,
+  Smartphone,
+  Lightbulb,
+} from "lucide-react";
 
 // [Função componente: recebe clientsList real e callback de atualização do dashboard]
 export default function ClientsDirectoryView({
@@ -82,10 +96,10 @@ export default function ClientsDirectoryView({
 
     // Mensagem humanizada pronta com o link funcional
     const prebuiltMsg =
-      `Fala ${clientFirstName}, aqui é o ${barberFirstName}! Tudo bem por aí? 💈\n\n` +
+      `Fala ${clientFirstName}, aqui é o ${barberFirstName}! Tudo bem por aí?\n\n` +
       `Vi aqui na minha agenda que faltam apenas ${daysRemaining} dias para fechar seu prazo habitual de ${client.frequencyDays} dias de corte e barba.\n\n` +
       `O que acha de já deixar seu horário garantido na minha cadeira para não ficar sem vaga?\n\n` +
-      `👉 Escolha seu horário aqui: ${customLink}\n\n` +
+      `Escolha seu horário aqui: ${customLink}\n\n` +
       `Te espero na cadeira!`;
 
     setCustomMessage(prebuiltMsg);
@@ -148,16 +162,35 @@ export default function ClientsDirectoryView({
 
     setIsSavingClient(true);
 
-    const clientPayload = {
-      name: newClientForm.name.trim(),
-      phone: newClientForm.phone.trim(),
-      cpf: newClientForm.cpf?.trim() || null,
-      birth_date: newClientForm.birthDate || null,
+    const rawClientData = {
+      name: DOMPurify.sanitize(newClientForm.name.trim(), { ALLOWED_TAGS: [] }),
+      phone: DOMPurify.sanitize(newClientForm.phone.trim(), { ALLOWED_TAGS: [] }),
+      cpf: DOMPurify.sanitize(newClientForm.cpf?.trim() || "", { ALLOWED_TAGS: [] }),
+      birth_date: newClientForm.birthDate || "",
       frequency_days: Number(newClientForm.frequencyDays || 18),
+      notes: DOMPurify.sanitize(newClientForm.notes?.trim() || "", { ALLOWED_TAGS: ["b", "i", "strong", "em", "p", "span"] }),
+    };
+
+    const validation = validateSchema(rawClientData, SCHEMAS.clientDirectory, {
+      rejectUnknown: true,
+    });
+
+    if (!validation.isValid) {
+      setFormErrors({ name: validation.errors[0] });
+      setIsSavingClient(false);
+      return;
+    }
+
+    const clientPayload = {
+      name: validation.sanitized.name,
+      phone: validation.sanitized.phone,
+      cpf: validation.sanitized.cpf || null,
+      birth_date: validation.sanitized.birth_date || null,
+      frequency_days: validation.sanitized.frequency_days,
       status: "active",
       total_visits: 0,
       total_spent: 0,
-      notes: newClientForm.notes?.trim() || "",
+      notes: validation.sanitized.notes || "",
     };
 
     try {
@@ -253,7 +286,7 @@ export default function ClientsDirectoryView({
       <div className={clientsStyles.headerCard}>
         <div className={clientsStyles.titleWrapper}>
           <h1 className={clientsStyles.title}>
-            <span>👥</span>
+            <Users className="w-5 h-5 text-amber-500 inline-block mr-2" />
             <span>Clientes & Prontuários Técnicos</span>
           </h1>
           <p className={clientsStyles.subtitle}>
@@ -277,7 +310,10 @@ export default function ClientsDirectoryView({
               onClick={onBack}
               className="text-xs py-2 px-3"
             >
-              ← Voltar
+              <span className="flex items-center gap-1.5">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Voltar</span>
+              </span>
             </Button>
           )}
         </div>
@@ -287,7 +323,7 @@ export default function ClientsDirectoryView({
       {recallDueClients.length > 0 && (
         <Alert
           variant="warning"
-          title={`🔔 Oportunidade de Receita: ${recallDueClients.length} clientes na janela ideal de retorno!`}
+          title={`Oportunidade de Receita: ${recallDueClients.length} clientes na janela ideal de retorno!`}
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
             <span className="text-xs text-neutral-300">
@@ -312,7 +348,7 @@ export default function ClientsDirectoryView({
         <StatCard
           title="Base de Clientes"
           value={`${totalClients} cadastrados`}
-          icon="👥"
+          icon="Users"
           theme="blue"
           delta={{
             value: "+12 este mês",
@@ -324,7 +360,7 @@ export default function ClientsDirectoryView({
         <StatCard
           title="Clientes VIP / Recorrentes"
           value={`${vipClientsCount} fiéis`}
-          icon="👑"
+          icon="Crown"
           theme="gold"
           delta={{
             value: "Voltam < 20 dias",
@@ -336,7 +372,7 @@ export default function ClientsDirectoryView({
         <StatCard
           title="Ticket Médio da Carteira"
           value={`R$ ${averageTicketGlobal.toFixed(2).replace(".", ",")}`}
-          icon="💰"
+          icon="DollarSign"
           theme="green"
           delta={{
             value: "Por atendimento",
@@ -348,7 +384,7 @@ export default function ClientsDirectoryView({
         <StatCard
           title="Em Risco de Perda (Churn)"
           value={`${atRiskCount} ausentes`}
-          icon="⚠️"
+          icon="AlertTriangle"
           theme="purple"
           delta={{
             value: "> 40 dias sem vir",
@@ -380,7 +416,7 @@ export default function ClientsDirectoryView({
               className="bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs py-2 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
             >
               <option value="all">Todos os Clientes</option>
-              <option value="vip">Apenas Clientes VIP (★)</option>
+              <option value="vip">Apenas Clientes VIP</option>
               <option value="at_risk">Em Risco de Perda (&gt; 40 dias)</option>
             </select>
           </div>
@@ -407,8 +443,9 @@ export default function ClientsDirectoryView({
                       <p className="font-bold text-white text-xs flex items-center gap-1.5">
                         <span>{row.name}</span>
                         {row.isVip && (
-                          <span className="text-amber-400 text-[10px]">
-                            ★ VIP
+                          <span className="flex items-center gap-0.5 text-amber-400 text-[10px] font-bold">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span>VIP</span>
                           </span>
                         )}
                         {isDueRecall && (
@@ -457,7 +494,7 @@ export default function ClientsDirectoryView({
               label: "Barbeiro",
               render: (row) => (
                 <span className="text-xs text-neutral-200 font-medium flex items-center gap-1">
-                  <span>💈</span>
+                  <Scissors className="w-3.5 h-3.5 text-amber-500" />
                   <span>{row.preferredBarber}</span>
                 </span>
               ),
@@ -472,22 +509,31 @@ export default function ClientsDirectoryView({
                 </span>
               ),
             },
+            {
+              key: "notes",
+              label: "Prontuário & Notas",
+              render: (row) => (
+                <div className="max-w-[200px] truncate text-[11px] text-neutral-300">
+                  <SafeHtml html={row.notes || row.technicalNotes?.cutSpecs || "—"} />
+                </div>
+              ),
+            },
           ]}
           actions={[
-            // 👇 NOVO: AÇÃO DE LEMBRETE PREDITIVO (SINO)
+            // AÇÃO DE LEMBRETE PREDITIVO (SINO)
             {
               label: "Disparar Lembrete Preditivo de Retorno",
-              icon: "🔔",
+              icon: "Bell",
               onClick: (row) => handleOpenRecallModal(row),
             },
             {
               label: "Abrir Prontuário & Ficha Técnica",
-              icon: "📜",
+              icon: "FileText",
               onClick: (row) => setSelectedClientForRecord(row),
             },
             {
               label: "Agendar Horário na Agenda",
-              icon: "📅",
+              icon: "Calendar",
               onClick: (row) => {
                 if (onNavigateToBooking) onNavigateToBooking(row);
                 else
@@ -507,7 +553,7 @@ export default function ClientsDirectoryView({
         isOpen={!!recallModalClient}
         size="lg"
         onClose={() => setRecallModalClient(null)}
-        title={`🔔 Lembrete Preditivo de Retorno: ${recallModalClient?.name}`}
+        title={`Lembrete Preditivo de Retorno: ${recallModalClient?.name}`}
         footer={
           <div className="w-full flex items-center justify-between gap-3">
             <Button
@@ -522,7 +568,7 @@ export default function ClientsDirectoryView({
               onClick={handleSendWhatsAppRecall}
               className="text-xs py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-lg flex items-center gap-2"
             >
-              <span>📲</span>
+              <Smartphone className="w-4 h-4 text-inherit" />
               <span>Enviar no WhatsApp do Cliente</span>
             </Button>
           </div>
@@ -572,8 +618,8 @@ export default function ClientsDirectoryView({
                 <span className="text-neutral-500 block text-[10px] uppercase font-bold">
                   Barbeiro Designado:
                 </span>
-                <strong className="text-amber-400 text-sm flex items-center gap-1 mt-0.5">
-                  <span>💈</span>
+                <strong className="text-amber-400 text-sm flex items-center gap-1.5 mt-0.5">
+                  <Scissors className="w-3.5 h-3.5 text-amber-500" />
                   <span>{recallModalClient.preferredBarber}</span>
                 </strong>
               </div>
@@ -584,19 +630,25 @@ export default function ClientsDirectoryView({
               <label className="text-xs font-bold text-neutral-300 flex items-center justify-between">
                 <span>Mensagem Pessoal Pronta (Em nome do Barbeiro):</span>
                 <span className="text-[10px] text-neutral-500">
-                  Você pode personalizar o texto antes de enviar
+                  Preview seguro com SafeHtml
                 </span>
               </label>
               <textarea
-                rows={6}
+                rows={4}
                 value={customMessage}
                 onChange={(e) => setCustomMessage(e.target.value)}
                 className="w-full p-3.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 leading-relaxed font-sans"
               />
+              <div className="p-3 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-neutral-300">
+                <span className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
+                  Pré-visualização da Mensagem:
+                </span>
+                <SafeHtml html={customMessage} />
+              </div>
             </div>
 
             <div className="p-3 bg-emerald-950/20 border border-emerald-800/40 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-              <span>💡</span>
+              <Lightbulb className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>
                 O link anexado na mensagem já abre a agenda com o barbeiro{" "}
                 <strong>{recallModalClient.preferredBarber}</strong>{" "}
@@ -643,7 +695,7 @@ export default function ClientsDirectoryView({
               events={selectedClientForRecord.historyEvents}
               onAddTechnicalNote={() =>
                 alert(
-                  `📝 Adicionar nota técnica para ${selectedClientForRecord.name}`,
+                  `Adicionar nota técnica para ${selectedClientForRecord.name}`,
                 )
               }
             />
@@ -656,7 +708,7 @@ export default function ClientsDirectoryView({
         isOpen={isNewClientModalOpen}
         size="md"
         onClose={() => setIsNewClientModalOpen(false)}
-        title="👤 Cadastrar Novo Cliente"
+        title="Cadastrar Novo Cliente"
         footer={
           <>
             <Button
@@ -702,7 +754,7 @@ export default function ClientsDirectoryView({
               error={formErrors.phone}
             />
 
-            {/* 👇 NOVO: PARAMETRIZAÇÃO DA FREQUÊNCIA NO CADASTRO */}
+            {/* NOVO: PARAMETRIZAÇÃO DA FREQUÊNCIA NO CADASTRO */}
             <Select
               label="Frequência Habitual de Retorno"
               value={newClientForm.frequencyDays}

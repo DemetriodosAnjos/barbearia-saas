@@ -1,4 +1,5 @@
 import { selectStyles } from "./Select.styles";
+import ProjectIcon from "./ProjectIcon";
 
 export default function Select({
   label,
@@ -21,6 +22,12 @@ export default function Select({
     ? selectStyles.status.error
     : selectStyles.status.default;
 
+  const errorId = selectId ? `${selectId}-error` : undefined;
+  const helperId = selectId ? `${selectId}-helper` : undefined;
+  const ariaDescribedBy = [error ? errorId : null, helperText ? helperId : null]
+    .filter(Boolean)
+    .join(" ") || undefined;
+
   return (
     <div className={selectStyles.container}>
       {/* Label Acessível */}
@@ -37,6 +44,8 @@ export default function Select({
           disabled={disabled}
           value={value}
           onChange={onChange}
+          aria-invalid={Boolean(error)}
+          aria-describedby={ariaDescribedBy}
           className={`${selectStyles.baseSelect} ${borderStatus} ${className}`}
           {...props}
         >
@@ -45,7 +54,7 @@ export default function Select({
             <option
               value=""
               disabled
-              className="bg-neutral-900 text-neutral-500"
+              className="bg-neutral-900 text-neutral-400"
             >
               {placeholder}
             </option>
@@ -67,7 +76,7 @@ export default function Select({
         </select>
 
         {/* Ícone de Seta (Chevron Down) */}
-        <div className={selectStyles.arrowIcon}>
+        <div className={selectStyles.arrowIcon} aria-hidden="true">
           <svg
             className="w-4 h-4"
             fill="none"
@@ -86,14 +95,22 @@ export default function Select({
 
       {/* Mensagem de Erro */}
       {error && (
-        <p className={selectStyles.errorMessage}>
-          <span>⚠️</span> {error}
+        <p
+          id={errorId}
+          role="alert"
+          aria-live="polite"
+          className={selectStyles.errorMessage}
+        >
+          <ProjectIcon name="AlertTriangle" size={13} colorVariant="danger" />
+          <span>{error}</span>
         </p>
       )}
 
       {/* Texto de Apoio */}
       {!error && helperText && (
-        <p className={selectStyles.helperText}>{helperText}</p>
+        <p id={helperId} className={selectStyles.helperText}>
+          {helperText}
+        </p>
       )}
     </div>
   );

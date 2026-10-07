@@ -1,4 +1,9 @@
-// Auditoria de Segurança e AppSec (Itens 8, 9, 10, 11 e 12)
+import {
+  maskSecret,
+  maskUrl,
+  FICTITIOUS_MOCK_CREDENTIALS,
+  scanContentForSecrets,
+} from "../../utils/security";
 
 // Decodificador seguro de JWT Base64URL com preenchimento (padding) automático
 function parseJwtPayloadSafe(token) {
@@ -7,7 +12,6 @@ function parseJwtPayloadSafe(token) {
     const parts = token.split(".");
     if (parts.length < 2) return null;
     let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    // Adiciona padding '=' se o comprimento não for múltiplo de 4 (exigência do atob no navegador)
     while (base64.length % 4 !== 0) {
       base64 += "=";
     }
@@ -30,12 +34,11 @@ export const securityAuditor = {
     const results = [];
     const envVars = import.meta.env || {};
 
-    const defaultFallbackAnonKey =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ2Vldnl3b3RiZmxpa2lsd2F5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzcyMTgsImV4cCI6MjEwNTUxMzIxOH0.MqO9fbKFvAa3DK8YW44F8obbnW4yG7wzhcgDDa2S3Qk";
-    const defaultFallbackUrl = "https://njgeevywotbflikilway.supabase.co";
-
-    const anonKey = envVars.VITE_SUPABASE_ANON_KEY || defaultFallbackAnonKey;
-    const supabaseUrl = envVars.VITE_SUPABASE_URL || defaultFallbackUrl;
+    const anonKey =
+      envVars.VITE_SUPABASE_ANON_KEY ||
+      FICTITIOUS_MOCK_CREDENTIALS.SUPABASE_ANON_KEY;
+    const supabaseUrl =
+      envVars.VITE_SUPABASE_URL || FICTITIOUS_MOCK_CREDENTIALS.SUPABASE_URL;
 
     // 1. Procura se alguma chave contém o padrão de service_role
     let serviceRoleFound = false;
@@ -57,7 +60,8 @@ export const securityAuditor = {
     results.push({
       id: "SEC-10-1",
       title: "Varredura de Chave Privada (service_role)",
-      description: "Verifica se a chave service_role ou tokens secretos vazaram no bundle client-side.",
+      description:
+        "Verifica se a chave service_role ou tokens secretos vazaram no bundle client-side.",
       passed: !serviceRoleFound,
       severity: "CRITICAL",
       details: serviceRoleFound
@@ -73,7 +77,8 @@ export const securityAuditor = {
     results.push({
       id: "SEC-10-2",
       title: "Validação da Role da Chave Pública (anon)",
-      description: "Garante que a chave pública usada nas requisições possui apenas privilégio 'anon' limitado por RLS.",
+      description:
+        "Garante que a chave pública usada nas requisições possui apenas privilégio 'anon' limitado por RLS.",
       passed: isRoleAnon,
       severity: "HIGH",
       details: isRoleAnon
@@ -81,26 +86,66 @@ export const securityAuditor = {
             jwtPayload?.exp
               ? new Date(jwtPayload.exp * 1000).toLocaleDateString()
               : "N/A"
-          }). ${isFallbackUsed ? "[Origem: Chave Padrão Supabase]" : "[Origem: .env]"}`
+          }). Token auditado e mascarado: ${maskSecret(anonKey, 10, 6)}`
         : "FALHA: O token não possui role 'anon' estrita ou não pôde ser decodificado.",
       payload: jwtPayload,
-      source: isFallbackUsed ? "default_client_fallback" : "environment",
+      source: isFallbackUsed ? "mock_fictitious_fallback" : "environment",
     });
 
-    // 3. Validação do Host Supabase
+    // 3. Validação do Host Supabase e Criptografia
     const isHttps = supabaseUrl.startsWith("https://");
     results.push({
       id: "SEC-10-3",
       title: "Criptografia de Transporte (HTTPS/TLS)",
-      description: "Garante que todo tráfego de banco de dados e autenticação transita sobre HTTPS.",
+      description:
+        "Garante que todo tráfego de banco de dados e autenticação transita sobre HTTPS.",
       passed: isHttps,
       severity: "MEDIUM",
       details: isHttps
-        ? `OK: Endpoint '${supabaseUrl}' configurado com SSL/TLS obrigatório.`
+        ? `OK: Endpoint '${maskUrl(supabaseUrl)}' configurado com SSL/TLS obrigatório.`
         : "FALHA: O endpoint do banco de dados não utiliza HTTPS.",
     });
 
     return results;
+  },
+
+  // Auditoria de Bundle, Mapas de Código e Risco de Exposição
+  auditBundleSecurity() {
+    const findings = [];
+    const envVars = import.meta.env || {};
+
+    // 1. Inspeciona se variáveis VITE_ expõem dados sensíveis
+    Object.keys(envVars).forEach((key) => {
+      if (
+        /secret|password|private|master|service_role/i.test(key) &&
+        key.startsWith("VITE_")
+      ) {
+        findings.push({
+          type: "EXPOSED_PRIVATE_ENV",
+          severity: "CRITICAL",
+          message: `A variável pública '${key}' está prefixada com VITE_ e portanto é compilada diretamente no bundle do navegador!`,
+        });
+      }
+    });
+
+    // 2. Verifica scripts carregados no DOM
+    const scripts = Array.from(document.querySelectorAll("script[src]"));
+    scripts.forEach((script) => {
+      const src = script.getAttribute("src") || "";
+      if (src.includes(".map")) {
+        findings.push({
+          type: "EXPOSED_SOURCEMAP",
+          severity: "MEDIUM",
+          message: `Mapa de código (sourcemap) '${src}' detectado em produção. Pode expor a estrutura original do código-fonte.`,
+        });
+      }
+    });
+
+    return {
+      passed: findings.length === 0,
+      findings,
+      checkedScriptsCount: scripts.length,
+    };
   },
 
   // Item 12: Sanitização de Input e Injeção (XSS / SQLi)
@@ -122,16 +167,18 @@ export const securityAuditor = {
       threatsDetected.push("Pseudo-Protocol (javascript:)");
     }
 
-    // Detecção abrangente de SQL Injection (comandos DDL/DML, tautologias OR/AND e comentários SQL -- ou /*)
+    // Detecção abrangente de SQL Injection
     if (
-      /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|CREATE)\b)/i.test(rawInput) ||
+      /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|CREATE)\b)/i.test(
+        rawInput
+      ) ||
       /(\b(OR|AND)\b\s+['"\d\w]+\s*=\s*['"\d\w]+)/i.test(rawInput) ||
       /--|;|\/\*|\*\//.test(rawInput)
     ) {
       threatsDetected.push("Padrão de SQL Injection Clássico");
     }
 
-    // Sanitização segura contra XSS para renderização segura
+    // Sanitização segura contra XSS
     const sanitized = rawInput
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -148,9 +195,11 @@ export const securityAuditor = {
   },
 
   // Item 9 & 11: Simulação de Isolamento Multi-Tenant & RBAC
-  simulateTenantIsolationCheck(currentTenantId, requestedBarbershopId, userRole = "client") {
-    // Regra:
-    // Se userRole !== 'superadmin', currentTenantId DEVE ser idêntico ao requestedBarbershopId.
+  simulateTenantIsolationCheck(
+    currentTenantId,
+    requestedBarbershopId,
+    userRole = "client"
+  ) {
     const isAllowed =
       userRole === "superadmin" || currentTenantId === requestedBarbershopId;
 
@@ -163,5 +212,39 @@ export const securityAuditor = {
         ? "Acesso concedido: Tenant verificado com sucesso pelo RLS."
         : "BLOQUEADO PELO RLS: Tentativa de leitura/mutação de dados de outro estabelecimento (Violação de Isolamento).",
     };
+  },
+
+  // Protocolo Formal de Rotação e Revogação de Segredos
+  getSecretRotationProtocol() {
+    return [
+      {
+        step: 1,
+        title: "Revogação Imediata do JWT Secret",
+        action: "Supabase Dashboard ➔ Project Settings ➔ API ➔ JWT Secret ➔ Generate New Secret",
+        impact:
+          "Invalida instantaneamente todos os tokens anon e service_role já emitidos no passado, encerrando qualquer sessão potencialmente comprometida.",
+      },
+      {
+        step: 2,
+        title: "Emissão e Rotação da Nova Chave",
+        action: "Atualizar as variáveis de ambiente nos servidores de produção e no arquivo .env local com a nova anon key.",
+        impact:
+          "Reestabelece a comunicação segura da aplicação com credenciais recém-geradas.",
+      },
+      {
+        step: 3,
+        title: "Auditoria Forense de Logs de Acesso",
+        action: "Supabase Dashboard ➔ Logs ➔ API Logs / Database Logs",
+        impact:
+          "Investiga se houve chamadas suspeitas a tabelas sensíveis durante o intervalo em que a chave esteve exposta em bundles públicos.",
+      },
+      {
+        step: 4,
+        title: "Migração da Camada de Dados para Backend Proxy",
+        action: "Implementar rotas seguras /api/* para que o cliente React nunca receba tokens de banco de dados diretamente no navegador.",
+        impact:
+          "Arquitetura Zero-Trust: o front-end se comunica apenas com o backend seguro.",
+      },
+    ];
   },
 };

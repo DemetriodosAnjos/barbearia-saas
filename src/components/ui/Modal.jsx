@@ -7,6 +7,8 @@ export default function Modal({
   title,
   children,
   footer,
+  size = "md",
+  className = "",
 }) {
   // Efeito para fechar com tecla ESC e travar o scroll da tela
   useEffect(() => {
@@ -32,6 +34,8 @@ export default function Modal({
   // Se não estiver aberto, não renderiza nada no DOM
   if (!isOpen) return null;
 
+  const sizeClass = modalStyles.sizes[size] || modalStyles.sizes.md;
+
   return (
     <div
       className={modalStyles.backdrop}
@@ -41,17 +45,22 @@ export default function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className={modalStyles.container}
+        aria-labelledby={title ? "modal-title-heading" : undefined}
+        className={`${modalStyles.containerBase} ${sizeClass} ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabeçalho */}
         <div className={modalStyles.header}>
-          {title && <h3 className={modalStyles.title}>{title}</h3>}
+          {title && (
+            <h3 id="modal-title-heading" className={modalStyles.title}>
+              {title}
+            </h3>
+          )}
           <button
             type="button"
             onClick={onClose}
-            className={modalStyles.closeButton}
-            aria-label="Fechar modal"
+            className={`${modalStyles.closeButton} focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none`}
+            aria-label="Fechar janela modal"
           >
             <svg
               className="w-5 h-5"

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Clock, Briefcase, Zap, Check, Coffee } from "lucide-react";
 import { workShiftStyles } from "./WorkShiftSelector.styles";
 import Button from "../ui/Button";
 
@@ -174,7 +175,7 @@ export default function WorkShiftSelector({
       <div className={workShiftStyles.header}>
         <div className={workShiftStyles.titleWrapper}>
           <h3 className={workShiftStyles.title}>
-            <span>⏰</span>
+            <Clock className="w-5 h-5 text-amber-500 shrink-0 inline mr-1" />
             <span>Escala Semanal & Horários de Atendimento</span>
           </h3>
           <p className={workShiftStyles.subtitle}>
@@ -183,7 +184,7 @@ export default function WorkShiftSelector({
         </div>
 
         <div className={workShiftStyles.weeklyHoursBadge}>
-          <span>💼</span>
+          <Briefcase className="w-3.5 h-3.5 text-amber-400 shrink-0 inline mr-1" />
           <span>Carga Total: {calculateTotalWeeklyHours()} semanais</span>
         </div>
       </div>
@@ -193,7 +194,10 @@ export default function WorkShiftSelector({
         <div className={workShiftStyles.bulkHeader}>
           <div>
             <h4 className={workShiftStyles.bulkTitle}>
-              <span>⚡</span> Preencher Horários em Lote (1 Clique)
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Preencher Horários em Lote (1 Clique)</span>
+              </span>
             </h4>
             <p className={workShiftStyles.bulkSubtitle}>
               Configure uma única vez e replique para os grupos selecionados
@@ -239,8 +243,9 @@ export default function WorkShiftSelector({
         <div className={workShiftStyles.bulkInputsRow}>
           {/* [Aviso visual sutil de sucesso ao aplicar lote] */}
           {batchFeedbackMessage && (
-            <div className="mx-4 mt-2 p-2 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-400 text-xs font-bold text-center animate-fade-in">
-              ✓ {batchFeedbackMessage}
+            <div className="mx-4 mt-2 p-2 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-400 text-xs font-bold text-center animate-fade-in flex items-center justify-center gap-1.5">
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>{batchFeedbackMessage}</span>
             </div>
           )}
 
@@ -269,7 +274,10 @@ export default function WorkShiftSelector({
 
             {/* Intervalo do Lote */}
             <div className={workShiftStyles.timeField}>
-              <span className={workShiftStyles.fieldLabel}>☕ Almoço:</span>
+              <span className={workShiftStyles.fieldLabel}>
+                <Coffee className="w-3.5 h-3.5 text-amber-400 shrink-0 inline mr-1" />
+                <span>Almoço:</span>
+              </span>
               <input
                 type="time"
                 value={batchBreakStart}
@@ -367,7 +375,8 @@ export default function WorkShiftSelector({
                   {/* Almoço */}
                   <div className={workShiftStyles.timeField}>
                     <span className={workShiftStyles.fieldLabel}>
-                      ☕ Almoço:
+                      <Coffee className="w-3.5 h-3.5 text-amber-400 shrink-0 inline mr-1" />
+                      <span>Almoço:</span>
                     </span>
                     <input
                       type="time"

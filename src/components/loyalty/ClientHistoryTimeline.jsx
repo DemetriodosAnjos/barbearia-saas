@@ -1,3 +1,4 @@
+import { Scissors, AlertTriangle, ShoppingBag, X } from "lucide-react";
 import { timelineStyles } from "./ClientHistoryTimeline.styles";
 
 export default function ClientHistoryTimeline({
@@ -63,7 +64,10 @@ export default function ClientHistoryTimeline({
       {/* 2. FICHA TÉCNICA DO CLIENTE COM SUPORTE A EMPTY STATE */}
       <div className={timelineStyles.notesBox}>
         <div className={notesHeader}>
-          <span>✂️ Ficha Técnica & Preferências</span>
+          <span className="flex items-center gap-1.5">
+            <Scissors className="w-3.5 h-3.5 text-amber-400" />
+            <span>Ficha Técnica &amp; Preferências</span>
+          </span>
           <button
             type="button"
             onClick={onAddTechnicalNote}
@@ -76,7 +80,7 @@ export default function ClientHistoryTimeline({
         {/* Alerta de Alergia em Destaque (Aparece somente se o cliente tiver alergia real registrada) */}
         {allergyAlert && (
           <div className={timelineStyles.allergyTag}>
-            <span>⚠️</span>
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 inline mr-1" />
             <span>{allergyAlert}</span>
           </div>
         )}
@@ -130,91 +134,61 @@ export default function ClientHistoryTimeline({
                 ? timelineStyles.dotProduct
                 : timelineStyles.dotNoShow;
 
-            const icon = isService ? "✂️" : isProduct ? "🛍️" : "✕";
-
             return (
               <div key={ev.id} className={timelineStyles.eventNode}>
                 {/* Ponto na Linha do Tempo */}
                 <div className={`${timelineStyles.nodeDot} ${dotStyle}`}>
-                  <span>{icon}</span>
+                  {isService ? (
+                    <Scissors className="w-3 h-3 text-amber-400" />
+                  ) : isProduct ? (
+                    <ShoppingBag className="w-3 h-3 text-amber-400" />
+                  ) : (
+                    <X className="w-3 h-3 text-rose-400" />
+                  )}
                 </div>
 
                 {/* Card com Detalhes do Evento */}
-                <div className={timelineStyles.eventsList}>
-                  {events.length === 0 && (
-                    <div className="py-8 text-center text-xs text-neutral-500">
-                      Nenhum histórico anterior registrado para este cliente.
-                    </div>
-                  )}
-
-                  {events.map((ev) => {
-                    const isService = ev.type === "service";
-                    const isProduct = ev.type === "product";
-                    const isNoShow = ev.type === "no_show";
-
-                    const dotStyle = isService
-                      ? timelineStyles.dotService
-                      : isProduct
-                        ? timelineStyles.dotProduct
-                        : timelineStyles.dotNoShow;
-
-                    const icon = isService ? "✂️" : isProduct ? "🛍️" : "✕";
-
-                    return (
-                      <div key={ev.id} className={timelineStyles.eventNode}>
-                        {/* Ponto na Linha do Tempo */}
-                        <div
-                          className={`${timelineStyles.nodeDot} ${dotStyle}`}
-                        >
-                          <span>{icon}</span>
-                        </div>
-
-                        {/* Card com Detalhes do Evento */}
-                        <div className={timelineStyles.eventCard}>
-                          <div className={timelineStyles.eventHeader}>
-                            <div>
-                              {/* Título do Atendimento + Badge de Falta se for No-Show */}
-                              <div className="flex items-center gap-2">
-                                <h5 className={timelineStyles.eventTitle}>
-                                  {ev.title}
-                                </h5>
-                                {isNoShow && (
-                                  <span className="text-[10px] font-bold text-red-400 bg-red-950/50 border border-red-800/60 px-1.5 py-0.5 rounded">
-                                    Falta / Não Compareceu
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Profissional e Valor */}
-                              <div className={timelineStyles.eventMeta}>
-                                {ev.barberName && (
-                                  <span>Por: {ev.barberName}</span>
-                                )}
-                                {ev.barberName && <span>•</span>}
-                                <span className={timelineStyles.eventPrice}>
-                                  R${" "}
-                                  {Number(ev.totalPrice || ev.price || 0)
-                                    .toFixed(2)
-                                    .replace(".", ",")}
-                                </span>
-                              </div>
-                            </div>
-
-                            <span className={timelineStyles.eventDate}>
-                              {ev.date}
-                            </span>
-                          </div>
-
-                          {/* Nota Técnica Registrada naquele atendimento */}
-                          {ev.notes && (
-                            <p className={timelineStyles.eventTechnicalNote}>
-                              "{ev.notes}"
-                            </p>
-                          )}
-                        </div>
+                <div className={timelineStyles.eventCard}>
+                  <div className={timelineStyles.eventHeader}>
+                    <div>
+                      {/* Título do Atendimento + Badge de Falta se for No-Show */}
+                      <div className="flex items-center gap-2">
+                        <h5 className={timelineStyles.eventTitle}>
+                          {ev.title}
+                        </h5>
+                        {isNoShow && (
+                          <span className="text-[10px] font-bold text-red-400 bg-red-950/50 border border-red-800/60 px-1.5 py-0.5 rounded">
+                            Falta / Não Compareceu
+                          </span>
+                        )}
                       </div>
-                    );
-                  })}
+
+                      {/* Profissional e Valor */}
+                      <div className={timelineStyles.eventMeta}>
+                        {ev.barberName && (
+                          <span>Por: {ev.barberName}</span>
+                        )}
+                        {ev.barberName && <span>•</span>}
+                        <span className={timelineStyles.eventPrice}>
+                          R${" "}
+                          {Number(ev.totalPrice || ev.price || 0)
+                            .toFixed(2)
+                            .replace(".", ",")}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span className={timelineStyles.eventDate}>
+                      {ev.date}
+                    </span>
+                  </div>
+
+                  {/* Nota Técnica Registrada naquele atendimento */}
+                  {ev.notes && (
+                    <p className={timelineStyles.eventTechnicalNote}>
+                      "{ev.notes}"
+                    </p>
+                  )}
                 </div>
               </div>
             );

@@ -1,3 +1,4 @@
+import { Crown, AlertTriangle, Sparkles, ArrowRight } from "lucide-react";
 import { subscriptionStyles } from "./SubscriptionBadge.styles";
 import Button from "../ui/Button";
 
@@ -47,7 +48,7 @@ export default function SubscriptionBadge({
   // Objeto de Status visual amigável
   const statusLabels = {
     active: { label: "Plano Ativo", dot: "bg-emerald-400" },
-    overdue: { label: "Pagamento Pendente ⚠️", dot: "bg-amber-400" },
+    overdue: { label: "Pagamento Pendente", dot: "bg-amber-400" },
     cancelled: { label: "Cancelado", dot: "bg-neutral-500" },
   };
 
@@ -91,7 +92,7 @@ export default function SubscriptionBadge({
       <div className={subscriptionStyles.cardHeader}>
         <div>
           <h4 className={subscriptionStyles.planName}>
-            <span>👑</span>
+            <Crown className="w-4 h-4 text-amber-400 shrink-0 inline mr-1.5" />
             <span>{planName}</span>
           </h4>
           <p className={subscriptionStyles.planPrice}>
@@ -116,7 +117,7 @@ export default function SubscriptionBadge({
       {/* Alerta de Inadimplência (se houver falha no cartão) */}
       {isOverdue && (
         <div className={subscriptionStyles.overdueAlert}>
-          <span>⚠️</span>
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 inline mr-1.5" />
           <span className="text-[11px] leading-tight flex-1">
             Falha na cobrança automática. Regularize a fatura para liberar os
             cortes do mês.
@@ -129,9 +130,14 @@ export default function SubscriptionBadge({
         <div className={subscriptionStyles.quotaTextRow}>
           <span className="text-neutral-400 text-xs">Franquia Mensal:</span>
           <span className="font-bold text-neutral-100 font-mono">
-            {isUnlimited
-              ? "Cortes Ilimitados 🌟"
-              : `${usedQuota} de ${totalQuota} cortes utilizados`}
+            {isUnlimited ? (
+              <span className="inline-flex items-center gap-1 text-amber-300">
+                <span>Cortes Ilimitados</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              </span>
+            ) : (
+              `${usedQuota} de ${totalQuota} cortes utilizados`
+            )}
           </span>
         </div>
 
@@ -164,9 +170,10 @@ export default function SubscriptionBadge({
           <button
             type="button"
             onClick={onManage}
-            className="text-xs font-semibold text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
+            className="text-xs font-semibold text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer inline-flex items-center gap-1"
           >
-            Gerenciar Plano ➔
+            <span>Gerenciar Plano</span>
+            <ArrowRight className="w-3 h-3 text-inherit" />
           </button>
         )}
       </div>

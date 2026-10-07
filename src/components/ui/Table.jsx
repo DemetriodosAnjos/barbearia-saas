@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { tableStyles } from "./Table.styles";
 import Skeleton from "./Skeleton";
 import Button from "./Button";
+import ProjectIcon from "./ProjectIcon";
 
 export default function Table({
   columns = [], // [{ key, label, sortable, render: (row) => ... }]
@@ -38,7 +40,10 @@ export default function Table({
     return 0;
   });
 
-  // 2. Seleção em Massa (Checkbox Mestre e por linha)
+  // 2. Manipulação de Seleção
+  const isAllSelected =
+    data.length > 0 && selectedIds.length === data.length;
+
   const handleSelectAll = (e) => {
     if (!onSelectionChange) return;
     if (e.target.checked) {
@@ -57,57 +62,52 @@ export default function Table({
     }
   };
 
-  const isAllSelected = data.length > 0 && selectedIds.length === data.length;
-  const hasSelections = selectedIds.length > 0;
-
   return (
     <div className={`${tableStyles.container} ${className}`}>
-      {/* 1. BARRA DE AÇÕES EM LOTE (BULK ACTIONS) */}
-      {selectable && hasSelections && (
-        <div className={tableStyles.bulkBar}>
-          <div className={tableStyles.bulkInfo}>
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span>
-              {selectedIds.length}{" "}
-              {selectedIds.length === 1
-                ? "item selecionado"
-                : "itens selecionados"}
+      {/* Barra de Ações em Lote (Bulk Actions) */}
+      {selectedIds.length > 0 && (
+        <div className={tableStyles.bulkActionsBar}>
+          <div className="flex items-center gap-2">
+            <span className={tableStyles.bulkSelectedCount}>
+              {selectedIds.length} selecionado(s)
             </span>
           </div>
-
           <div className="flex items-center gap-2">
-            {bulkActions}
-            <button
-              type="button"
-              onClick={() => onSelectionChange([])}
-              className="text-neutral-400 hover:text-white underline cursor-pointer text-xs ml-2"
-            >
-              Desmarcar todos
-            </button>
+            {bulkActions || (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() =>
+                  alert(`Ação em massa executada para ${selectedIds.length} itens.`)
+                }
+              >
+                Excluir Selecionados
+              </Button>
+            )}
           </div>
         </div>
       )}
 
-      {/* 2. ÁREA DE ROLAGEM HORIZONTAL COM TABELA */}
-      <div className={tableStyles.scrollArea}>
+      {/* Container Rolável Horizontalmente com Suporte Touch */}
+      <div className={tableStyles.tableWrapper}>
         <table className={tableStyles.table}>
           {/* CABEÇALHO */}
           <thead className={tableStyles.thead}>
             <tr>
-              {/* Checkbox Mestre */}
+              {/* Checkbox "Selecionar Todos" */}
               {selectable && (
-                <th className="w-10 py-3.5 px-4">
+                <th className={tableStyles.checkboxTh}>
                   <input
                     type="checkbox"
                     checked={isAllSelected}
                     onChange={handleSelectAll}
-                    disabled={isLoading || data.length === 0}
+                    aria-label="Selecionar todas as linhas"
                     className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
                   />
                 </th>
               )}
 
-              {/* Colunas Dinâmicas */}
+              {/* Colunas de Dados */}
               {columns.map((col) => (
                 <th
                   key={col.key}
@@ -120,12 +120,16 @@ export default function Table({
                   <div className="flex items-center gap-1.5">
                     <span>{col.label}</span>
                     {col.sortable && (
-                      <span className="text-neutral-600 text-[10px]">
-                        {sortConfig.key === col.key
-                          ? sortConfig.direction === "asc"
-                            ? "▲"
-                            : "▼"
-                          : "↕"}
+                      <span className="text-neutral-500 hover:text-amber-400 transition-colors">
+                        {sortConfig.key === col.key ? (
+                          sortConfig.direction === "asc" ? (
+                            <ArrowUp className="w-3.5 h-3.5 text-amber-500" />
+                          ) : (
+                            <ArrowDown className="w-3.5 h-3.5 text-amber-500" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="w-3.5 h-3.5 text-neutral-600 hover:text-amber-400" />
+                        )}
                       </span>
                     )}
                   </div>
@@ -143,50 +147,45 @@ export default function Table({
           <tbody>
             {isLoading ? (
               /* Linhas de Esqueleto no Carregamento */
-              Array.from({ length: 4 }).map((_, i) => (
-                <tr key={`skel-${i}`} className={tableStyles.tr}>
+              Array.from({ length: 5 }).map((_, rIdx) => (
+                <tr key={rIdx} className={tableStyles.tr}>
                   {selectable && (
-                    <td className="px-4 py-3">
-                      <Skeleton variant="rounded" width="16px" height="16px" />
+                    <td className={tableStyles.td}>
+                      <Skeleton className="w-4 h-4 rounded" />
                     </td>
                   )}
-                  {columns.map((col, idx) => (
-                    <td key={idx} className={tableStyles.td}>
-                      <Skeleton variant="text" width="80%" height="14px" />
+                  {columns.map((_, cIdx) => (
+                    <td key={cIdx} className={tableStyles.td}>
+                      <Skeleton className="h-4 w-full rounded" />
                     </td>
                   ))}
                   {actions.length > 0 && (
                     <td className={tableStyles.stickyActionTd}>
-                      <Skeleton
-                        variant="rounded"
-                        width="60px"
-                        height="24px"
-                        className="ml-auto"
-                      />
+                      <Skeleton className="h-6 w-12 rounded" />
                     </td>
                   )}
                 </tr>
               ))
             ) : sortedData.length > 0 ? (
-              /* Linhas com Dados Reais */
-              sortedData.map((row) => {
+              /* Linhas Normais */
+              sortedData.map((row, index) => {
                 const isSelected = selectedIds.includes(row[keyField]);
-
                 return (
                   <tr
-                    key={row[keyField]}
+                    key={row[keyField] || index}
                     className={`
                       ${tableStyles.tr}
                       ${isSelected ? tableStyles.trSelected : ""}
                     `}
                   >
-                    {/* Checkbox de Seleção Individual */}
+                    {/* Checkbox da Linha */}
                     {selectable && (
-                      <td className="px-4 py-3">
+                      <td className={tableStyles.td}>
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleSelectRow(row[keyField])}
+                          aria-label={`Selecionar ${row.name || "linha"}`}
                           className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
                         />
                       </td>
@@ -215,7 +214,15 @@ export default function Table({
                                   : tableStyles.actionBtn
                               }
                             >
-                              {act.icon}
+                              {typeof act.icon === "string" ? (
+                                <ProjectIcon
+                                  name={act.icon}
+                                  size={15}
+                                  colorVariant={act.isDanger ? "danger" : "amber"}
+                                />
+                              ) : (
+                                act.icon
+                              )}
                             </button>
                           ))}
                         </div>

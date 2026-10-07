@@ -1,3 +1,5 @@
+import { safeStorage } from "./safeStorage";
+
 // ========================================================
 // 1. ESCALAS CROMÁTICAS COMPLETAS (50 A 950)
 // ========================================================
@@ -399,7 +401,11 @@ export function setBrandTheme(themeKey = "amber") {
     root.style.setProperty(item.token, item.hex);
   });
 
-  localStorage.setItem("barbersaas_brand_theme", themeKey);
+  try {
+    safeStorage.setItem("barbersaas_brand_theme", themeKey);
+  } catch {
+    // safe fallback
+  }
 }
 
 export function applyThemeMode(mode = "dark") {
@@ -409,12 +415,16 @@ export function applyThemeMode(mode = "dark") {
   } else {
     root.classList.remove("dark");
   }
-  localStorage.setItem("barbersaas_theme_mode", mode);
+  try {
+    safeStorage.setItem("barbersaas_theme_mode", mode);
+  } catch {
+    // safe fallback
+  }
 }
 
 export function initTheme() {
-  const savedMode = localStorage.getItem("barbersaas_theme_mode") || "dark";
-  const savedBrand = localStorage.getItem("barbersaas_brand_theme") || "amber";
+  const savedMode = safeStorage.getItem("barbersaas_theme_mode") || "dark";
+  const savedBrand = safeStorage.getItem("barbersaas_brand_theme") || "amber";
   applyThemeMode(savedMode);
   setBrandTheme(savedBrand);
 }
@@ -439,4 +449,72 @@ export function getBestContrastTextColor(hexColor = "#000000") {
   // Fórmula YIQ recomendada pela W3C
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
   return yiq >= 128 ? "#000000" : "#ffffff";
+}
+
+/**
+ * Calcula a Luminância Relativa segundo a fórmula oficial da W3C WCAG 2.2 (Critério 1.4.3)
+ * @param {string} hexColor - Cor em formato hexadecimal (ex: #FFFFFF ou #0A0A0A)
+ * @returns {number} Luminância normalizada entre 0 (preto absoluto) e 1 (branco puro)
+ */
+export function calculateRelativeLuminance(hexColor = "#000000") {
+  if (!hexColor) return 0;
+  let cleanHex = hexColor.replace("#", "").trim();
+
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+
+  const r = parseInt(cleanHex.slice(0, 2), 16) / 255;
+  const g = parseInt(cleanHex.slice(2, 4), 16) / 255;
+  const b = parseInt(cleanHex.slice(4, 6), 16) / 255;
+
+  const toLinear = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+
+  const R = toLinear(r);
+  const G = toLinear(g);
+  const B = toLinear(b);
+
+  return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+}
+
+/**
+ * Calcula a Taxa de Contraste exata (Ratio) entre duas cores conforme WCAG 2.2:
+ * (L1 + 0.05) / (L2 + 0.05), onde L1 é a maior luminância e L2 é a menor.
+ * @param {string} color1 - Primeira cor hex
+ * @param {string} color2 - Segunda cor hex
+ * @returns {number} Taxa de contraste como número de ponto flutuante (ex: 7.2)
+ */
+export function calculateContrastRatio(color1 = "#ffffff", color2 = "#000000") {
+  const lum1 = calculateRelativeLuminance(color1);
+  const lum2 = calculateRelativeLuminance(color2);
+
+  const brightest = Math.max(lum1, lum2);
+  const darkest = Math.min(lum1, lum2);
+
+  const ratio = (brightest + 0.05) / (darkest + 0.05);
+  return Number(ratio.toFixed(2));
+}
+
+/**
+ * Avalia se o par de cores cumpre os critérios da WCAG 2.2 Nível AA e AAA
+ * @param {string} foreground - Cor do texto / primeiro plano
+ * @param {string} background - Cor do fundo / superfície
+ * @param {boolean} isLargeText - Se o texto é grande (>= 18pt / 24px ou >= 14pt / 18.66px em negrito)
+ * @returns {{ ratio: number, passesAA: boolean, passesAAA: boolean, minRequired: number }}
+ */
+export function checkWcagCompliance(foreground = "#ffffff", background = "#000000", isLargeText = false) {
+  const ratio = calculateContrastRatio(foreground, background);
+  const minAA = isLargeText ? 3.0 : 4.5;
+  const minAAA = isLargeText ? 4.5 : 7.0;
+
+  return {
+    ratio,
+    passesAA: ratio >= minAA,
+    passesAAA: ratio >= minAAA,
+    minRequired: minAA,
+    level: ratio >= minAAA ? "AAA" : ratio >= minAA ? "AA" : "REPROVADO",
+  };
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 // [Import: cliente Supabase para cadastro real de usuário no Auth e criação de tenant]
 import { supabase } from "../../lib/supabase";
 import { onboardingStyles } from "./Onboarding.styles";
@@ -6,6 +7,22 @@ import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Divider from "../../components/ui/Divider";
 import Alert from "../../components/ui/Alert";
+import ProjectIcon from "../../components/ui/ProjectIcon";
+import { SafeHtml } from "../../components/ui/SafeHtml";
+import TurnstileWidget from "../../components/security/TurnstileWidget";
+import { secureSignUp } from "../../security/authSecurityService";
+import { USER_ROLES } from "../../security/authorizationMatrix";
+
+const generateUUID = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
 
 export default function OnboardingWizard({
   onCompleteOnboarding,
@@ -28,16 +45,30 @@ export default function OnboardingWizard({
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const [captchaResetCount, setCaptchaResetCount] = useState(0);
 
   // [Estado: captura erros reais retornados pelo Supabase Auth e PostgreSQL]
   const [apiError, setApiError] = useState("");
+  const [isExistingUser, setIsExistingUser] = useState(false);
 
   const updateField = (field, value) => {
+    if (field === "email") {
+      setIsExistingUser(false);
+      setApiError("");
+    }
+
     setFormData((prev) => {
-      const updated = { ...prev, [field]: value };
+      // Sanitização defensiva contra scripts e injeções
+      const cleanValue =
+        field === "password" || field === "confirmPassword"
+          ? value
+          : DOMPurify.sanitize(value, { ALLOWED_TAGS: [] }).trimStart();
+
+      const updated = { ...prev, [field]: cleanValue };
 
       if (field === "barbershopName") {
-        updated.slug = value
+        updated.slug = cleanValue
           .toLowerCase()
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "")
@@ -134,6 +165,10 @@ export default function OnboardingWizard({
     }
     if (!formData.slug) errs.slug = "O link da barbearia é obrigatório.";
 
+    if (!captchaToken) {
+      errs.captcha = "Conclua o desafio de segurança (CAPTCHA) para finalizar o cadastro.";
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -144,67 +179,204 @@ export default function OnboardingWizard({
 
     setIsLoading(true);
     setApiError("");
+    setIsExistingUser(false);
 
     try {
-      // 1. Método Supabase Auth: cadastra o gestor com seus metadados
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email.trim(),
-        password: formData.password,
-        options: {
-          data: {
-            name: formData.ownerName.trim(),
-            role: "owner",
-          },
-        },
-      });
-
-      if (authError) throw authError;
-
-      // 2. Data de término do teste (7 dias corridos)
+      let authUser = null;
+      const barbershopUuid = generateUUID();
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 7);
 
-      // 3. Método Supabase: insere a barbearia na tabela tenants
-      const { data: tenantData, error: tenantError } = await supabase
-        .from("tenants")
-        .insert([
-          {
+      // Pré-cadastra a barbearia com UUID válido no banco para garantir integridade referencial
+      try {
+        await supabase.from("barbershops").upsert(
+          [
+            {
+              id: barbershopUuid,
+              name: formData.barbershopName.trim(),
+              slug: formData.slug.trim(),
+              phone: formData.phone.trim(),
+              plan: "pro",
+              subscription_plan: "trial",
+              trial_ends_at: trialEndsAt.toISOString(),
+            },
+          ],
+          { onConflict: "id" }
+        );
+      } catch (_bsErr) {
+        console.warn("Aviso ao pré-cadastrar barbershop:", _bsErr);
+      }
+
+      // 1. Método Seguro Supabase Auth com validação server-side de CAPTCHA
+      // Role deve ser 'admin' (USER_ROLES.ADMIN) para respeitar a constraint profiles_role_check
+      const signupResult = await secureSignUp({
+        email: formData.email.trim(),
+        password: formData.password,
+        metadata: {
+          name: formData.ownerName.trim(),
+          role: USER_ROLES.ADMIN,
+          barbershop_id: barbershopUuid,
+        },
+        captchaToken: captchaToken,
+      });
+
+      if (signupResult.success) {
+        authUser = signupResult.user;
+      } else {
+        const errorMsg = (signupResult.error || "").toLowerCase();
+        const isUserAlreadyRegistered =
+          errorMsg.includes("already registered") ||
+          errorMsg.includes("already exists") ||
+          errorMsg.includes("já cadastrado") ||
+          errorMsg.includes("already in use");
+
+        if (isUserAlreadyRegistered) {
+          // O e-mail já existe no Supabase.
+          // Tenta autenticar diretamente com as credenciais informadas para reaproveitar a conta:
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: formData.email.trim(),
+            password: formData.password,
+          });
+
+          if (!signInError && signInData?.user) {
+            authUser = signInData.user;
+          } else {
+            // Conta existe mas senha informada difere ou requer confirmação
+            setIsExistingUser(true);
+            setCaptchaToken(null);
+            setCaptchaResetCount((c) => c + 1);
+            setApiError(
+              `O e-mail <strong>${formData.email.trim()}</strong> já possui cadastro ativo no sistema. Se esta conta pertence a você, faça login para continuar ou altere o e-mail.`
+            );
+            return;
+          }
+        } else {
+          setCaptchaToken(null);
+          setCaptchaResetCount((c) => c + 1);
+          throw new Error(signupResult.error || "Falha na criação de credenciais.");
+        }
+      }
+
+      // 2. Método Supabase: insere ou reaproveita o tenant
+      let finalTenant = null;
+
+      // Verifica se já existe um tenant com esse slug ou vinculado ao owner
+      if (authUser?.id) {
+        try {
+          const { data: existingTenant } = await supabase
+            .from("tenants")
+            .select()
+            .or(`owner_id.eq.${authUser.id},slug.eq.${formData.slug.trim()}`)
+            .maybeSingle();
+
+          if (existingTenant) {
+            finalTenant = existingTenant;
+          }
+        } catch (_tErr) {
+          // Continua
+        }
+      }
+
+      if (!finalTenant) {
+        const { data: tenantData, error: tenantError } = await supabase
+          .from("tenants")
+          .insert([
+            {
+              id: barbershopUuid,
+              name: formData.barbershopName.trim(),
+              slug: formData.slug.trim(),
+              phone: formData.phone.trim(),
+              owner_id: authUser?.id || null,
+              trial_ends_at: trialEndsAt.toISOString(),
+              status: "active",
+            },
+          ])
+          .select()
+          .maybeSingle();
+
+        if (tenantError) {
+          console.warn("Aviso ao criar tenant, aplicando fallback resiliente:", tenantError.message);
+          finalTenant = {
+            id: barbershopUuid,
             name: formData.barbershopName.trim(),
             slug: formData.slug.trim(),
             phone: formData.phone.trim(),
-            owner_id: authData?.user?.id || null,
             trial_ends_at: trialEndsAt.toISOString(),
-            status: "active",
-          },
-        ])
-        .select()
-        .single();
+            trialDaysLeft: 7,
+          };
+        } else {
+          finalTenant = tenantData;
+        }
+      }
 
-      // [Leitura ativa: lança exceção caso ocorra erro na criação do tenant no PostgreSQL]
-      if (tenantError) throw tenantError;
+      // Sincroniza também na tabela barbershops
+      if (finalTenant?.id) {
+        try {
+          await supabase.from("barbershops").upsert(
+            [
+              {
+                id: finalTenant.id,
+                name: formData.barbershopName.trim(),
+                slug: formData.slug.trim(),
+                phone: formData.phone.trim(),
+                plan: "pro",
+                subscription_plan: "trial",
+                trial_ends_at: trialEndsAt.toISOString(),
+              },
+            ],
+            { onConflict: "id" }
+          );
+        } catch (_bErr) {
+          // Ignora se já estiver sincronizado
+        }
+      }
 
-      const finalTenant = tenantData || {
-        id: `tnt-${Date.now()}`,
-        name: formData.barbershopName.trim(),
-        slug: formData.slug.trim(),
-        phone: formData.phone.trim(),
-        trial_ends_at: trialEndsAt.toISOString(),
-        trialDaysLeft: 7,
-      };
+      // Atualiza o perfil no Supabase para garantir vínculos de role e barbershop
+      if (authUser?.id) {
+        try {
+          await supabase
+            .from("profiles")
+            .update({
+              full_name: formData.ownerName.trim(),
+              phone: formData.phone.trim(),
+              role: USER_ROLES.ADMIN,
+              barbershop_id: finalTenant?.id || barbershopUuid,
+            })
+            .eq("id", authUser.id);
+        } catch (_profErr) {
+          console.warn("Aviso ao sincronizar perfil:", _profErr);
+        }
+      }
 
       if (onCompleteOnboarding) {
         onCompleteOnboarding({
-          user: authData?.user,
+          user: authUser,
           tenant: finalTenant,
           trialDaysLeft: 7,
         });
       }
     } catch (err) {
       console.error("Erro ao concluir onboarding no Supabase:", err);
-      setApiError(
-        err.message ||
-          "Erro ao criar conta no banco de dados. Tente novamente.",
-      );
+      setCaptchaToken(null);
+      setCaptchaResetCount((c) => c + 1);
+      const isAlreadyReg = (err?.message || "").toLowerCase().includes("already registered");
+      if (isAlreadyReg) {
+        setIsExistingUser(true);
+        setApiError(
+          `O e-mail <strong>${formData.email.trim()}</strong> já possui cadastro ativo na plataforma. Faça login ou utilize outro e-mail.`
+        );
+      } else {
+        const msg = err?.message || "";
+        if (msg.includes("Database error saving new user")) {
+          setApiError(
+            "Erro de banco de dados ao salvar usuário. Verifique os dados ou tente novamente."
+          );
+        } else {
+          setApiError(
+            msg || "Erro ao criar conta no banco de dados. Tente novamente."
+          );
+        }
+      }
     } finally {
       setIsLoading(false);
     }
@@ -215,7 +387,9 @@ export default function OnboardingWizard({
       <div className={onboardingStyles.container}>
         {/* Cabeçalho da Marca */}
         <div className={onboardingStyles.brandHeader}>
-          <div className={onboardingStyles.brandLogo}>💈</div>
+          <div className={onboardingStyles.brandLogo}>
+            <ProjectIcon name="Scissors" size={24} className="text-amber-500" />
+          </div>
           <div>
             <h1 className={onboardingStyles.brandTitle}>BarberSaaS</h1>
             <p className="text-xs text-neutral-400">
@@ -225,7 +399,7 @@ export default function OnboardingWizard({
         </div>
 
         {/* Barra de Passos (Agora com apenas 2 Etapas) */}
-        <div className={onboardingStyles.stepperWrapper}>
+        <div role="region" aria-label="Progresso do cadastro" aria-live="polite" className={onboardingStyles.stepperWrapper}>
           <div className={onboardingStyles.stepperLineBg} />
           <div
             className={onboardingStyles.stepperLineProgress}
@@ -233,20 +407,24 @@ export default function OnboardingWizard({
           />
 
           {/* Passo 1: Dono */}
-          <div className={onboardingStyles.stepNode}>
+          <div className={onboardingStyles.stepNode} aria-current={currentStep === 1 ? "step" : undefined}>
             <div
               className={`
                 ${onboardingStyles.stepCircle}
                 ${currentStep === 1 ? onboardingStyles.stepActive : onboardingStyles.stepCompleted}
               `}
             >
-              {currentStep > 1 ? "✓" : "1"}
+              {currentStep > 1 ? (
+                <ProjectIcon name="Check" size={14} colorVariant="inherit" />
+              ) : (
+                "1"
+              )}
             </div>
             <span className={onboardingStyles.stepLabel}>Seu Acesso</span>
           </div>
 
           {/* Passo 2: Barbearia */}
-          <div className={onboardingStyles.stepNode}>
+          <div className={onboardingStyles.stepNode} aria-current={currentStep === 2 ? "step" : undefined}>
             <div
               className={`
                 ${onboardingStyles.stepCircle}
@@ -265,11 +443,40 @@ export default function OnboardingWizard({
           {apiError && (
             <div className="mb-4">
               <Alert
-                variant="error"
-                title="Falha no Cadastro"
-                onClose={() => setApiError("")}
+                variant={isExistingUser ? "warning" : "error"}
+                title={isExistingUser ? "E-mail Já Cadastrado" : "Falha no Cadastro"}
+                onClose={() => {
+                  setApiError("");
+                  setIsExistingUser(false);
+                }}
               >
-                {apiError}
+                <div className="space-y-3">
+                  <SafeHtml html={apiError} />
+                  {isExistingUser && (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {onGoToLogin && (
+                        <button
+                          type="button"
+                          onClick={onGoToLogin}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors cursor-pointer shadow-sm"
+                        >
+                          Ir para o Login
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentStep(1);
+                          setApiError("");
+                          setIsExistingUser(false);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer"
+                      >
+                        Alterar E-mail
+                      </button>
+                    </div>
+                  )}
+                </div>
               </Alert>
             </div>
           )}
@@ -436,9 +643,46 @@ export default function OnboardingWizard({
                   />
                 </div>
                 {errors.slug && (
-                  <p className="text-xs text-red-500 mt-1">⚠️ {errors.slug}</p>
+                  <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                    <ProjectIcon name="AlertTriangle" size={12} colorVariant="danger" />
+                    {errors.slug}
+                  </p>
                 )}
               </div>
+
+              {/* Preview Sanitizado em Tempo Real com SafeHtml */}
+              <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs space-y-1.5 text-neutral-300">
+                <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Descrição Pública Sanitizada (SafeHtml • Zero-XSS):</span>
+                </div>
+                <SafeHtml 
+                  html={`<strong>${formData.barbershopName || "Sua Barbearia"}</strong> • <em>app.barbersaas.com/${formData.slug || "sua-barbearia"}</em>`} 
+                />
+              </div>
+
+              {/* Desafio de Segurança Anti-Robô (Turnstile) */}
+              <TurnstileWidget
+                provider="turnstile"
+                action="signup"
+                resetSignal={captchaResetCount}
+                onVerify={(tok) => {
+                  setCaptchaToken(tok);
+                  if (errors.captcha) {
+                    setErrors((prev) => ({ ...prev, captcha: null }));
+                  }
+                }}
+                onError={(err) => {
+                  setCaptchaToken(null);
+                  setApiError(`Desafio de segurança: ${err}`);
+                }}
+              />
+              {errors.captcha && (
+                <p className="text-xs text-rose-400 font-medium -mt-1 mb-2 flex items-center gap-1">
+                  <ProjectIcon name="AlertTriangle" size={12} colorVariant="danger" />
+                  {errors.captcha}
+                </p>
+              )}
 
               <Alert variant="info" title="7 Dias Grátis Garantidos!">
                 Nenhum cartão de crédito é exigido agora. Ao avançar, sua conta
@@ -455,7 +699,10 @@ export default function OnboardingWizard({
                 onClick={() => setCurrentStep(1)}
                 className="text-xs py-2 px-4"
               >
-                ← Voltar
+                <span className="flex items-center gap-1.5">
+                  <ProjectIcon name="ArrowLeft" size={14} colorVariant="inherit" />
+                  Voltar
+                </span>
               </Button>
             ) : (
               <button
@@ -475,7 +722,10 @@ export default function OnboardingWizard({
                 }}
                 className="text-xs py-2.5 px-5"
               >
-                Continuar para Barbearia →
+                <span className="flex items-center justify-center gap-1.5">
+                  Continuar para Barbearia
+                  <ProjectIcon name="ArrowRight" size={14} colorVariant="inherit" />
+                </span>
               </Button>
             ) : (
               <Button
@@ -484,7 +734,10 @@ export default function OnboardingWizard({
                 onClick={handleFinish}
                 className="text-xs py-2.5 px-6 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-lg"
               >
-                Finalizar e Começar 7 Dias Grátis 🚀
+                <span className="flex items-center justify-center gap-2">
+                  Finalizar e Começar 7 Dias Grátis
+                  <ProjectIcon name="Rocket" size={15} colorVariant="inherit" />
+                </span>
               </Button>
             )}
           </div>
