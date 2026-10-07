@@ -9,13 +9,18 @@ useDefault = true
 description = "Permite fixtures sintéticas de testes unitários explicitamente seguras"
 paths = [
   '''src/tests/.*''',
+  '''tests/.*''',
   '''src/pages/QAPanel/.*\.json''',
   '''package-lock\.json''',
-  '''bun\.lock'''
+  '''bun\.lock''',
+  '''\.env\.example'''
 ]
 regexes = [
   '''MOCK_TOKEN_.*''',
   '''EXAMPLE_KEY_.*''',
   '''test_secret_.*''',
-  '''sk_test_.*'''
+  '''sk_test_.*''',
+  '''whsec_.*''',
+  '''APP_USR-.*''',
+  '''pk_test_.*'''
 ]

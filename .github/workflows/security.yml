@@ -51,8 +51,6 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
           extra_args: --debug --only-verified=false --fail
         continue-on-error: false
 
@@ -111,7 +109,7 @@ jobs:
 
       - name: SonarCloud SAST Quality Gate Scanner
         id: sonarcloud
-        if: env.SONAR_TOKEN != ''
+        if: ${{ secrets.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -152,7 +150,7 @@ jobs:
 
       - name: Run Snyk Open Source SCA Scanner
         id: snyk
-        if: env.SNYK_TOKEN != ''
+        if: ${{ secrets.SNYK_TOKEN != '' }}
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
