@@ -1,0 +1,55 @@
+name: 🚀 Deploy Production App to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: 🏗️ Build Vite & Deploy to gh-pages Branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Production Assets (Vite)
+        env:
+          GITHUB_PAGES: 'true'
+          VITE_BASE_PATH: '/barbearia-saas/'
+        run: |
+          npm run build
+          # Garante suporte a SPA no GitHub Pages (roteamento sem 404)
+          cp dist/index.html dist/404.html
+          # Garante que o Jekyll não ignore pastas como _assets se houver
+          touch dist/.nojekyll
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          force_orphan: true
+          commit_message: "deploy: publicar build de produção Vite no GitHub Pages [skip ci]"

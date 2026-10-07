@@ -206,8 +206,9 @@ function mercadoPagoProxyPlugin(): Plugin {
   };
 }
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
   return {
+    base: process.env.VITE_BASE_PATH || (process.env.GITHUB_PAGES === 'true' ? '/barbearia-saas/' : './'),
     plugins: [react(), tailwindcss(), mercadoPagoProxyPlugin()],
     resolve: {
       alias: {
