@@ -66,6 +66,8 @@ export const ENDPOINT_CATALOG: EndpointHandlerConfig[] = [
   { method: "POST", pathPattern: /^\/api\/mercadopago\/preference$/ },
   { method: "POST", pathPattern: /^\/api\/mercadopago\/pix$/ },
   { method: "GET", pathPattern: /^\/api\/mercadopago\/status$/ },
+  { method: "POST", pathPattern: /^\/api\/email\/send$/ },
+  { method: "POST", pathPattern: /^\/api\/email\/test$/ },
   { method: "POST", pathPattern: /^\/api\/mercadopago\/webhook$/, isWebhook: true, webhookProvider: "mercadopago" },
   { method: "POST", pathPattern: /^\/api\/webhooks\/mercadopago$/, isWebhook: true, webhookProvider: "mercadopago" },
   { method: "POST", pathPattern: /^\/api\/webhooks\/stripe$/, isWebhook: true, webhookProvider: "stripe" },
@@ -418,7 +420,32 @@ export async function dispatchApiRequest(
         return sendJson(200, statusRes);
       }
 
-      // 11. Resposta Padrão de Sucesso para outros Endpoints Aprovados
+      // 12. Roteamento de Disparo de E-mails via SMTP Oficial (Gmail / atendmentor@gmail.com)
+      if (pathname === "/api/email/send" && method === "POST") {
+        const { sendEmail } = await import("../services/emailService");
+        const { to, subject, html, text, fromName } = parsedBody || {};
+        if (!to || !subject || !html) {
+          return sendJson(400, {
+            success: false,
+            error: "Campos obrigatórios ausentes: 'to', 'subject' e 'html'.",
+          });
+        }
+        const result = await sendEmail({ to, subject, html, text, fromName });
+        return sendJson(result.success ? 200 : 500, result);
+      }
+
+      if (pathname === "/api/email/test" && method === "POST") {
+        const { sendEmail } = await import("../services/emailService");
+        const targetEmail = parsedBody?.to || "atendmentor@gmail.com";
+        const result = await sendEmail({
+          to: targetEmail,
+          subject: "Teste de Conexão SMTP - Barbearia SaaS",
+          html: `<p>Olá! Este é um e-mail de teste confirmando a ativação do SMTP do <strong>atendmentor@gmail.com</strong> com sucesso.</p>`,
+        });
+        return sendJson(result.success ? 200 : 500, result);
+      }
+
+      // 13. Resposta Padrão de Sucesso para outros Endpoints Aprovados
       return sendJson(200, {
         status: 200,
         success: true,
