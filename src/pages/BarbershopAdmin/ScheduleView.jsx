@@ -584,7 +584,7 @@ export default function ScheduleView({
                             setAppointmentToCancel(selectedAppointment);
                             setSelectedAppointment(null);
                           }}
-                          className="text-xs font-medium text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
+                          className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
                         >
                           Cancelar horário
                         </button>
@@ -592,7 +592,7 @@ export default function ScheduleView({
                   </div>
                 </div>
 
-                {/* CardInfo #02: Barbeiro (Nome) e Serviço (Descrição), com link Editar */}
+                {/* CardInfo #02: Barbeiro (Nome em Branco) e Serviço (Descrição), com link Editar */}
                 <div className="relative p-3.5 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
                   {selectedAppointment.status !== "completed" &&
                     selectedAppointment.status !== "cancelled" && (
@@ -610,7 +610,7 @@ export default function ScheduleView({
                       <span className="text-neutral-500 block text-[10px] uppercase font-bold">
                         Barbeiro:
                       </span>
-                      <strong className="text-amber-400 text-sm block mt-0.5">
+                      <strong className="text-white text-sm block mt-0.5">
                         <SafeHtml html={selectedAppointment.barberName} />
                       </strong>
                     </div>
