@@ -9,6 +9,8 @@
  */
 
 import nodemailer from "nodemailer";
+import fs from "node:fs";
+import path from "node:path";
 
 export interface SendEmailOptions {
   to: string;
@@ -27,10 +29,23 @@ export interface EmailDispatchResult {
 
 // Configuração segura com fallback e tolerância
 function getSmtpConfig() {
+  // Lê do .env em tempo real se não estiver no process.env
+  let fileSmtpPass = "";
+  try {
+    const envPath = path.resolve(process.cwd(), ".env");
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf8");
+      const match = content.match(/SMTP_PASS=["']?([^"'\r\n]+)["']?/);
+      if (match && match[1]) fileSmtpPass = match[1];
+    }
+  } catch {
+    // fallback
+  }
+
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT) || 465;
   const user = process.env.SMTP_USER || "atendmentor@gmail.com";
-  const pass = (process.env.SMTP_PASS || "").replace(/\s+/g, "");
+  const pass = (process.env.SMTP_PASS || fileSmtpPass || "").replace(/\s+/g, "");
   const from = process.env.EMAIL_FROM || "atendmentor@gmail.com";
   const fromName = process.env.EMAIL_FROM_NAME || "Barbearia SaaS - Suporte & Agendamentos";
 

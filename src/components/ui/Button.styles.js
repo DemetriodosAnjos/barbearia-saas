@@ -10,6 +10,8 @@ export const buttonStyles = {
       "bg-red-700 text-white hover:bg-red-800 active:bg-red-900 focus-visible:ring-red-400 shadow-sm",
     outline:
       "bg-transparent text-amber-400 border border-amber-500 hover:bg-amber-500/10 focus-visible:ring-amber-400",
+    ghost:
+      "bg-transparent text-neutral-400 hover:text-white hover:bg-neutral-800/60 active:bg-neutral-800 focus-visible:ring-neutral-400 border border-transparent",
   },
 
   spinner: "animate-spin -ml-1 mr-2 h-4 w-4 text-current",

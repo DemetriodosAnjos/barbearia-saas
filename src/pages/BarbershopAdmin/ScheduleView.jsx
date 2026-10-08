@@ -483,69 +483,52 @@ export default function ScheduleView({
         }
         footer={
           selectedAppointment && (
-            <div className="w-full flex flex-wrap items-center justify-between gap-3">
+            <div className="w-full flex items-center justify-between gap-3">
               {isEditingAppointment ? (
                 <>
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     onClick={() => setIsEditingAppointment(false)}
+                    className="text-xs"
                   >
                     Cancelar Edição
                   </Button>
                   <Button
                     variant="primary"
                     onClick={() => setIsConfirmEditModalOpen(true)}
+                    className="text-xs ml-auto"
                   >
                     Salvar Alterações
                   </Button>
                 </>
               ) : (
                 <>
-                  {selectedAppointment.status !== "cancelled" &&
-                    selectedAppointment.status !== "completed" && (
-                      <Button
-                        variant="danger"
-                        onClick={() => {
-                          setAppointmentToCancel(selectedAppointment);
-                          setSelectedAppointment(null);
-                        }}
-                        className="text-xs py-2 px-3"
-                      >
-                        Cancelar Horário
-                      </Button>
-                    )}
-
-                  <div className="flex items-center gap-2 ml-auto">
+                  {/* Lado Esquerdo: Ação de Cobrança / Pagamento */}
+                  <div>
                     {!selectedAppointment.isPaid && selectedAppointment.status !== "cancelled" && (
                       <Button
-                        variant="primary"
+                        variant="secondary"
                         onClick={() => setIsMercadoPagoModalOpen(true)}
-                        className="text-xs py-2 px-3.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        className="text-xs font-semibold"
                       >
-                        <ProjectIcon name="CreditCard" size={13} colorVariant="inherit" />
-                        <span>Pagar com Mercado Pago</span>
+                        Pagar
                       </Button>
                     )}
+                  </div>
 
-                    <Button
-                      variant="secondary"
-                      onClick={() => setSelectedAppointment(null)}
-                      className="text-xs py-2 px-3"
-                    >
-                      Fechar
-                    </Button>
-
-                    {selectedAppointment.status !== "completed" &&
-                      selectedAppointment.status !== "cancelled" && (
+                  {/* Lado Direito: Cancelar (secundário transparente) à esquerda do botão primário */}
+                  <div className="flex items-center gap-2 ml-auto">
+                    {selectedAppointment.status !== "cancelled" &&
+                      selectedAppointment.status !== "completed" && (
                         <Button
-                          variant="secondary"
-                          onClick={() => setIsEditingAppointment(true)}
-                          className="text-xs py-2 px-3 text-amber-400 border-amber-500/40 hover:bg-amber-500/10"
+                          variant="ghost"
+                          onClick={() => {
+                            setAppointmentToCancel(selectedAppointment);
+                            setSelectedAppointment(null);
+                          }}
+                          className="text-xs text-neutral-400 hover:text-red-400 hover:bg-red-950/20"
                         >
-                          <span className="flex items-center gap-1.5">
-                            <ProjectIcon name="Edit3" size={13} colorVariant="inherit" />
-                            Editar
-                          </span>
+                          Cancelar horário
                         </Button>
                       )}
 
@@ -560,12 +543,9 @@ export default function ScheduleView({
                           );
                           setSelectedAppointment(null);
                         }}
-                        className="text-xs py-2 px-4 bg-purple-600 hover:bg-purple-500 font-bold"
+                        className="text-xs font-bold"
                       >
-                        <span className="flex items-center gap-1.5">
-                          <ProjectIcon name="Scissors" size={14} colorVariant="inherit" />
-                          Iniciar Atendimento
-                        </span>
+                        Iniciar Atendimento
                       </Button>
                     )}
 
@@ -575,23 +555,11 @@ export default function ScheduleView({
                         onClick={() =>
                           handleFinishAppointment(selectedAppointment)
                         }
-                        className={`text-xs py-2 px-4 font-bold shadow-md ${
-                          selectedAppointment.isPaid
-                            ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                            : "bg-amber-600 hover:bg-amber-500 text-white"
-                        }`}
+                        className="text-xs font-bold"
                       >
-                        {selectedAppointment.isPaid ? (
-                          <span className="flex items-center gap-1.5">
-                            <ProjectIcon name="Check" size={14} colorVariant="inherit" />
-                            Finalizar Atendimento
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1.5">
-                            <ProjectIcon name="Receipt" size={14} colorVariant="inherit" />
-                            Finalizar o Atendimento
-                          </span>
-                        )}
+                        {selectedAppointment.isPaid
+                          ? "Finalizar Atendimento"
+                          : "Finalizar o Atendimento"}
                       </Button>
                     )}
                   </div>
@@ -605,6 +573,7 @@ export default function ScheduleView({
           <div className="space-y-4 text-left">
             {!isEditingAppointment ? (
               <div className="space-y-4">
+                {/* CardInfo #01: Título, Nome do cliente, Telefone do cliente, Tag status */}
                 <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-2xl flex justify-between items-center">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-neutral-500">
@@ -626,47 +595,74 @@ export default function ScheduleView({
                   <Badge status={selectedAppointment.status} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 p-3.5 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
-                  <div>
-                    <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Barbeiro:
-                    </span>
-                    <strong className="text-amber-400 text-sm flex items-center gap-1.5 mt-0.5">
-                      <ProjectIcon name="Scissors" size={14} className="text-amber-500" />
-                      <SafeHtml html={selectedAppointment.barberName} />
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Serviço:
-                    </span>
-                    <strong className="text-white text-sm block mt-0.5">
-                      <SafeHtml html={selectedAppointment.serviceName} />
-                    </strong>
+                {/* CardInfo #02: Barbeiro (Nome) e Serviço (Descrição), com link Editar */}
+                <div className="relative p-3.5 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
+                  {selectedAppointment.status !== "completed" &&
+                    selectedAppointment.status !== "cancelled" && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingAppointment(true)}
+                        className="absolute top-3 right-3 text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                        title="Editar profissional ou serviço"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  <div className="grid grid-cols-2 gap-3 pr-12">
+                    <div>
+                      <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                        Barbeiro:
+                      </span>
+                      <strong className="text-amber-400 text-sm block mt-0.5">
+                        <SafeHtml html={selectedAppointment.barberName} />
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                        Serviço:
+                      </span>
+                      <strong className="text-white text-sm block mt-0.5">
+                        <SafeHtml html={selectedAppointment.serviceName} />
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 p-3.5 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
-                  <div>
-                    <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Horário de Cadeira:
-                    </span>
-                    <span className="text-white font-mono font-bold block mt-0.5">
-                      {selectedAppointment.startTime} às{" "}
-                      {selectedAppointment.endTime} (
-                      {selectedAppointment.durationMinutes} min)
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Valor a Cobrar:
-                    </span>
-                    <span className="text-emerald-400 font-black font-mono text-base block mt-0.5">
-                      R${" "}
-                      {Number(selectedAppointment.price || 0)
-                        .toFixed(2)
-                        .replace(".", ",")}
-                    </span>
+                {/* CardInfo #03: Horário de cadeira e Valor a cobrar, com link Editar */}
+                <div className="relative p-3.5 bg-neutral-950/70 border border-neutral-800 rounded-2xl text-xs">
+                  {selectedAppointment.status !== "completed" &&
+                    selectedAppointment.status !== "cancelled" && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingAppointment(true)}
+                        className="absolute top-3 right-3 text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                        title="Editar horário ou valor"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  <div className="grid grid-cols-2 gap-3 pr-12">
+                    <div>
+                      <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                        Horários de Cadeira:
+                      </span>
+                      <span className="text-white font-mono font-bold block mt-0.5">
+                        {selectedAppointment.startTime} às{" "}
+                        {selectedAppointment.endTime} (
+                        {selectedAppointment.durationMinutes} min)
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                        Valor a Cobrar:
+                      </span>
+                      <span className="text-emerald-400 font-black font-mono text-base block mt-0.5">
+                        R${" "}
+                        {Number(selectedAppointment.price || 0)
+                          .toFixed(2)
+                          .replace(".", ",")}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
