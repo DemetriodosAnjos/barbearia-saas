@@ -9,7 +9,9 @@ export const buttonStyles = {
     danger:
       "bg-red-700 text-white hover:bg-red-800 active:bg-red-900 focus-visible:ring-red-400 shadow-sm",
     outline:
-      "bg-transparent text-amber-400 border border-amber-500 hover:bg-amber-500/10 focus-visible:ring-amber-400",
+      "bg-transparent text-amber-400 border-[1.5px] border-amber-500 hover:bg-amber-500/10 active:bg-amber-500/20 focus-visible:ring-amber-400 font-semibold",
+    success:
+      "bg-emerald-600 text-white hover:bg-emerald-500 active:bg-emerald-700 focus-visible:ring-emerald-400 shadow-sm font-bold",
     ghost:
       "bg-transparent text-neutral-400 hover:text-white hover:bg-neutral-800/60 active:bg-neutral-800 focus-visible:ring-neutral-400 border border-transparent",
   },

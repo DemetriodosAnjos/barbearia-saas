@@ -479,15 +479,15 @@ export default function ScheduleView({
         title={
           isEditingAppointment
             ? `Editar Atendimento: ${selectedAppointment?.clientName}`
-            : `Detalhes do Atendimento #${selectedAppointment?.id}`
+            : "Detalhes do Atendimento"
         }
         footer={
           selectedAppointment && (
-            <div className="w-full flex items-center justify-between gap-3">
+            <div className="w-full flex items-center justify-end gap-2.5">
               {isEditingAppointment ? (
                 <>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     onClick={() => setIsEditingAppointment(false)}
                     className="text-xs"
                   >
@@ -496,73 +496,55 @@ export default function ScheduleView({
                   <Button
                     variant="primary"
                     onClick={() => setIsConfirmEditModalOpen(true)}
-                    className="text-xs ml-auto"
+                    className="text-xs"
                   >
                     Salvar Alterações
                   </Button>
                 </>
               ) : (
                 <>
-                  {/* Lado Esquerdo: Ação de Cobrança / Pagamento */}
-                  <div>
-                    {!selectedAppointment.isPaid && selectedAppointment.status !== "cancelled" && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => setIsMercadoPagoModalOpen(true)}
-                        className="text-xs font-semibold"
-                      >
-                        Pagar
-                      </Button>
-                    )}
-                  </div>
+                  {/* CardInfo #06: BOTÃO 'Pagar' (Verde Sucesso, Fonte Branca, ao lado esquerdo do primário) */}
+                  {!selectedAppointment.isPaid && selectedAppointment.status !== "cancelled" && (
+                    <Button
+                      variant="success"
+                      onClick={() => setIsMercadoPagoModalOpen(true)}
+                      className="text-xs font-bold"
+                    >
+                      Pagar
+                    </Button>
+                  )}
 
-                  {/* Lado Direito: Cancelar (secundário transparente) à esquerda do botão primário */}
-                  <div className="flex items-center gap-2 ml-auto">
-                    {selectedAppointment.status !== "cancelled" &&
-                      selectedAppointment.status !== "completed" && (
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            setAppointmentToCancel(selectedAppointment);
-                            setSelectedAppointment(null);
-                          }}
-                          className="text-xs text-neutral-400 hover:text-red-400 hover:bg-red-950/20"
-                        >
-                          Cancelar horário
-                        </Button>
-                      )}
+                  {/* BOTÃO PRIMÁRIO: Iniciar Atendimento (Extrema direita, Âmbar) */}
+                  {(selectedAppointment.status === "waiting" ||
+                    selectedAppointment.status === "confirmed") && (
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        handleStatusChange(
+                          selectedAppointment.id,
+                          "in_progress",
+                        );
+                        setSelectedAppointment(null);
+                      }}
+                      className="text-xs font-bold"
+                    >
+                      Iniciar Atendimento
+                    </Button>
+                  )}
 
-                    {(selectedAppointment.status === "waiting" ||
-                      selectedAppointment.status === "confirmed") && (
-                      <Button
-                        variant="primary"
-                        onClick={() => {
-                          handleStatusChange(
-                            selectedAppointment.id,
-                            "in_progress",
-                          );
-                          setSelectedAppointment(null);
-                        }}
-                        className="text-xs font-bold"
-                      >
-                        Iniciar Atendimento
-                      </Button>
-                    )}
-
-                    {selectedAppointment.status === "in_progress" && (
-                      <Button
-                        variant="primary"
-                        onClick={() =>
-                          handleFinishAppointment(selectedAppointment)
-                        }
-                        className="text-xs font-bold"
-                      >
-                        {selectedAppointment.isPaid
-                          ? "Finalizar Atendimento"
-                          : "Finalizar o Atendimento"}
-                      </Button>
-                    )}
-                  </div>
+                  {selectedAppointment.status === "in_progress" && (
+                    <Button
+                      variant="primary"
+                      onClick={() =>
+                        handleFinishAppointment(selectedAppointment)
+                      }
+                      className="text-xs font-bold"
+                    >
+                      {selectedAppointment.isPaid
+                        ? "Finalizar Atendimento"
+                        : "Finalizar o Atendimento"}
+                    </Button>
+                  )}
                 </>
               )}
             </div>
@@ -573,13 +555,13 @@ export default function ScheduleView({
           <div className="space-y-4 text-left">
             {!isEditingAppointment ? (
               <div className="space-y-4">
-                {/* CardInfo #01: Título, Nome do cliente, Telefone do cliente, Tag status */}
-                <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-2xl flex justify-between items-center">
+                {/* CardInfo #01: Título 'Cliente Agendado', Nome, Telefone, Tag Status e Link 'Cancelar horário' */}
+                <div className="relative p-4 bg-neutral-950 border border-neutral-800 rounded-2xl flex justify-between items-start">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-neutral-500">
                       Cliente Agendado
                     </span>
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white flex items-center gap-2 mt-0.5">
                       <SafeHtml html={selectedAppointment.clientName} />
                       {selectedAppointment.isVip && (
                         <span className="text-amber-400 text-xs flex items-center gap-1">
@@ -592,7 +574,22 @@ export default function ScheduleView({
                       <SafeHtml html={selectedAppointment.clientPhone || "Telefone não informado"} />
                     </p>
                   </div>
-                  <Badge status={selectedAppointment.status} />
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <Badge status={selectedAppointment.status} />
+                    {selectedAppointment.status !== "cancelled" &&
+                      selectedAppointment.status !== "completed" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAppointmentToCancel(selectedAppointment);
+                            setSelectedAppointment(null);
+                          }}
+                          className="text-xs font-medium text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          Cancelar horário
+                        </button>
+                      )}
+                  </div>
                 </div>
 
                 {/* CardInfo #02: Barbeiro (Nome) e Serviço (Descrição), com link Editar */}
