@@ -17,6 +17,8 @@ import {
   saveRegisteredUserPixKey,
   generatePixBrCodePayload,
   generatePixQrCodeDataUrl,
+  getRegisteredUserPhone,
+  formatWhatsAppNumber,
 } from "../../utils/pixQrCode";
 
 export interface MercadoPagoCheckoutModalProps {
@@ -96,6 +98,10 @@ export default function MercadoPagoCheckoutModal({
   const [preferenceData, setPreferenceData] = useState<PreferenceResult | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Estados do Link e Mensagem Personalizada do WhatsApp
+  const [customWhatsappMessage, setCustomWhatsappMessage] = useState<string>("");
+  const [isEditingMessage, setIsEditingMessage] = useState<boolean>(false);
+
   // Geração Automática ao abrir o modal
   useEffect(() => {
     if (!isOpen || (!plan && !appointment)) return;
@@ -105,6 +111,8 @@ export default function MercadoPagoCheckoutModal({
     setErrorMsg(null);
     setPixStatus("pending");
     setPreferenceData(null);
+    setIsEditingMessage(false);
+    setCustomWhatsappMessage("");
 
     const defaultTenant = tenant || {
       id: "superadmin_checkout",
@@ -281,16 +289,22 @@ export default function MercadoPagoCheckoutModal({
       setIsLoading(false);
     }
   };
-  const ownerPhoneClean = (
-    targetClientPhone ||
-    tenant?.ownerPhone ||
-    "11999998888"
-  ).replace(/\D/g, "");
-  const whatsappMessage = encodeURIComponent(
-    isAppointmentMode
-      ? `Olá ${targetClientName}! Segue o link oficial do Mercado Pago para quitação do seu atendimento #${appointment?.id} (${appointment?.serviceName} - R$ ${targetPrice.toFixed(2).replace(".", ",")}):\n\n${checkoutUrl}\n\nVocê pode pagar via PIX Instantâneo ou Cartão de Crédito/Débito no ambiente seguro da barbearia.`
-      : `Olá ${tenant?.ownerName || "Gestor"}! Segue o link oficial do Mercado Pago para ativação/renovação do seu plano ${plan?.name} (R$ ${plan?.price?.toFixed(2)?.replace(".", ",")}):\n\n${checkoutUrl}\n\nVocê pode pagar via PIX Instantâneo ou Cartão de Crédito em até 12x no ambiente seguro do Mercado Pago.`
-  );
+  // Telefone do cliente cadastrado para envio via WhatsApp (ex: Marilia Santos -> 41 99788-4424)
+  const clientPhoneRaw = isAppointmentMode
+    ? (appointment?.clientPhone || targetClientPhone || "")
+    : (tenant?.ownerPhone || tenant?.phone || targetClientPhone || "");
+  const recipientPhoneClean = formatWhatsAppNumber(clientPhoneRaw);
+
+  // Mensagem Padrão vs Mensagem Customizada Editada
+  const defaultWhatsappMessage = isAppointmentMode
+    ? `Olá ${targetClientName}! Segue o link oficial do Mercado Pago para quitação do seu atendimento #${appointment?.id} (${appointment?.serviceName || targetName} - R$ ${targetPrice.toFixed(2).replace(".", ",")}):\n\n${checkoutUrl || "Aguardando link de pagamento..."}\n\nVocê pode pagar via PIX Instantâneo ou Cartão de Crédito/Débito no ambiente seguro da barbearia.`
+    : `Olá ${tenant?.ownerName || "Gestor"}! Segue o link oficial do Mercado Pago para ativação/renovação do seu plano ${plan?.name} (R$ ${plan?.price?.toFixed(2)?.replace(".", ",")}):\n\n${checkoutUrl || "Aguardando link de pagamento..."}\n\nVocê pode pagar via PIX Instantâneo ou Cartão de Crédito em até 12x no ambiente seguro do Mercado Pago.`;
+
+  const effectiveWhatsappMessage = customWhatsappMessage.trim()
+    ? customWhatsappMessage
+    : defaultWhatsappMessage;
+
+  const whatsappMessage = encodeURIComponent(effectiveWhatsappMessage);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Pagamento">
@@ -570,63 +584,121 @@ export default function MercadoPagoCheckoutModal({
         {/* ======================================================== */}
         {activeTab === "whatsapp" && (
           <div className="space-y-4 p-4 bg-neutral-950 border border-neutral-800 rounded-2xl">
-            <div className="space-y-1">
-              <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                <ProjectIcon
-                  name="Smartphone"
-                  size={15}
-                  className="text-emerald-400"
-                />
-                <span>Mensagem Pronta para WhatsApp</span>
-              </h4>
-              <p className="text-neutral-400 text-xs">
-                Destinatário:{" "}
-                <strong className="text-white">{targetClientName}</strong> (
-                {targetClientPhone ||
-                  tenant?.ownerPhone ||
-                  "Telefone não cadastrado"}
-                )
-              </p>
+            <div className="flex items-start justify-between gap-2 border-b border-neutral-900 pb-3">
+              <div className="space-y-1">
+                <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                  <ProjectIcon
+                    name="Smartphone"
+                    size={15}
+                    className="text-emerald-400"
+                  />
+                  <span>Mensagem Pronta para WhatsApp</span>
+                </h4>
+                <p className="text-neutral-400 text-xs">
+                  Cliente: <strong className="text-white">{targetClientName}</strong>
+                  {clientPhoneRaw && (
+                    <span className="font-mono text-neutral-300"> ({clientPhoneRaw})</span>
+                  )}
+                </p>
+              </div>
+
+              {/* Link EDITAR: Mesmo padrão usado no modal "Detalhes do Atendimento" */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isEditingMessage && !customWhatsappMessage) {
+                    setCustomWhatsappMessage(defaultWhatsappMessage);
+                  }
+                  setIsEditingMessage(!isEditingMessage);
+                }}
+                className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer shrink-0"
+                title="Editar mensagem do WhatsApp"
+              >
+                {isEditingMessage ? "Cancelar Edição" : "Editar"}
+              </button>
             </div>
 
-            <div className="p-3.5 bg-neutral-900 border border-neutral-800 rounded-xl space-y-2 text-xs text-neutral-300 font-sans leading-relaxed">
-              <p>
-                {isAppointmentMode ? (
-                  <>
-                    Olá <strong>{targetClientName}</strong>! Segue o link
-                    oficial do Mercado Pago para quitação do seu atendimento{" "}
-                    <strong>#{appointment?.id}</strong> ({targetName} - R${" "}
-                    {Number(targetPrice || 0)
-                      .toFixed(2)
-                      .replace(".", ",")}
-                    ):
-                  </>
+            {/* Visualização ou Edição da Mensagem */}
+            {isEditingMessage ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-neutral-400 px-1">
+                  <label className="text-neutral-300 font-medium">
+                    Mensagem de envio para o cliente:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCustomWhatsappMessage(defaultWhatsappMessage)}
+                    className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                  >
+                    Restaurar padrão
+                  </button>
+                </div>
+                <textarea
+                  value={customWhatsappMessage || defaultWhatsappMessage}
+                  onChange={(e) => setCustomWhatsappMessage(e.target.value)}
+                  rows={6}
+                  className="w-full bg-neutral-900 border border-neutral-700 focus:border-amber-400 text-neutral-100 text-xs p-3 rounded-xl outline-none resize-y leading-relaxed font-sans placeholder-neutral-500 shadow-inner"
+                  placeholder="Escreva a mensagem personalizada para enviar ao cliente..."
+                />
+                <div className="flex items-center justify-end text-xs px-1 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingMessage(false)}
+                    className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                  >
+                    Concluir
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 bg-neutral-900 border border-neutral-800 rounded-xl space-y-2 text-xs text-neutral-300 font-sans leading-relaxed">
+                {customWhatsappMessage ? (
+                  <div className="whitespace-pre-wrap text-neutral-200">
+                    {customWhatsappMessage}
+                  </div>
                 ) : (
                   <>
-                    Olá <strong>{tenant?.ownerName || "Gestor"}</strong>! Segue
-                    o link oficial do Mercado Pago para ativação/renovação do
-                    seu plano <strong>{plan?.name}</strong> (R${" "}
-                    {Number(plan?.price || 0)
-                      .toFixed(2)
-                      .replace(".", ",")}
-                    ):
+                    <p>
+                      {isAppointmentMode ? (
+                        <>
+                          Olá <strong>{targetClientName}</strong>! Segue o link
+                          oficial do Mercado Pago para quitação do seu atendimento{" "}
+                          <strong>#{appointment?.id}</strong> ({appointment?.serviceName || targetName} - R${" "}
+                          {Number(targetPrice || 0)
+                            .toFixed(2)
+                            .replace(".", ",")}
+                          ):
+                        </>
+                      ) : (
+                        <>
+                          Olá <strong>{tenant?.ownerName || "Gestor"}</strong>! Segue
+                          o link oficial do Mercado Pago para ativação/renovação do
+                          seu plano <strong>{plan?.name}</strong> (R${" "}
+                          {Number(plan?.price || 0)
+                            .toFixed(2)
+                            .replace(".", ",")}
+                          ):
+                        </>
+                      )}
+                    </p>
+                    <p className="font-mono text-amber-400 break-all bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                      {checkoutUrl || "Gerando link oficial no Mercado Pago..."}
+                    </p>
+                    <p className="text-[11px] text-neutral-400">
+                      Você pode pagar via PIX Instantâneo ou Cartão de Crédito/Débito
+                      no ambiente seguro do Mercado Pago.
+                    </p>
                   </>
                 )}
-              </p>
-              <p className="font-mono text-amber-400 break-all bg-neutral-950 p-2 rounded-lg border border-neutral-800">
-                {checkoutUrl}
-              </p>
-              <p className="text-[11px] text-neutral-400">
-                Você pode pagar via PIX Instantâneo ou Cartão de Crédito/Débito
-                no ambiente seguro do Mercado Pago.
-              </p>
-            </div>
+              </div>
+            )}
 
             <Button
               variant="primary"
               onClick={() => {
+                const targetPhone = recipientPhoneClean || "5541997884424";
                 window.open(
-                  `https://wa.me/55${ownerPhoneClean}?text=${whatsappMessage}`,
+                  `https://wa.me/${targetPhone}?text=${whatsappMessage}`,
                   "_blank"
                 );
               }}
@@ -638,7 +710,7 @@ export default function MercadoPagoCheckoutModal({
                 colorVariant="white"
                 className="text-white"
               />
-              <span>Abrir WhatsApp Web com Mensagem</span>
+              <span>Compartilhar por WhatsApp</span>
             </Button>
           </div>
         )}

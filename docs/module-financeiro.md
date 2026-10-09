@@ -11,6 +11,10 @@ O módulo financeiro é composto por duas interfaces integradas:
      - **CardInfo #03 (Seletores de Modo):** Botões `Pix`, `Cartão Crédito / Débito` e `Link WhatsApp` com estado ativo na cor Âmbar (`bg-amber-600`) e ícones + fonte na cor branca (`text-white`).
      - **CardInfo #04 (PIX & QR Code Real):** Geração de QR Code real (padrão EMV® QRCPS-MPM BR Code do Banco Central com CRC16-CCITT) a partir da chave cadastrada pelo usuário em `"Meu Perfil" => Perfil & Chave PIX / Chave PIX Cadastrada` (`src/utils/pixQrCode.ts`), sem botões ou textos de simulação de webhook.
      - **CardInfo Cartão de Crédito / Débito (Checkout Pro):** Criação de preferência real via `POST https://api.mercadopago.com/checkout/preferences` (`init_point` oficial sem IDs simulados `pref_mp_...` que causavam erro 400 `COW00`) e botão de ação intitulado `"Pagar com Mercado Pago"`.
+     - **CardInfo Link WhatsApp:**
+       - **Link Editar:** Mesmo padrão minimalista e limpo adotado no modal "Detalhes do Atendimento" (`text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer`), permitindo editar a mensagem para o cliente ou restaurar o modelo padrão.
+       - **Telefone do Cliente:** Carrega e formata o telefone do cliente cadastrado no atendimento (ex: Marilia Santos -> `41 99788-4424` / `wa.me/5541997884424`).
+       - **Botão Oficial:** Intitulado `"Compartilhar por WhatsApp"`, abrindo diretamente a conversa no WhatsApp com o cliente para envio da cobrança com o link oficial de pagamento.
      - **CardInfo #05 (Rodapé Limpo):** Sem rodapé técnico (`Mercado Pago API v1...`) e sem botão inferior `Fechar` redundante.
    - Adição de serviços realizados e consumo do bar/produtos.
    - Fechamento tradicional de conta no balcão com rateio de comissões por profissional.

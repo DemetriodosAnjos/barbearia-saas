@@ -234,3 +234,65 @@ export function saveRegisteredUserPixKey(pixKey: string): void {
     // ignore
   }
 }
+
+export const USER_PHONE_STORAGE_KEY = "barbearia_user_phone";
+
+/**
+ * Recupera o telefone da barbearia cadastrado em "Meu Perfil => Contato & Endereço".
+ */
+export function getRegisteredUserPhone(user?: any, tenant?: any): string {
+  try {
+    const stored = safeStorage.getItem(USER_PHONE_STORAGE_KEY);
+    if (stored && stored.trim()) {
+      return stored.trim();
+    }
+  } catch {
+    // ignore
+  }
+
+  const fromUserMeta =
+    user?.user_metadata?.phone ||
+    user?.user_metadata?.whatsapp ||
+    user?.phone;
+  if (fromUserMeta && String(fromUserMeta).trim()) {
+    return String(fromUserMeta).trim();
+  }
+
+  const fromTenant =
+    tenant?.phone ||
+    tenant?.ownerPhone ||
+    tenant?.whatsapp;
+  if (fromTenant && String(fromTenant).trim()) {
+    return String(fromTenant).trim();
+  }
+
+  return "";
+}
+
+/**
+ * Salva o telefone da barbearia cadastrado no storage seguro.
+ */
+export function saveRegisteredUserPhone(phone: string): void {
+  try {
+    const clean = (phone || "").trim();
+    safeStorage.setItem(USER_PHONE_STORAGE_KEY, clean);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Formata um número de telefone para o padrão oficial do link do WhatsApp (wa.me/55...).
+ */
+export function formatWhatsAppNumber(phone: string): string {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10 || digits.length === 11) {
+    return `55${digits}`;
+  }
+  if (digits.length >= 12 && digits.startsWith("55")) {
+    return digits;
+  }
+  return digits.startsWith("55") ? digits : `55${digits}`;
+}
+

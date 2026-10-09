@@ -5,6 +5,8 @@ import { supabase } from "../../lib/supabase";
 import {
   getRegisteredUserPixKey,
   saveRegisteredUserPixKey,
+  getRegisteredUserPhone,
+  saveRegisteredUserPhone,
 } from "../../utils/pixQrCode";
 import { profileStyles } from "./UserProfileView.styles";
 import Tabs from "../../components/ui/Tabs";
@@ -115,7 +117,13 @@ export default function UserProfileView({
   // 2. CONTATO & LOCALIZAÇÃO PESSOAL
   const [contactData, setContactData] = useState({
     email: user?.email || "",
-    phone: user?.phone || tenant?.phone || "",
+    phone:
+      user?.user_metadata?.phone ||
+      user?.phone ||
+      tenant?.phone ||
+      tenant?.ownerPhone ||
+      getRegisteredUserPhone(user, tenant) ||
+      "",
     cep: tenant?.cep || "",
     street: tenant?.street || "",
     number: tenant?.number || "",
@@ -270,13 +278,16 @@ export default function UserProfileView({
     }
 
     try {
+      const cleanPhone = contactData.phone.trim();
+      saveRegisteredUserPhone(cleanPhone);
+
       const updatedMetadata = {
         ...(user?.user_metadata || {}),
         name: personalData.fullName.trim(),
         full_name: personalData.fullName.trim(),
         display_name: personalData.displayName.trim(),
         cpf: personalData.cpf.trim(),
-        phone: contactData.phone.trim(),
+        phone: cleanPhone,
         bio: professionalData.bio.trim(),
         pix_key: cleanPixKey,
         pixKey: cleanPixKey,
@@ -300,6 +311,8 @@ export default function UserProfileView({
       if (onUpdateTenant && tenant) {
         onUpdateTenant({
           ...tenant,
+          phone: cleanPhone,
+          ownerPhone: cleanPhone,
           pix_key: cleanPixKey,
           pixKey: cleanPixKey,
         });
