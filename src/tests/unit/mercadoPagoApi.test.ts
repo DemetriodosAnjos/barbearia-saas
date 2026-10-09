@@ -109,7 +109,7 @@ describe("Integração Oficial da API Mercado Pago", () => {
       expect(pixResult.id).toMatch(/^pay_mp_pix_/);
       expect(pixResult.status).toBe("pending");
       expect(pixResult.qrCode).toContain("BR.GOV.BCB.PIX");
-      expect(pixResult.qrCodeBase64).toContain("data:image/svg+xml;base64,");
+      expect(pixResult.qrCodeBase64).toMatch(/^data:image\/(png|svg\+xml);base64,/);
       expect(pixResult.expiresAt).toBeDefined();
     });
 

@@ -138,7 +138,7 @@ export function generatePixBrCodePayload({
   const normalizedKey = normalizePixKeyForBrCode(pixKey);
   if (!normalizedKey) return "";
 
-  const guiField = formatEmvField("00", "br.gov.bcb.pix");
+  const guiField = formatEmvField("00", "BR.GOV.BCB.PIX");
   const keyField = formatEmvField("01", normalizedKey);
   const merchantAccountInfo = formatEmvField("26", `${guiField}${keyField}`);
 
