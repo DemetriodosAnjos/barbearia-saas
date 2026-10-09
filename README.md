@@ -1,4 +1,4 @@
-# Barbearia SaaS
+# Barbearia SaaS (V1.5.1.9)
 
 Sistema SaaS multi-tenant completo e de alta performance para barbearias, com controle de agendamentos em tempo real, comissões automáticas por profissional, frente de caixa (PDV), portal do cliente e integração nativa com o gateway **Mercado Pago** (PIX Instantâneo e Checkout Pro).
 

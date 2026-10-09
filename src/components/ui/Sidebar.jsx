@@ -329,49 +329,55 @@ export default function Sidebar({
           })}
         </nav>
 
-        {/* Rodapé: Versão do Sistema (metadata.json) & Logout (sem avatar nem "Authenticated") */}
+        {/* Rodapé: Versão do Sistema Centralizada (SaaS V1.5.1.9) & Logout */}
         {!isCollapsed ? (
-          <div className={sidebarStyles.footer}>
-            <div className={sidebarStyles.userWrapper}>
-              <div className={sidebarStyles.userInfo}>
-                <span className={sidebarStyles.userName}>
-                  {user?.name || "Administrador"}
-                </span>
-                <span className={sidebarStyles.userVersion}>
-                  {appMetadata?.name || "SaaS V1.5.1.6"}
-                </span>
+          <div className="p-3 border-t border-neutral-800/80 mt-auto flex flex-col gap-2.5 bg-neutral-900/60 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className={sidebarStyles.userWrapper}>
+                <div className={sidebarStyles.userInfo}>
+                  <span className={sidebarStyles.userName}>
+                    {user?.name || "Administrador"}
+                  </span>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={onLogout}
+                className={sidebarStyles.logoutButton}
+                title="Sair do sistema"
+                aria-label="Sair"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={onLogout}
-              className={sidebarStyles.logoutButton}
-              title="Sair do sistema"
-              aria-label="Sair"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-            </button>
+            {/* Versão Centralizada */}
+            <div className="w-full flex items-center justify-center pt-2 border-t border-neutral-800/60 text-center">
+              <span className="text-[11px] font-mono font-bold text-amber-400 tracking-wider">
+                {appMetadata?.name || "SaaS V1.5.1.9"}
+              </span>
+            </div>
           </div>
         ) : (
           <div className={sidebarStyles.footerCollapsed}>
             <span
-              className="text-[10px] font-mono font-bold text-amber-400"
-              title={appMetadata?.name || "SaaS V1.5.1.6"}
+              className="text-[10px] font-mono font-bold text-amber-400 text-center"
+              title={appMetadata?.name || "SaaS V1.5.1.9"}
             >
-              V1.5
+              V1.5.1.9
             </span>
             <button
               type="button"

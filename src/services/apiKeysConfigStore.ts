@@ -306,58 +306,75 @@ export const BASELINE_ENV_CONFIG: ApiKeysFullConfig = {
   },
   supabase: {
     projectUrl:
-      (typeof import.meta !== "undefined" &&
-        import.meta.env?.VITE_SUPABASE_URL &&
-        !String(import.meta.env.VITE_SUPABASE_URL).includes("seu-projeto"))
-        ? import.meta.env.VITE_SUPABASE_URL
-        : "https://njgeevywotbflikilway.supabase.co",
+      (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_URL) || "",
     anonKey:
-      (typeof import.meta !== "undefined" &&
-        import.meta.env?.VITE_SUPABASE_ANON_KEY &&
-        !String(import.meta.env.VITE_SUPABASE_ANON_KEY).includes("sua_chave"))
-        ? import.meta.env.VITE_SUPABASE_ANON_KEY
-        : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ2Vldnl3b3RiZmxpa2lsd2F5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzcyMTgsImV4cCI6MjEwNTUxMzIxOH0.MqO9fbKFvAa3DK8YW44F8obbnW4yG7wzhcgDDa2S3Qk",
+      (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_ANON_KEY) || "",
     serviceRoleKey:
-      "",
+      (typeof process !== "undefined" && process.env?.SUPABASE_SERVICE_ROLE_KEY) || "",
   },
   mercadopago: {
     publicKey:
-      (typeof import.meta !== "undefined" && (import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY || import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY_PROD)) ||
-      "APP_USR-5ac54098-969a-4315-aa30-04d5faa9d008",
+      (typeof import.meta !== "undefined" &&
+        (import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY ||
+          import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY_PROD)) ||
+      "",
     publicKeyProd:
-      (typeof import.meta !== "undefined" && import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY_PROD) ||
-      "APP_USR-5ac54098-969a-4315-aa30-04d5faa9d008",
+      (typeof import.meta !== "undefined" &&
+        import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY_PROD) ||
+      "",
     publicKeyTest:
-      (typeof import.meta !== "undefined" && import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY_TEST) ||
-      "APP_USR-6829f043-ccd3-4a53-b255-362262d12298",
-    accessToken: "APP_USR-2637365150905441-100112-0937d7feec6bfdfe0c37c65c7636acdf-648721800",
-    accessTokenProd: "APP_USR-2637365150905441-100112-0937d7feec6bfdfe0c37c65c7636acdf-648721800",
-    webhookSecret: "7d84a7fc3e154362e6cdfc66206f121ca1cb4fee23a6a230da87737b7f6fcc0b",
+      (typeof import.meta !== "undefined" &&
+        import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY_TEST) ||
+      "",
+    accessToken:
+      (typeof process !== "undefined" &&
+        (process.env?.MERCADO_PAGO_ACCESS_TOKEN ||
+          process.env?.MERCADO_PAGO_ACCESS_TOKEN_PROD)) ||
+      "",
+    accessTokenProd:
+      (typeof process !== "undefined" &&
+        process.env?.MERCADO_PAGO_ACCESS_TOKEN_PROD) ||
+      "",
+    accessTokenTest:
+      (typeof process !== "undefined" &&
+        process.env?.MERCADO_PAGO_ACCESS_TOKEN_TEST) ||
+      "",
+    webhookSecret:
+      (typeof process !== "undefined" &&
+        process.env?.WEBHOOK_SECRET_MERCADOPAGO) ||
+      "",
     activeEnvironment: "production",
   },
   stripe: {
     publicKey:
       (typeof import.meta !== "undefined" && import.meta.env?.VITE_STRIPE_PUBLIC_KEY) ||
-      "pk_test_suaChavePublicaStripeAqui",
-    secretKey: "",
-    webhookSecret: "whsec_seu_segredo_hmac_webhook_stripe_aqui",
+      "",
+    secretKey:
+      (typeof process !== "undefined" && process.env?.STRIPE_SECRET_KEY) || "",
+    webhookSecret:
+      (typeof process !== "undefined" && process.env?.WEBHOOK_SECRET_STRIPE) || "",
   },
   security: {
     jwtAccessSecret:
-      "segredo_super_forte_para_access_token_minimo_32_caracteres_aleatorios",
+      (typeof process !== "undefined" && process.env?.JWT_ACCESS_SECRET) || "",
     jwtRefreshSecret:
-      "segredo_super_forte_para_refresh_token_minimo_32_caracteres_aleatorios",
-    lgpdPepper: "chave_pepper_secreta_minimo_32_caracteres_aleatorios",
-    lgpdCronToken: "token_secreto_autorizacao_cron_expurgo",
-    auditTrailSecret: "segredo_hmac_assinatura_trilha_auditoria",
+      (typeof process !== "undefined" && process.env?.JWT_REFRESH_SECRET) || "",
+    lgpdPepper:
+      (typeof process !== "undefined" && process.env?.LGPD_ANONYMIZATION_PEPPER) || "",
+    lgpdCronToken:
+      (typeof process !== "undefined" && process.env?.LGPD_CRON_INTERNAL_TOKEN) || "",
+    auditTrailSecret:
+      (typeof process !== "undefined" && process.env?.AUDIT_TRAIL_HMAC_SECRET) || "",
   },
   comms: {
-    whatsappWebhookSecret: "seu_segredo_hmac_whatsapp_meta_aqui",
-    geminiApiKey: "seu_gemini_api_key_para_ia_server_side",
+    whatsappWebhookSecret:
+      (typeof process !== "undefined" && process.env?.WEBHOOK_SECRET_WHATSAPP) || "",
+    geminiApiKey:
+      (typeof process !== "undefined" && process.env?.GEMINI_API_KEY) || "",
     appUrl:
-      (typeof import.meta !== "undefined" && import.meta.env?.VITE_APP_URL) ||
-      "https://barbersaas.com.br",
-    nodeEnv: "development",
+      (typeof import.meta !== "undefined" && import.meta.env?.VITE_APP_URL) || "",
+    nodeEnv:
+      (typeof process !== "undefined" && process.env?.NODE_ENV) || "development",
   },
 };
 

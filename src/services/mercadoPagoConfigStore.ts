@@ -31,25 +31,37 @@ export interface MercadoPagoFullSettings {
 
 const STORAGE_KEY = "mp_saas_credentials_v3";
 
-// Credenciais de teste reais fornecidas pelo usuário do painel Mercado Pago Developers
 const DEFAULT_CONFIG: MercadoPagoFullSettings = {
   isEnabled: true,
   activeEnvironment: "sandbox", // Inicia em modo de teste
   sandbox: {
-    publicKey: "APP_USR-6829f043-ccd3-4a53-b255-362262d12298",
-    accessToken: "APP_USR-6788981073517529-100112-2214f7e89e7b15899685be864851edcc-3081058128",
-    webhookSecret: "whsec_test_8f4a7c1b5e39d20a46f8271035cb",
-    appId: "6788981073517529",
-    userId: "3081058128",
-    testUser: "TESTUSER4679213206535377554",
-    testPassword: "77xOpUPGzn",
-    verificationCode: "058128",
+    publicKey:
+      (typeof import.meta !== "undefined" && import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY_TEST) || "",
+    accessToken:
+      (typeof process !== "undefined" && process.env?.MERCADO_PAGO_ACCESS_TOKEN_TEST) || "",
+    webhookSecret: "",
+    appId: "",
+    userId: "",
+    testUser: "",
+    testPassword: "",
+    verificationCode: "",
   },
   production: {
-    publicKey: "APP_USR-5ac54098-969a-4315-aa30-04d5faa9d008",
-    accessToken: "APP_USR-2637365150905441-100112-0937d7feec6bfdfe0c37c65c7636acdf-648721800",
-    webhookSecret: "whsec_prod_99ab7c1b5e39d20a46f8271035ef",
-    appId: "7050222041",
+    publicKey:
+      (typeof import.meta !== "undefined" &&
+        (import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY_PROD ||
+          import.meta.env?.VITE_MERCADO_PAGO_PUBLIC_KEY)) ||
+      "",
+    accessToken:
+      (typeof process !== "undefined" &&
+        (process.env?.MERCADO_PAGO_ACCESS_TOKEN_PROD ||
+          process.env?.MERCADO_PAGO_ACCESS_TOKEN)) ||
+      "",
+    webhookSecret:
+      (typeof process !== "undefined" &&
+        process.env?.WEBHOOK_SECRET_MERCADOPAGO) ||
+      "",
+    appId: "",
     userId: "",
     testUser: "",
     testPassword: "",
