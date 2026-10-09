@@ -1,5 +1,6 @@
 import ProjectIcon from "./components/ui/ProjectIcon";
 import { useState, useEffect, useCallback } from "react";
+import { LogIn, Crown } from "lucide-react";
 import {
   supabase,
   buildTenantRecordPayload,
@@ -51,6 +52,17 @@ export default function App() {
   })();
 
   const [currentScreen, setCurrentScreen] = useState(initialScreen);
+  const [activeNavButton, setActiveNavButton] = useState(() =>
+    initialScreen === "superadmin" ? "superadmin" : "login"
+  );
+
+  useEffect(() => {
+    if (currentScreen === "superadmin") {
+      setActiveNavButton("superadmin");
+    } else if (currentScreen === "login") {
+      setActiveNavButton("login");
+    }
+  }, [currentScreen]);
 
   const handleNavigate = useCallback((screenId) => {
     setCurrentScreen(screenId);
@@ -699,41 +711,44 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
+                setActiveNavButton("login");
+                setActiveUserRole(USER_ROLES.ANON);
                 setCurrentScreen("login");
               }}
               className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-200 cursor-pointer ${
-                currentScreen !== "superadmin"
-                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/20"
+                activeNavButton === "login"
+                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/25"
                   : "bg-transparent hover:bg-amber-500/10 text-amber-500 border-[1.5px] border-amber-500"
               }`}
             >
-              <ProjectIcon
-                name="LogIn"
-                size={16}
-                colorVariant="inherit"
+              <LogIn
+                className={`w-4 h-4 shrink-0 transition-colors ${
+                  activeNavButton === "login" ? "text-white" : "text-amber-500"
+                }`}
               />
-              <span>Login</span>
+              <span className={activeNavButton === "login" ? "text-white" : "text-amber-500"}>Login</span>
             </button>
 
             {/* BOTÃO: SuperAdmin (Carrega a tela SuperAdmin) */}
             <button
               type="button"
               onClick={() => {
+                setActiveNavButton("superadmin");
                 setActiveUserRole(USER_ROLES.SUPERADMIN);
                 setCurrentScreen("superadmin");
               }}
               className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-200 cursor-pointer ${
-                currentScreen === "superadmin"
-                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/20"
+                activeNavButton === "superadmin"
+                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/25"
                   : "bg-transparent hover:bg-amber-500/10 text-amber-500 border-[1.5px] border-amber-500"
               }`}
             >
-              <ProjectIcon
-                name="Crown"
-                size={16}
-                colorVariant="inherit"
+              <Crown
+                className={`w-4 h-4 shrink-0 transition-colors ${
+                  activeNavButton === "superadmin" ? "text-white" : "text-amber-500"
+                }`}
               />
-              <span>SuperAdmin</span>
+              <span className={activeNavButton === "superadmin" ? "text-white" : "text-amber-500"}>SuperAdmin</span>
             </button>
           </nav>
         </div>

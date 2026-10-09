@@ -24,20 +24,20 @@ export default function ProtectedRoute({
   useEffect(() => {
     // 1. Auditoria de integridade do storage: purga adulterações
     const tampering = detectAndNeutralizeStorageTampering();
-    if (tampering.tamperingDetected && onNavigate) {
+    if (tampering.tamperingDetected && onNavigate && screenId !== "superadmin" && screenId !== "login") {
       if (onSwitchRole) onSwitchRole(USER_ROLES.ANON);
       onNavigate("login");
       return;
     }
 
-    // 2. Redirecionamento imediato caso anônimo tente rota restrita
-    if (autoRedirect && !isPublic && currentRole === USER_ROLES.ANON && onNavigate) {
+    // 2. Redirecionamento imediato caso anônimo tente rota restrita (exceto telas públicas, login ou superadmin)
+    if (autoRedirect && !isPublic && currentRole === USER_ROLES.ANON && screenId !== "login" && screenId !== "superadmin" && onNavigate) {
       onNavigate(redirectTo);
     }
-  }, [autoRedirect, currentRole, isPublic, onNavigate, onSwitchRole, redirectTo]);
+  }, [autoRedirect, currentRole, isPublic, onNavigate, onSwitchRole, redirectTo, screenId]);
 
-  // 1. Tela pública: acesso irrestrito
-  if (isPublic) {
+  // 1. Tela pública ou telas de controle de acesso (login / superadmin): acesso direto
+  if (isPublic || screenId === "superadmin" || screenId === "login") {
     return children;
   }
 

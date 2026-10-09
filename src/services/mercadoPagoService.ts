@@ -215,6 +215,16 @@ export class MercadoPagoService {
 
       const sep = safeBackBase.includes("?") ? "&" : "?";
 
+      // Resolve a URL oficial do Webhook Mercado Pago registrada no SaaS
+      const webhookBase =
+        (typeof process !== "undefined" && (process.env?.VITE_APP_URL || process.env?.APP_URL)) ||
+        (typeof import.meta !== "undefined" && import.meta.env?.VITE_APP_URL) ||
+        (typeof window !== "undefined" && window.location?.origin?.startsWith("https://") ? window.location.origin : "") ||
+        "https://ais-pre-musfj3getfoi6faqf7vpul-705341666319.us-west2.run.app";
+
+      const cleanWebhookBase = webhookBase.replace(/\/$/, "");
+      const notificationUrl = `${cleanWebhookBase}/api/mercadopago/webhook`;
+
       const preferencePayload = {
         items: [
           {
@@ -238,6 +248,7 @@ export class MercadoPagoService {
           excluded_payment_types: [{ id: "ticket" }],
           installments: 12,
         },
+        notification_url: notificationUrl,
       };
 
       let preferenceId = `pref_mp_${validated.planId}_${Date.now().toString(36)}`;
@@ -249,10 +260,15 @@ export class MercadoPagoService {
       // Se houver Access Token real do Mercado Pago (APP_USR-), cria a preferência oficial na API do Mercado Pago
       // Prioriza o token de produção (conta real) para que o link Checkout Pro abra sem bloqueio COW00 para clientes reais
       const fullConfig = mercadoPagoConfigStore.getConfig();
+      const envToken =
+        (typeof process !== "undefined" && process.env?.MERCADO_PAGO_ACCESS_TOKEN) ||
+        "APP_USR-2637365150905441-100112-0937d7feec6bfdfe0c37c65c7636acdf-648721800";
+
       const candidateTokens = Array.from(
         new Set(
           [
             fullConfig.production?.accessToken,
+            envToken,
             resolved.accessToken,
             fullConfig.sandbox?.accessToken,
           ].filter((t): t is string => Boolean(t && t.trim().startsWith("APP_USR-")))
