@@ -94,14 +94,31 @@ export default function TurnstileWidget({
       </div>
 
       {/* Caixa do Desafio */}
-      <div className="flex items-center justify-between p-2.5 bg-neutral-950/80 rounded border border-neutral-800">
+      <div
+        onClick={() => {
+          if (status === "idle") handleTriggerChallenge();
+        }}
+        className={`flex items-center justify-between p-2.5 bg-neutral-950/80 rounded border transition-all select-none ${
+          status === "idle"
+            ? "border-neutral-800 hover:border-amber-500/70 hover:bg-neutral-900 cursor-pointer group"
+            : status === "success"
+            ? "border-emerald-500/40 bg-emerald-950/10"
+            : status === "verifying"
+            ? "border-amber-500/50 bg-amber-950/10"
+            : "border-rose-500/50 bg-rose-950/10"
+        }`}
+        title={status === "idle" ? "Clique com o mouse para ativar a verificação Cloudflare" : undefined}
+      >
         <div className="flex items-center gap-3">
           {status === "idle" && (
             <button
               type="button"
-              onClick={() => handleTriggerChallenge()}
-              className="w-6 h-6 rounded border-2 border-amber-600/70 hover:border-amber-500 bg-neutral-900 flex items-center justify-center transition-all cursor-pointer shadow-sm"
-              title="Clique para validar desafio de segurança"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTriggerChallenge();
+              }}
+              className="w-6 h-6 rounded border-2 border-amber-600/70 hover:border-amber-400 bg-neutral-900 flex items-center justify-center transition-all cursor-pointer shadow-sm group-hover:border-amber-400 group-hover:scale-105"
+              title="Clique com o mouse para ativar a verificação Cloudflare"
             >
               <div className="w-2 h-2 rounded-xs bg-transparent" />
             </button>

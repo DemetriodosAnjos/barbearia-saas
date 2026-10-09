@@ -302,6 +302,13 @@ export const UI_SCREEN_MATRIX = [
     isPublic: true,
     allowedRoles: [USER_ROLES.ANON, USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN],
   },
+  {
+    screenId: "qa-panel",
+    name: "QA Studio & DevSecOps",
+    classification: ROUTE_CLASSIFICATIONS.PUBLIC,
+    isPublic: true,
+    allowedRoles: [USER_ROLES.ANON, USER_ROLES.CLIENT, USER_ROLES.EMPLOYEE, USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN],
+  },
 ];
 
 /**

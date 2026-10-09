@@ -7,6 +7,7 @@ import {
   normalizeTenantRecord,
 } from "./lib/supabase";
 import DesignSystem from "./pages/DesignSystem";
+import QAPanel from "./pages/QAPanel/QAPanel";
 import OnboardingWizard from "./pages/Onboarding/OnboardingWizard";
 import Login from "./pages/Auth/Login";
 import SuperAdminDashboard from "./pages/SuperAdmin/SuperAdminDashboard";
@@ -833,6 +834,18 @@ export default function App() {
           >
             <span className="flex items-center gap-1.5"><ProjectIcon name="Palette" size={14} colorVariant="inherit" /><span>UI Kit</span></span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setCurrentScreen("qa-panel")}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
+              currentScreen === "qa-panel"
+                ? "bg-amber-600 text-white shadow-xs"
+                : "text-neutral-400 hover:text-white bg-neutral-800/60"
+            }`}
+          >
+            <span className="flex items-center gap-1.5"><ProjectIcon name="Shield" size={14} colorVariant="inherit" /><span>QA & DevSecOps</span></span>
+          </button>
         </div>
 
         {/* Simulador de Role RBAC Ativo */}
@@ -998,6 +1011,17 @@ export default function App() {
         {currentScreen === "design-system" && (
           <ErrorBoundary componentName="Design System / UI Kit">
             <DesignSystem />
+          </ErrorBoundary>
+        )}
+
+        {/* 7. QA STUDIO & DEVSECOPS: Suíte de testes, caos e auditoria de segurança */}
+        {currentScreen === "qa-panel" && (
+          <ErrorBoundary componentName="QA Studio & DevSecOps">
+            <QAPanel
+              currentUserRole={activeUserRole}
+              onSwitchRole={setActiveUserRole}
+              onNavigate={handleNavigate}
+            />
           </ErrorBoundary>
         )}
       </ProtectedRoute>

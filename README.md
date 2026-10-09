@@ -1,38 +1,54 @@
-# Barbearia SaaS (V1.5.1.8)
+# Barbearia SaaS
 
 Sistema SaaS multi-tenant completo e de alta performance para barbearias, com controle de agendamentos em tempo real, comissões automáticas por profissional, frente de caixa (PDV), portal do cliente e integração nativa com o gateway **Mercado Pago** (PIX Instantâneo e Checkout Pro).
 
 ---
 
-## 🚀 Principais Módulos
+## 🔐 Autenticação & Tela de Login (`Login`)
 
-- **Portal de Agendamento do Cliente (`client-app`)**: Funil responsivo para clientes agendarem serviços, escolherem barbeiro preferido, visualizarem horários livres em tempo real e receberem confirmações.
-- **Painel Administrativo da Barbearia (`barbershop`)**:
-  - Agenda interativa em tempo real com timeline de barbeiros.
-  - Gestão de equipe, cadeiras, escalas e cálculo automatizado de comissões.
-  - Frente de caixa (PDV) com comandas abertas/fechadas e baixa imediata.
-  - Catálogo de serviços e controle de estoque de produtos.
-  - Métricas e relatórios financeiros (faturamento bruto, ticket médio, lucro líquido e repasses).
-- **Modal de Planos & Assinaturas (`TrialBanner`)**:
-  - Título oficial: *"Escolha o plano ideal para sua barbearia"*.
-  - **Plano de Teste**: 7 dias de avaliação gratuita com todas as ferramentas liberadas.
-  - **Starter**: 1 cadeira / barbeiro para autônomos.
-  - **Pro**: Até 6 barbeiros, comissões automáticas, lembretes via WhatsApp e Checkout Pro em até 12x.
-  - **Entreprise**: Cadeiras ilimitadas, multi-unidades, pacote white-label e suporte prioritário VIP.
-  - Botões integrados à API oficial do Mercado Pago para geração dinâmica de links de pagamento.
-  - Botão de confirmação: *"Continuar para pagamento seguro"*.
-- **Painel SuperAdmin (`superadmin`)**: Gestão global de barbearias/tenants, parâmetros da plataforma e credenciais de pagamento.
+A tela de autenticação oficial foi configurada com os seguintes padrões de UX e segurança:
+
+1. **Identidade Visual**:
+   - Título oficial atualizado: **Barbearia SaaS**.
+   - Subtítulo e branding integrado com tema dark/amber.
+
+2. **Proteção Anti-Automação (Cloudflare Turnstile)**:
+   - Ativação manual mediante **clique do mouse** do usuário no desafio de segurança.
+   - Validação criptográfica do token antes de permitir o envio das credenciais.
+   - Proteção estrita contra força bruta (máximo de 5 tentativas com bloqueio temporário).
+
+3. **Ordem dos Botões de Login**:
+   - **Botão Primário**: `Entrar na Plataforma` (envio de e-mail e senha validados).
+   - **Acesso Social**: Botão `Entrar com o Google` (OAuth Supabase) posicionado imediatamente **abaixo** do botão primário.
+   - Remoção de botões de atalho/teste não autenticados no fluxo de login em produção.
+
+4. **Recuperação de Senha**:
+   - Modal integrada com verificação OTP via Supabase Auth e redefinição segura de credenciais.
 
 ---
 
-## 🛡️ DevSecOps & Segurança
+## 🚀 Principais Módulos
 
-- **Secret Scanning**: Verificação automatizada de credenciais com Gitleaks e TruffleHog.
-- **SAST (Static Application Security Testing)**: Regras do OWASP Top 10 e AppSec analisadas via Semgrep.
-- **SCA (Software Composition Analysis)**: Auditoria estrita de dependências com `npm audit` (0 vulnerabilidades High/Critical).
-- **Proteção XSS**: Sanitização de saídas com `<SafeHtml>` e DOMPurify.
-- **Defesa contra SSRF**: Validação rigorosa de URLs de saída (`SafeHttpClient` / `ssrfGuard`).
-- **Validação de Schemas**: Validação de todas as entradas de API com Zod.
+- **Portal de Agendamento do Cliente (`client-app`)**:
+  - Funil responsivo para clientes agendarem serviços, escolherem barbeiro preferido, visualizarem horários livres em tempo real e receberem confirmação via WhatsApp.
+
+- **Painel Administrativo da Barbearia (`barbershop`)**:
+  - **Agenda Interativa**: Marcação de horários com timeline dos barbeiros.
+  - **Frente de Caixa (PDV)**: Abertura e fechamento de comandas, comissões automáticas e baixa imediata.
+  - **Equipe e Cadeiras**: Escalas, comissões percentuais e perfis.
+  - **Catálogo & Estoque**: Gestão de serviços e produtos para venda no balcão.
+  - **Relatórios Financeiros**: Faturamento bruto, repasses, ticket médio e lucro líquido.
+
+- **Painel SuperAdmin (`superadmin`)**:
+  - Gestão global de barbearias/tenants cadastrados na plataforma.
+  - Configuração do gateway Mercado Pago (Chave Pública, Access Token, telemetria e teste de conectividade).
+  - Gestão de planos (Starter, Pro, Enterprise) e assinaturas.
+
+- **Onboarding de Novas Barbearias (`onboarding`)**:
+  - Wizard guiado passo a passo para cadastrar unidade, slug personalizado e dados fiscais.
+
+- **DevSecOps & QA Studio (`qa-panel`)**:
+  - Central de testes de segurança OWASP, verificação de cabeçalhos SSRF e matriz de controle de acesso (RBAC).
 
 ---
 
@@ -40,23 +56,20 @@ Sistema SaaS multi-tenant completo e de alta performance para barbearias, com co
 
 - **Front-end**: React 19 + TypeScript + Vite + Tailwind CSS.
 - **Back-end & Banco de Dados**: Supabase (PostgreSQL) com Row Level Security (RLS).
+- **Segurança**: Cloudflare Turnstile, sanitização DOMPurify, Zod schemas e proteção CSRF/SSRF.
 - **Pagamentos**: Mercado Pago REST API & SDK oficial.
-- **Testes & CI/CD**: GitHub Actions, Playwright, Vitest.
 
 ---
 
-## 📦 Instalação e Execução Local
+## 📦 Execução Local
 
 ```bash
-# Instalar dependências
-npm install --legacy-peer-deps
-
 # Iniciar servidor de desenvolvimento (porta 3000)
 npm run dev
 
 # Compilar para produção
 npm run build
 
-# Executar linting de tipos
+# Executar checagem de tipos
 npm run lint
 ```

@@ -57,7 +57,7 @@ export const LoginPrototype: React.FC<LoginPrototypeProps> = ({ onSuccess }) => 
             <Fingerprint className="w-6 h-6 text-indigo-400" />
           </div>
         </div>
-        <h2 className="text-xl font-bold text-white tracking-tight">Acesso ao Sistema</h2>
+        <h2 className="text-xl font-bold text-white tracking-tight">Barbearia SaaS</h2>
         <p className="text-xs text-zinc-400 mt-1">
           Informe suas credenciais para gerenciar a plataforma
         </p>
