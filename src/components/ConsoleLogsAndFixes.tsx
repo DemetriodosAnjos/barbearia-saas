@@ -38,7 +38,7 @@ import {
   saveStoredProbedStatus 
 } from '../lib/security/externalProbeEngine';
 
-export type TeamCategory = 'ALL' | 'FRONTEND' | 'BACKEND' | 'CYBER_SECURITY' | 'DEVOPS_CLOUD' | 'DATABASE_SRE' | 'QA_COMPLIANCE';
+export type TeamCategory = 'ALL' | 'FRONTEND' | 'BACKEND' | 'CYBER_SECURITY' | 'DEVOPS_CLOUD' | 'DATABASE_SRE' | 'QA_COMPLIANCE' | 'QA_AUTOMATION';
 export type FixNature = 'INTERNAL_APPLIED' | 'EXTERNAL_PENDING';
 export type NatureFilterType = 'ALL' | 'INTERNAL_APPLIED' | 'EXTERNAL_PENDING' | 'RESOLVED_CLOUD';
 

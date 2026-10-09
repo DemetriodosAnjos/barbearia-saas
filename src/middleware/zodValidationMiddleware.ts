@@ -27,6 +27,12 @@ export interface SchemaValidationOptions {
   rejectUnknown?: boolean;
 }
 
+export interface FormattedValidationError {
+  field: string;
+  message: string;
+  code: string;
+}
+
 export interface ValidationIncidentResponse {
   status: 400 | 422;
   error: "Bad Request" | "Unprocessable Entity";

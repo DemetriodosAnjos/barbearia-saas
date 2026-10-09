@@ -208,7 +208,7 @@ const contractViolationBuffer: ContractTelemetryRecord[] = [];
  */
 export function validateArrayContract<T>(
   raw: unknown,
-  itemSchema: z.ZodType<T>,
+  itemSchema: z.ZodType<T, any, any>,
   entityName = "Entidade",
   fallbackList: T[] = []
 ): ContractValidationResult<T[]> {
@@ -318,7 +318,7 @@ export function validateArrayContract<T>(
  */
 export function validateSingleContract<T>(
   raw: unknown,
-  schema: z.ZodType<T>,
+  schema: z.ZodType<T, any, any>,
   fallback: T,
   entityName = "Registro"
 ): ContractValidationResult<T> {

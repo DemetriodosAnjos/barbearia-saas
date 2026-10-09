@@ -112,3 +112,5 @@ export const Button: React.FC<ButtonProps> = ({
     </div>
   );
 };
+
+export default Button;

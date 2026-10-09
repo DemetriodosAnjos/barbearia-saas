@@ -11,7 +11,14 @@ import { validateSafeUrl } from './ssrfGuard';
 
 export interface SecurityFinding {
   id: string;
-  tool: 'Gitleaks' | 'Semgrep SAST' | 'Snyk / npm audit' | 'SSRF & Egress Guard';
+  tool:
+    | 'Gitleaks'
+    | 'Semgrep SAST'
+    | 'Snyk / npm audit'
+    | 'SSRF & Egress Guard'
+    | 'Crypto & Auth Audit'
+    | 'Cookie Security Guard'
+    | 'Axios Resilience Interceptor';
   ruleId: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
   file: string;

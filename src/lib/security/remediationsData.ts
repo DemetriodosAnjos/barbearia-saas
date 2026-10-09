@@ -19,7 +19,7 @@ export interface RemediationItem {
   id: string;
   title: string;
   subtitle: string;
-  category: 'Cyber Security' | 'Frontend' | 'Backend' | 'Cloud & DevOps' | 'Database (Supabase)' | 'Pagamentos (Mercado Pago)' | 'QA & Automação';
+  category: 'Cyber Security' | 'Frontend' | 'Frontend & AppSec' | 'Backend' | 'Cloud & DevOps' | 'Database (Supabase)' | 'Pagamentos (Mercado Pago)' | 'QA & Automação';
   scope: 'INTERNA_PROJETO' | 'EXTERNA_INFRA';
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   status: 'APLICADA_NO_CODIGO' | 'PENDENTE_EXTERNA' | 'VERIFICADA';

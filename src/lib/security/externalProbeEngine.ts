@@ -110,7 +110,6 @@ export function getStoredProbedStatusMap(): Record<string, 'RESOLVED' | 'UNRESOL
         if (parsed['EXT-BE-02'] && !parsed['CORR-021']) parsed['CORR-021'] = parsed['EXT-BE-02'];
         return parsed;
       }
-    }
   } catch {
     // fallback
   }
@@ -383,7 +382,7 @@ export async function runExternalItemProbe(itemId: string, itemTitle: string): P
 
     const mpSecret =
       ssot.mercadopago?.webhookSecret ||
-      mpStore.webhookSecret ||
+      (mpStore as any)?.webhookSecret ||
       env.WEBHOOK_SECRET_MERCADOPAGO ||
       '';
 

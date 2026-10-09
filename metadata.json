@@ -1,8 +1,6 @@
 {
-  "name": "SaaS V1.5.1.7",
+  "name": "SaaS V1.5.1.8",
   "description": "Sistema SaaS para barbearias com agendamentos, comissões, gestão de equipe e integração Mercado Pago.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

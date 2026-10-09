@@ -108,6 +108,8 @@ export default function BarbershopDashboard({
         trialDaysLeft={realDaysLeft}
         isPlansModalOpen={isPlansModalOpen}
         setIsPlansModalOpen={setIsPlansModalOpen}
+        tenant={tenant}
+        user={user}
         onSubscribePlan={(plan) => console.log("Plano assinado:", plan)}
       />
 

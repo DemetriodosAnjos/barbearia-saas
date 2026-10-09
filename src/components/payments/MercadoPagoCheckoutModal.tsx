@@ -189,7 +189,7 @@ export default function MercadoPagoCheckoutModal({
       payerEmail,
       payerFirstName,
       description,
-    }).then((res) => {
+    } as any).then((res) => {
       if (isMounted) {
         if (res.success && res.data) {
           setPixData(res.data);
@@ -209,7 +209,7 @@ export default function MercadoPagoCheckoutModal({
       payerEmail,
       payerName,
       payerPhone: targetClientPhone || defaultTenant.ownerPhone,
-    }).then((res) => {
+    } as any).then((res) => {
       if (isMounted) {
         if (res.success && res.data) {
           setPreferenceData(res.data);
@@ -280,7 +280,7 @@ export default function MercadoPagoCheckoutModal({
         payerEmail: defaultTenant.ownerEmail || "pagamento@barbearia.com.br",
         payerName: targetClientName,
         payerPhone: targetClientPhone || defaultTenant.ownerPhone,
-      });
+      } as any);
       if (res.success && res.data?.initPoint) {
         setPreferenceData(res.data);
         window.open(res.data.initPoint, "_blank");
@@ -292,7 +292,7 @@ export default function MercadoPagoCheckoutModal({
   // Telefone do cliente cadastrado para envio via WhatsApp (ex: Marilia Santos -> 41 99788-4424)
   const clientPhoneRaw = isAppointmentMode
     ? (appointment?.clientPhone || targetClientPhone || "")
-    : (tenant?.ownerPhone || tenant?.phone || targetClientPhone || "");
+    : (tenant?.ownerPhone || (tenant as any)?.phone || targetClientPhone || "");
   const recipientPhoneClean = formatWhatsAppNumber(clientPhoneRaw);
 
   // Mensagem Padrão vs Mensagem Customizada Editada

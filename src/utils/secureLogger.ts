@@ -128,7 +128,7 @@ export function redactSensitiveData<T = unknown>(
 
   // Sanitização de strings
   if (typeof input === "string") {
-    let sanitized = input;
+    let sanitized: string = input;
 
     // Mascarar strings de conexão com senha (ex: postgresql://user:secret@host:5432/db)
     sanitized = sanitized.replace(
