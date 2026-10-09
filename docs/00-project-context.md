@@ -1,4 +1,4 @@
-# Contexto do Projeto: SaaS de Agendamento e Gestão para Barbearias (SaaS V1.5.1.0)
+# Contexto do Projeto: SaaS de Agendamento e Gestão para Barbearias (SaaS V1.5.1.8)
 
 ## 1. Visão Geral do Sistema
 Plataforma SaaS Multi-tenant completa para gestão de barbearias, atendendo três públicos principais:
@@ -47,3 +47,12 @@ Plataforma SaaS Multi-tenant completa para gestão de barbearias, atendendo trê
    - Identidade visual, horários de funcionamento, regras de agendamento e dados da empresa.
 8. **Controle Global SaaS (`SuperAdminDashboard`):**
    - Visão consolidada de todas as barbearias, planos de assinatura e integração Mercado Pago.
+9. **Planos & Assinaturas SaaS (`TrialBanner` / Modal de Planos):**
+   - Modal oficial *"Escolha o plano ideal para sua barbearia"* com 4 opções padronizadas:
+     - **Plano de Teste:** 7 dias gratuitos com agenda, comissões e caixa liberados.
+     - **Starter:** Individual (1 cadeira/barbeiro), PDV e suporte.
+     - **Pro:** Até 6 cadeiras, comissões automáticas, lembretes via WhatsApp e Checkout Pro em até 12x.
+     - **Entreprise:** Cadeiras ilimitadas, multi-filiais, pacote white-label e suporte prioritário VIP.
+   - Botões dos cards conectados dinamicamente à API do Mercado Pago (`/api/mercadopago/preference`) gerando links de Checkout Pro em tempo real.
+   - Botão de confirmação no rodapé: *"Continuar para pagamento seguro"*.
+
