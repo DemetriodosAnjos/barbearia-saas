@@ -5,18 +5,28 @@ import Modal from "../ui/Modal";
 import Alert from "../ui/Alert";
 import Spinner from "../ui/Spinner";
 
-export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export default function TrialBanner({
+  trialDaysLeft,
+  onSubscribePlan,
+  isPlansModalOpen,
+  setIsPlansModalOpen,
+}) {
+  const [internalModalOpen, setInternalModalOpen] = useState(false);
+  const isModalOpen =
+    isPlansModalOpen !== undefined ? isPlansModalOpen : internalModalOpen;
+  const setIsModalOpen = setIsPlansModalOpen || setInternalModalOpen;
+
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   // Estados do Modal de Redirecionamento com Spinner
   const [isRedirectModalOpen, setIsRedirectModalOpen] = useState(false);
   const [redirectInfo, setRedirectInfo] = useState({ planName: "", link: "" });
 
-  // 1. Defesa: se trialDaysLeft for null/undefined (ex: assinante ativo ou dados ainda carregando), não renderiza
-  if (trialDaysLeft === undefined || trialDaysLeft === null) return null;
+  const showBanner = trialDaysLeft !== undefined && trialDaysLeft !== null;
+  const isExpired = typeof trialDaysLeft === "number" ? trialDaysLeft <= 0 : false;
 
-  const isExpired = trialDaysLeft <= 0;
+  // 1. Defesa: se trialDaysLeft for null/undefined e o modal não estiver aberto, não renderiza
+  if (!showBanner && !isModalOpen && !isRedirectModalOpen) return null;
 
   // Função disparada ao clicar no botão de pagamento
   const handleProceedToPayment = () => {
@@ -71,55 +81,57 @@ export default function TrialBanner({ trialDaysLeft, onSubscribePlan }) {
   return (
     <>
       {/* 1. FAIXA DE CONTAGEM REGRESSIVA NO TOPO */}
-      <div
-        className={`
-          w-full px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs select-none shadow-md z-30 sticky top-0
-          ${
-            isExpired
-              ? "bg-red-950 border-b border-red-800 text-red-200"
-              : trialDaysLeft <= 2
-                ? "bg-amber-950/80 border-b border-amber-800/80 text-amber-200"
-                : "bg-neutral-900 border-b border-neutral-800 text-neutral-300"
-          }
-        `}
-      >
-        <div className="flex items-center gap-2">
-          {isExpired ? (
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-          ) : (
-            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-          )}
-          <span>
-            {isExpired ? (
-              <strong className="text-white">
-                Seu período de teste de 7 dias expirou!
-              </strong>
-            ) : (
-              <>
-                Período de Avaliação: Você tem{" "}
-                <strong className="text-amber-400 font-bold font-mono">
-                  {trialDaysLeft}{" "}
-                  {trialDaysLeft === 1 ? "dia restante" : "dias restantes"}
-                </strong>{" "}
-                de Teste Grátis na sua barbearia.
-              </>
-            )}
-          </span>
-        </div>
-
-        <Button
-          variant="primary"
-          onClick={() => {
-            setIsModalOpen(true);
-            setErrorMessage("");
-          }}
-          className="text-xs py-1 px-3 bg-amber-600 hover:bg-amber-500 text-white font-bold cursor-pointer"
+      {showBanner && (
+        <div
+          className={`
+            w-full px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs select-none shadow-md z-30 sticky top-0
+            ${
+              isExpired
+                ? "bg-red-950 border-b border-red-800 text-red-200"
+                : trialDaysLeft <= 2
+                  ? "bg-amber-950/80 border-b border-amber-800/80 text-amber-200"
+                  : "bg-neutral-900 border-b border-neutral-800 text-neutral-300"
+            }
+          `}
         >
-          {isExpired
-            ? "Escolher Plano para Liberar"
-            : "Fazer Upgrade / Assinar"}
-        </Button>
-      </div>
+          <div className="flex items-center gap-2">
+            {isExpired ? (
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            ) : (
+              <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+            )}
+            <span>
+              {isExpired ? (
+                <strong className="text-white">
+                  Seu período de teste de 7 dias expirou!
+                </strong>
+              ) : (
+                <>
+                  Período de Avaliação: Você tem{" "}
+                  <strong className="text-amber-400 font-bold font-mono">
+                    {trialDaysLeft}{" "}
+                    {trialDaysLeft === 1 ? "dia restante" : "dias restantes"}
+                  </strong>{" "}
+                  de Teste Grátis na sua barbearia.
+                </>
+              )}
+            </span>
+          </div>
+
+          <Button
+            variant="primary"
+            onClick={() => {
+              setIsModalOpen(true);
+              setErrorMessage("");
+            }}
+            className="text-xs py-1 px-3 bg-amber-600 hover:bg-amber-500 text-white font-bold cursor-pointer"
+          >
+            {isExpired
+              ? "Escolher Plano para Liberar"
+              : "Fazer Upgrade / Assinar"}
+          </Button>
+        </div>
+      )}
 
       {/* 2. MODAL DE ESCOLHA DE PLANOS */}
       <Modal

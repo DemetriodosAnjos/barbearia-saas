@@ -1,20 +1,50 @@
 import { useState, useEffect } from "react";
 import { sidebarStyles } from "./Sidebar.styles";
 import ProjectIcon from "./ProjectIcon";
+import appMetadata from "../../../metadata.json";
 
 export default function Sidebar({
   tenantName = "Barbearia Dom Pedro",
-  tenantPlan = "Plano Pro",
+  tenantPlan = "TRIAL",
   items = [],
   activeItem,
   onSelect,
   isOpen = false,
   onClose,
-  user = { name: "Pedro Silva", role: "Proprietário / Admin" },
+  isCollapsed: controlledCollapsed,
+  onToggleCollapse,
+  onOpenPlansModal,
+  user = { name: "Pedro Silva" },
   onLogout,
 }) {
   // Estado para controlar quais submenus estão abertos (Acordeão)
   const [expandedMenus, setExpandedMenus] = useState({});
+
+  // Estado interno de encolhimento do sidebar no desktop
+  const [internalCollapsed, setInternalCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("barbearia_sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const isCollapsed =
+    controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
+
+  const handleToggleCollapse = () => {
+    const nextVal = !isCollapsed;
+    if (onToggleCollapse) {
+      onToggleCollapse(nextVal);
+    } else {
+      setInternalCollapsed(nextVal);
+      try {
+        localStorage.setItem("barbearia_sidebar_collapsed", String(nextVal));
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   // 1. AUTO-EXPANSÃO INTELIGENTE: Se o activeItem for um filho, abre o pai sozinho!
   useEffect(() => {
@@ -33,7 +63,7 @@ export default function Sidebar({
   };
 
   // Helper para renderizar ícone semântico via ProjectIcon SVG
-  const renderItemIcon = (icon, isParent = false) => {
+  const renderItemIcon = (icon) => {
     if (!icon) return null;
     if (typeof icon === "string") {
       return (
@@ -62,56 +92,142 @@ export default function Sidebar({
       <aside
         className={`
           ${sidebarStyles.drawer}
+          ${isCollapsed ? sidebarStyles.drawerCollapsed : sidebarStyles.drawerExpanded}
           ${isOpen ? sidebarStyles.drawerOpen : sidebarStyles.drawerClosed}
         `}
         role="navigation"
         aria-label="Menu principal"
       >
         {/* Cabeçalho */}
-        <div className={sidebarStyles.header}>
-          <div className={sidebarStyles.brandWrapper}>
-            <div className={sidebarStyles.brandLogo}>
-              <ProjectIcon name="Scissors" size={20} colorVariant="amber" />
+        {!isCollapsed ? (
+          <div className={sidebarStyles.header}>
+            <div className={sidebarStyles.brandWrapper}>
+              <div
+                className={sidebarStyles.brandLogo}
+                onClick={handleToggleCollapse}
+                title="Recolher menu lateral"
+              >
+                <ProjectIcon name="Scissors" size={20} colorVariant="amber" />
+              </div>
+              <div className={sidebarStyles.brandInfo}>
+                <span className={sidebarStyles.brandTitle}>{tenantName}</span>
+                {/* Link TRIAL para abrir modal de planos */}
+                <button
+                  type="button"
+                  onClick={onOpenPlansModal}
+                  className="text-[11px] font-semibold text-amber-500 hover:text-amber-400 uppercase tracking-wider mt-0.5 cursor-pointer text-left flex items-center gap-1 transition-colors group no-underline hover:no-underline"
+                  title="Abrir planos e fazer upgrade (Escolha o plano ideal para a sua barbearia)"
+                >
+                  <span className="truncate">{tenantPlan || "TRIAL"}</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 group-hover:bg-amber-500/30">
+                    Planos
+                  </span>
+                </button>
+              </div>
             </div>
-            <div className={sidebarStyles.brandInfo}>
-              <span className={sidebarStyles.brandTitle}>{tenantName}</span>
-              <span className={sidebarStyles.brandPlan}>{tenantPlan}</span>
+
+            <div className="flex items-center gap-1">
+              {/* Botão de Encolher Desktop */}
+              <button
+                type="button"
+                onClick={handleToggleCollapse}
+                className={sidebarStyles.collapseButton}
+                title="Recolher menu lateral"
+                aria-label="Recolher menu lateral"
+              >
+                <ProjectIcon name="ChevronLeft" size={18} />
+              </button>
+
+              {/* Botão de Fechar Mobile */}
+              <button
+                type="button"
+                onClick={onClose}
+                className={sidebarStyles.closeMobileButton}
+                aria-label="Fechar menu"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className={sidebarStyles.closeMobileButton}
-            aria-label="Fechar menu"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        ) : (
+          /* Cabeçalho Encolhido (Apenas Logo e Botão de Expandir) */
+          <div className={sidebarStyles.headerCollapsed}>
+            <div
+              className={sidebarStyles.brandLogo}
+              onClick={handleToggleCollapse}
+              title={`Expandir menu (${tenantName})`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
+              <ProjectIcon name="Scissors" size={20} colorVariant="amber" />
+            </div>
 
-        {/* NAVEGAÇÃO COM SUPORTE A SUBMENUS */}
-        <nav className={sidebarStyles.nav}>
+            <button
+              type="button"
+              onClick={handleToggleCollapse}
+              className="text-neutral-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors"
+              title="Expandir menu lateral"
+              aria-label="Expandir menu lateral"
+            >
+              <ProjectIcon name="ChevronRight" size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* NAVEGAÇÃO COM SUPORTE A SUBMENUS OU COLUNA DE ÍCONES */}
+        <nav className={isCollapsed ? sidebarStyles.navCollapsed : sidebarStyles.nav}>
           {items.map((item) => {
             const hasChildren = item.children && item.children.length > 0;
             const isParentOfActive =
               hasChildren && item.children.some((c) => c.id === activeItem);
             const isExpanded = Boolean(expandedMenus[item.id]);
             const isDirectActive = activeItem === item.id;
+            const isActive = isDirectActive || isParentOfActive;
 
             // ==========================================
-            // CENÁRIO 1: ITEM COM SUBMENU (ACORDEÃO)
+            // MODO ENCOLHIDO: APENAS COLUNA DE ÍCONES
+            // ==========================================
+            if (isCollapsed) {
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  title={item.label}
+                  onClick={() => {
+                    if (hasChildren) {
+                      if (onSelect) onSelect(item.children[0].id);
+                    } else {
+                      if (onSelect) onSelect(item.id);
+                    }
+                    if (onClose) onClose();
+                  }}
+                  className={`
+                    ${sidebarStyles.navItemCollapsed}
+                    ${isActive ? sidebarStyles.navItemActive : sidebarStyles.navItemInactive}
+                  `}
+                >
+                  <span className={sidebarStyles.navItemIcon}>
+                    {renderItemIcon(item.icon)}
+                  </span>
+                  {item.badge && (
+                    <span className="w-2 h-2 rounded-full bg-amber-500 absolute top-2 right-2 ring-2 ring-neutral-900" />
+                  )}
+                </button>
+              );
+            }
+
+            // ==========================================
+            // MODO EXPANDIDO - CENÁRIO 1: COM SUBMENU (ACORDEÃO)
             // ==========================================
             if (hasChildren) {
               return (
@@ -126,7 +242,7 @@ export default function Sidebar({
                     `}
                   >
                     <span className={sidebarStyles.navItemIcon}>
-                      {renderItemIcon(item.icon, true)}
+                      {renderItemIcon(item.icon)}
                     </span>
                     <span className={sidebarStyles.navItemLabel}>
                       {item.label}
@@ -184,7 +300,7 @@ export default function Sidebar({
             }
 
             // ==========================================
-            // CENÁRIO 2: ITEM NORMAL DE CLIQUE ÚNICO
+            // MODO EXPANDIDO - CENÁRIO 2: ITEM NORMAL DE CLIQUE ÚNICO
             // ==========================================
             return (
               <button
@@ -213,41 +329,75 @@ export default function Sidebar({
           })}
         </nav>
 
-        {/* Rodapé do Usuário */}
-        <div className={sidebarStyles.footer}>
-          <div className={sidebarStyles.userWrapper}>
-            <div className={sidebarStyles.userAvatar}>
-              {user.name ? user.name.slice(0, 2).toUpperCase() : "US"}
+        {/* Rodapé: Versão do Sistema (metadata.json) & Logout (sem avatar nem "Authenticated") */}
+        {!isCollapsed ? (
+          <div className={sidebarStyles.footer}>
+            <div className={sidebarStyles.userWrapper}>
+              <div className={sidebarStyles.userInfo}>
+                <span className={sidebarStyles.userName}>
+                  {user?.name || "Administrador"}
+                </span>
+                <span className={sidebarStyles.userVersion}>
+                  {appMetadata?.name || "SaaS V1.5.1.6"}
+                </span>
+              </div>
             </div>
-            <div className={sidebarStyles.userInfo}>
-              <span className={sidebarStyles.userName}>{user.name}</span>
-              <span className={sidebarStyles.userRole}>{user.role}</span>
-            </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={onLogout}
-            className={sidebarStyles.logoutButton}
-            title="Sair do sistema"
-            aria-label="Sair"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+            <button
+              type="button"
+              onClick={onLogout}
+              className={sidebarStyles.logoutButton}
+              title="Sair do sistema"
+              aria-label="Sair"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-          </button>
-        </div>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <div className={sidebarStyles.footerCollapsed}>
+            <span
+              className="text-[10px] font-mono font-bold text-amber-400"
+              title={appMetadata?.name || "SaaS V1.5.1.6"}
+            >
+              V1.5
+            </span>
+            <button
+              type="button"
+              onClick={onLogout}
+              className={sidebarStyles.logoutButton}
+              title="Sair do sistema"
+              aria-label="Sair"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
       </aside>
     </>
   );
 }
+

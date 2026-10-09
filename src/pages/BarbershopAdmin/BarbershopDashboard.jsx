@@ -47,6 +47,7 @@ export default function BarbershopDashboard({
 }) {
   const [activeMenuTab, setActiveMenuTab] = useState("agenda");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [barberPresenceStatus, setBarberPresenceStatus] = useState("available");
 
   // [Lazy Initializer: captura o timestamp de referência de forma idempotente na montagem]
@@ -102,22 +103,29 @@ export default function BarbershopDashboard({
 
   return (
     <div className={barbershopStyles.pageWrapper}>
-      {/* Componente: exibe a contagem real calculada do banco */}
+      {/* Componente: exibe a contagem real calculada do banco e modal de planos */}
       <TrialBanner
         trialDaysLeft={realDaysLeft}
+        isPlansModalOpen={isPlansModalOpen}
+        setIsPlansModalOpen={setIsPlansModalOpen}
         onSubscribePlan={(plan) => console.log("Plano assinado:", plan)}
       />
 
       <div className={barbershopStyles.layoutBody}>
-        {/* SIDEBAR com dados dinâmicos da barbearia e do usuário logado */}
+        {/* SIDEBAR com dados dinâmicos da barbearia, encolhimento e link para planos */}
         <Sidebar
           tenantName={DOMPurify.sanitize(tenant?.name || "Minha Barbearia")}
-          tenantPlan={DOMPurify.sanitize(tenant?.subscription_plan || tenant?.plan || "Plano Pro")}
+          tenantPlan={DOMPurify.sanitize(
+            (tenant?.subscription_plan || tenant?.plan || "trial").toLowerCase() === "trial"
+              ? "TRIAL"
+              : tenant?.subscription_plan || tenant?.plan || "TRIAL"
+          )}
           items={barbershopMenuItems}
           activeItem={activeMenuTab}
           onSelect={setActiveMenuTab}
           isOpen={isMobileSidebarOpen}
           onClose={() => setIsMobileSidebarOpen(false)}
+          onOpenPlansModal={() => setIsPlansModalOpen(true)}
           user={
             user || {
               name: tenant?.name ? `Admin ${DOMPurify.sanitize(tenant.name)}` : "Administrador",
