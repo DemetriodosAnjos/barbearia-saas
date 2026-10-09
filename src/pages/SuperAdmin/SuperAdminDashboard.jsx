@@ -148,6 +148,7 @@ export default function SuperAdminDashboard({
                 mercadoPagoPlanId: p.mercado_pago_plan_id || `plan_mp_${p.id}`,
                 mercadoPagoCheckoutUrl:
                   p.mercado_pago_checkout_url ||
+                  p.nubank_payment_link ||
                   `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_mp_${p.id}`,
                 features: Array.isArray(p.features) ? p.features : [],
               })),
@@ -484,7 +485,8 @@ export default function SuperAdminDashboard({
       .map((f) => f.trim())
       .filter(Boolean);
 
-    // [Objeto payload: formata dados para as colunas do PostgreSQL]
+    // [Objeto payload: formata dados estritamente para as colunas existentes na tabela 'plans' do PostgreSQL]
+    const checkoutUrl = planForm.mercadoPagoCheckoutUrl || "";
     const planPayload = {
       name: planForm.name,
       price: Number(planForm.price),
@@ -492,7 +494,7 @@ export default function SuperAdminDashboard({
       extra_barber_price: Number(planForm.extraBarberPrice || 0),
       tag: planForm.tag || "Novo",
       active: planForm.active,
-      mercado_pago_checkout_url: planForm.mercadoPagoCheckoutUrl,
+      nubank_payment_link: checkoutUrl,
       features: featuresList,
     };
 
@@ -513,7 +515,8 @@ export default function SuperAdminDashboard({
             ...planPayload,
             maxBarbers: planPayload.max_barbers,
             extraBarberPrice: planPayload.extra_barber_price,
-            nubankPaymentLink: planPayload.nubank_payment_link,
+            mercadoPagoCheckoutUrl: checkoutUrl,
+            nubankPaymentLink: checkoutUrl,
           },
         ]);
       } else {
@@ -533,12 +536,15 @@ export default function SuperAdminDashboard({
                   ...planPayload,
                   maxBarbers: planPayload.max_barbers,
                   extraBarberPrice: planPayload.extra_barber_price,
-                  nubankPaymentLink: planPayload.nubank_payment_link,
+                  mercadoPagoCheckoutUrl: checkoutUrl,
+                  nubankPaymentLink: checkoutUrl,
                 }
               : p,
           ),
         );
       }
+      setSaveSuccessMsg("Plano salvo com sucesso no banco de dados!");
+      setTimeout(() => setSaveSuccessMsg(""), 3500);
       setPlanModalMode(null);
     } catch (err) {
       console.error("Erro ao salvar plano no Supabase:", err);

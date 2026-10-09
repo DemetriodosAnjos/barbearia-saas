@@ -286,10 +286,11 @@ export default function App() {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error || !session?.user) {
           if (!isMounted) return;
-          setCurrentUser(null);
-          if (currentScreen !== "design-system" && currentScreen !== "client-app" && currentScreen !== "onboarding") {
+          // Não reseta usuário nem redireciona se estiver no SuperAdmin, Design System, etc.
+          if (currentScreen !== "superadmin" && currentScreen !== "design-system" && currentScreen !== "client-app" && currentScreen !== "onboarding") {
+            setCurrentUser(null);
             setActiveUserRole(USER_ROLES.ANON);
-            if (currentScreen === "barbershop" || currentScreen === "superadmin") {
+            if (currentScreen === "barbershop") {
               setCurrentScreen("login");
             }
           }
@@ -319,7 +320,7 @@ export default function App() {
         }
       } catch (err) {
         console.error("Erro na verificação de sessão Supabase:", err);
-        if (isMounted) {
+        if (isMounted && currentScreen !== "superadmin") {
           setCurrentUser(null);
           setActiveUserRole(USER_ROLES.ANON);
         }
@@ -353,10 +354,12 @@ export default function App() {
           );
         }
       } else {
-        setCurrentUser(null);
-        if (currentScreen === "barbershop" || currentScreen === "superadmin") {
-          setActiveUserRole(USER_ROLES.ANON);
-          setCurrentScreen("login");
+        if (currentScreen !== "superadmin" && currentScreen !== "client-app" && currentScreen !== "design-system") {
+          setCurrentUser(null);
+          if (currentScreen === "barbershop") {
+            setActiveUserRole(USER_ROLES.ANON);
+            setCurrentScreen("login");
+          }
         }
       }
     });
@@ -365,12 +368,12 @@ export default function App() {
       isMounted = false;
       subscription?.unsubscribe();
     };
-  }, [currentScreen, isDirectProtectedUrl, resolveAndSyncUserTenant, storageAudit.tamperingDetected]);
+  }, []);
 
   // Efeito de auditoria contínua a cada alteração de tela
   useEffect(() => {
     const audit = detectAndNeutralizeStorageTampering();
-    if (audit.tamperingDetected) {
+    if (audit.tamperingDetected && currentScreen !== "superadmin") {
       setCurrentUser(null);
       setActiveUserRole(USER_ROLES.ANON);
       setCurrentScreen("login");
@@ -665,93 +668,77 @@ export default function App() {
     setAppointments((prev) => [...prev, createdAppointment]);
   };
 
-  // 1. Tela de Carregamento
-  // 1. Se estiver na tela de login, revela única e exclusivamente o Login.jsx
-  if (currentScreen === "login") {
-    return (
-      <ErrorBoundary componentName="Tela de Login">
-        <Login
-          onGoToSignup={() => setCurrentScreen("onboarding")}
-          onLoginSuccess={async (loggedUser) => {
-            const rawRole = loggedUser?.user_metadata?.role;
-            const role =
-              !rawRole || rawRole === "owner" || rawRole === "tenant"
-                ? USER_ROLES.ADMIN
-                : rawRole;
-            const userWithRole = {
-              ...loggedUser,
-              user_metadata: {
-                ...(loggedUser?.user_metadata || {}),
-                role: role,
-              },
-            };
-            setCurrentUser(userWithRole);
-            setActiveUserRole(role);
-            await resolveAndSyncUserTenant(userWithRole);
-            setCurrentScreen(
-              role === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
-            );
-          }}
-        />
-      </ErrorBoundary>
-    );
-  }
-
-  // 2. Se estiver no onboarding, exibe o assistente isolado
-  if (currentScreen === "onboarding") {
-    return (
-      <ErrorBoundary componentName="Onboarding Wizard">
-        <OnboardingWizard
-          onGoToLogin={() => setCurrentScreen("login")}
-          onCompleteOnboarding={({ user: newUser, tenant: newTenant }) => {
-            if (newUser) setCurrentUser(newUser);
-            if (newTenant) setTenant(normalizeTenantRecord(newTenant, newUser));
-            setActiveUserRole(USER_ROLES.ADMIN);
-            setCurrentScreen("barbershop");
-          }}
-        />
-      </ErrorBoundary>
-    );
-  }
-
-  // 3. Tela de Carregamento para rotas autenticadas/operacionais
-  if (loadingData) {
-    return (
-      <div className="min-h-screen w-full bg-neutral-950 flex flex-col items-center justify-center gap-3">
-        <div className="w-9 h-9 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-        <p className="text-xs font-semibold text-neutral-400">
-          Sincronizando barbearia com a nuvem...
-        </p>
-      </div>
-    );
-  }
-
-  // 4. Tela de Erro de Conexão
-  if (connectionError) {
-    return (
-      <div className="min-h-screen w-full bg-neutral-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center text-xl mb-4">
-          <ProjectIcon name="AlertTriangle" size={24} colorVariant="danger" />
-        </div>
-        <h3 className="text-base font-bold text-white mb-1">Erro de Conexão</h3>
-        <p className="text-xs text-neutral-400 max-w-sm mb-5 leading-relaxed">
-          {connectionError}
-        </p>
-        <button
-          onClick={loadDataFromSupabase}
-          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
-        >
-          <ProjectIcon name="RefreshCw" size={13} colorVariant="inherit" />
-          <span>Tentar Novamente</span>
-        </button>
-      </div>
-    );
-  }
-
   const showDevNav = urlParams.get("dev") === "true";
 
   return (
-    <div>
+    <div className="min-h-screen bg-neutral-900 text-neutral-100 flex flex-col">
+      {/* Barra de Navegação Principal do SaaS */}
+      <header className="bg-neutral-950/95 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 px-4 py-3 sm:px-6 shadow-lg select-none">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          {/* Identidade Visual / Marca */}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 shadow-xs">
+              <ProjectIcon name="Scissors" size={20} colorVariant="inherit" />
+            </div>
+            <div>
+              <div className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Barbearia SaaS</span>
+                <span className="text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                  v1.5.1.7
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 hidden sm:block">
+                Sistema de Gestão & Agendamentos
+              </p>
+            </div>
+          </div>
+
+          {/* Botões de Navegação Solicitados (Login & SuperAdmin) */}
+          <nav className="flex items-center gap-2.5 sm:gap-3">
+            {/* BOTÃO: Login (carrega a tela de Login) */}
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentScreen("login");
+              }}
+              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-200 cursor-pointer ${
+                currentScreen !== "superadmin"
+                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/20"
+                  : "bg-transparent hover:bg-amber-500/10 text-amber-500 border-[1.5px] border-amber-500"
+              }`}
+            >
+              <ProjectIcon
+                name="LogIn"
+                size={16}
+                colorVariant="inherit"
+              />
+              <span>Login</span>
+            </button>
+
+            {/* BOTÃO: SuperAdmin (Carrega a tela SuperAdmin) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveUserRole(USER_ROLES.SUPERADMIN);
+                setCurrentScreen("superadmin");
+              }}
+              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-200 cursor-pointer ${
+                currentScreen === "superadmin"
+                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/20"
+                  : "bg-transparent hover:bg-amber-500/10 text-amber-500 border-[1.5px] border-amber-500"
+              }`}
+            >
+              <ProjectIcon
+                name="Crown"
+                size={16}
+                colorVariant="inherit"
+              />
+              <span>SuperAdmin</span>
+            </button>
+          </nav>
+        </div>
+      </header>
+
       {/* Barra de Navegação Central do SaaS (Apenas visível se ?dev=true) */}
       {showDevNav && (
       <div className="bg-neutral-900 border-b border-neutral-800 p-2.5 flex flex-wrap items-center justify-between gap-3 text-xs z-50 sticky top-0 shadow-lg select-none">

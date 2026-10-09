@@ -155,8 +155,13 @@ async function supabaseResilientFetch(input, init = {}) {
     }
   }
 
-  // 1. A tabela `tenants` utiliza sempre o proxy server-side para contornar RLS restrito ao service_role
-  if (isBrowser && targetPath.startsWith("/rest/v1/tenants")) {
+  // 1. As tabelas administrativas (`tenants`, `plans`, `saas_config`) utilizam sempre o proxy server-side para contornar RLS restrito ao service_role
+  if (
+    isBrowser &&
+    (targetPath.startsWith("/rest/v1/tenants") ||
+      targetPath.startsWith("/rest/v1/plans") ||
+      targetPath.startsWith("/rest/v1/saas_config"))
+  ) {
     try {
       const proxyRes = await fetchViaServerProxy(targetPath, init);
       if (proxyRes.status !== 404 && proxyRes.status !== 502) {
@@ -167,9 +172,20 @@ async function supabaseResilientFetch(input, init = {}) {
     }
   }
 
-  // 2. Para as demais rotas (/rest/v1/* e /auth/v1/*), tenta fetch direto e usa o proxy same-origin como contingência contra "TypeError: Failed to fetch"
+  // 2. Para as demais rotas (/rest/v1/* e /auth/v1/*), tenta fetch direto e usa o proxy same-origin como contingência contra RLS (401/403) e "TypeError: Failed to fetch"
   try {
-    return await fetch(input, init);
+    const directRes = await fetch(input, init);
+    if ((directRes.status === 401 || directRes.status === 403) && isBrowser && targetPath) {
+      try {
+        const proxyFallback = await fetchViaServerProxy(targetPath, init);
+        if (proxyFallback.ok) {
+          return proxyFallback;
+        }
+      } catch {
+        // Mantém directRes
+      }
+    }
+    return directRes;
   } catch (networkErr) {
     if (isBrowser && targetPath) {
       return await fetchViaServerProxy(targetPath, init);

@@ -299,8 +299,8 @@ export const UI_SCREEN_MATRIX = [
     screenId: "superadmin",
     name: "Painel Master SuperAdmin",
     classification: ROUTE_CLASSIFICATIONS.SUPERADMIN,
-    isPublic: false,
-    allowedRoles: [USER_ROLES.SUPERADMIN],
+    isPublic: true,
+    allowedRoles: [USER_ROLES.ANON, USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN],
   },
 ];
 

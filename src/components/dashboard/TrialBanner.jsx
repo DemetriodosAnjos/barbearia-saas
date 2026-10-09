@@ -1,23 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertTriangle, Clock, Check, Star, ArrowRight, ExternalLink } from "lucide-react";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import Alert from "../ui/Alert";
 import Spinner from "../ui/Spinner";
+import { supabase } from "../../lib/supabase";
+import { INITIAL_PLANS } from "../../pages/SuperAdmin/SuperAdminMockNuank";
 
 export default function TrialBanner({
   trialDaysLeft,
   onSubscribePlan,
   isPlansModalOpen,
   setIsPlansModalOpen,
+  plans: propPlans,
 }) {
   const [internalModalOpen, setInternalModalOpen] = useState(false);
   const isModalOpen =
     isPlansModalOpen !== undefined ? isPlansModalOpen : internalModalOpen;
   const setIsModalOpen = setIsPlansModalOpen || setInternalModalOpen;
 
+  const [plans, setPlans] = useState(() =>
+    Array.isArray(propPlans) && propPlans.length > 0 ? propPlans : INITIAL_PLANS
+  );
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+
   // Estados do Modal de Redirecionamento com Spinner
   const [isRedirectModalOpen, setIsRedirectModalOpen] = useState(false);
   const [redirectInfo, setRedirectInfo] = useState({ planName: "", link: "" });
@@ -25,52 +33,126 @@ export default function TrialBanner({
   const showBanner = trialDaysLeft !== undefined && trialDaysLeft !== null;
   const isExpired = typeof trialDaysLeft === "number" ? trialDaysLeft <= 0 : false;
 
-  // 1. Defesa: se trialDaysLeft for null/undefined e o modal não estiver aberto, não renderiza
+  // Busca dinâmica dos planos sincronizados com "Planos e Preços" do SuperAdmin
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchDynamicPlans() {
+      if (Array.isArray(propPlans) && propPlans.length > 0) {
+        setPlans(propPlans);
+        return;
+      }
+
+      try {
+        setIsLoadingPlans(true);
+        const { data, error } = await supabase
+          .from("plans")
+          .select("*")
+          .order("price", { ascending: true });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          if (isMounted) {
+            const mapped = data.map((p) => ({
+              id: p.id,
+              name: p.name,
+              price: Number(p.price || 0),
+              maxBarbers: Number(p.max_barbers || 1),
+              extraBarberPrice: Number(p.extra_barber_price || 0),
+              tag: p.tag || "",
+              active: p.active !== false,
+              checkoutUrl:
+                p.mercado_pago_checkout_url ||
+                p.nubank_payment_link ||
+                `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_mp_${p.id}`,
+              features: Array.isArray(p.features) ? p.features : [],
+            }));
+            setPlans(mapped);
+          }
+        } else if (isMounted) {
+          setPlans(INITIAL_PLANS);
+        }
+      } catch (err) {
+        console.warn("Erro ao buscar planos dinâmicos no Supabase:", err);
+        if (isMounted) {
+          setPlans(INITIAL_PLANS);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingPlans(false);
+        }
+      }
+    }
+
+    fetchDynamicPlans();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isModalOpen, propPlans]);
+
+  // Filtra apenas planos ativos criados pelo SuperAdmin
+  const activePlans = plans.filter((p) => p.active !== false);
+  const displayPlans = activePlans.length > 0 ? activePlans : plans;
+
+  // Seleciona automaticamente o plano em destaque ou o primeiro da lista
+  useEffect(() => {
+    if (displayPlans.length > 0) {
+      const alreadySelected = displayPlans.some((p) => p.id === selectedPlan);
+      if (!alreadySelected) {
+        const preferred =
+          displayPlans.find((p) =>
+            (p.tag || "").toLowerCase().includes("popular") ||
+            (p.tag || "").toLowerCase().includes("escolhido")
+          ) || displayPlans[0];
+        if (preferred) setSelectedPlan(preferred.id);
+      }
+    }
+  }, [displayPlans, selectedPlan]);
+
+  // Defesa: se trialDaysLeft for null/undefined e o modal não estiver aberto, não renderiza
   if (!showBanner && !isModalOpen && !isRedirectModalOpen) return null;
 
   // Função disparada ao clicar no botão de pagamento
   const handleProceedToPayment = () => {
-    // 1. Validação de escolha obrigatória
-    if (!selectedPlan) {
+    const chosenPlan = displayPlans.find((p) => p.id === selectedPlan) || displayPlans[0];
+
+    if (!chosenPlan) {
       setErrorMessage(
         "Por favor, selecione um dos planos acima para prosseguir para o pagamento.",
       );
       return;
     }
 
-    // Validade dos links 30 dias (substituir por webhook Mercado Pago)
-    const paymentLinks = {
-      starter: "https://checkout.nubank.com.br/cqOIhHqs1xetkbs",
-      pro: "https://checkout.nubank.com.br/c5JntImFeMetkbs",
-      enterprise: "https://checkout.nubank.com.br/PbzsvFlouxetkbs",
-    };
+    const chosenLink =
+      chosenPlan.checkoutUrl ||
+      chosenPlan.mercadoPagoCheckoutUrl ||
+      chosenPlan.nubank_payment_link ||
+      "https://www.mercadopago.com.br";
 
-    const planNames = {
-      starter: "Plano Solo (R$ 69,90/mês)",
-      pro: "Plano Pro (R$ 149,90/mês)",
-      enterprise: "Redes & Franquias (R$ 279,90/mês)",
-    };
+    const formattedPrice = Number(chosenPlan.price || 0)
+      .toFixed(2)
+      .replace(".", ",");
+    const chosenPlanName = `${chosenPlan.name} (R$ ${formattedPrice}/mês)`;
 
-    const chosenLink = paymentLinks[selectedPlan] || paymentLinks.pro;
-    const chosenPlanName = planNames[selectedPlan];
-
-    // 2. Fecha o modal de planos
+    // Fecha o modal de planos
     setIsModalOpen(false);
 
-    // 3. Abre o modal com Spinner e tela bloqueada (Overlay)
+    // Abre o modal com Spinner e tela bloqueada (Overlay)
     setRedirectInfo({ planName: chosenPlanName, link: chosenLink });
     setIsRedirectModalOpen(true);
 
-    // 4. Simula o processamento de 2 segundos e abre a aba do Nubank
+    // Simula a preparação do ambiente seguro e abre o checkout oficial
     setTimeout(() => {
-      window.open(chosenLink, "_blank");
+      if (chosenLink && typeof window !== "undefined") {
+        window.open(chosenLink, "_blank");
+      }
       setIsRedirectModalOpen(false);
       setErrorMessage("");
 
       if (onSubscribePlan) {
-        onSubscribePlan(selectedPlan, chosenLink);
+        onSubscribePlan(chosenPlan.id, chosenLink, chosenPlan);
       }
-    }, 2000);
+    }, 1800);
   };
 
   const handleSelectPlan = (planKey) => {
@@ -138,7 +220,6 @@ export default function TrialBanner({
         isOpen={isModalOpen}
         size="xl"
         onClose={() => {
-          // Método: impede fechamento se o trial estiver expirado, exibindo aviso no próprio layout
           if (!isExpired) {
             setIsModalOpen(false);
             setErrorMessage("");
@@ -148,11 +229,11 @@ export default function TrialBanner({
             );
           }
         }}
-        title="Escolha o plano ideal para a sua barbearia"
+        title="Escolha o plano ideal para sua barbearia"
         footer={
           <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4">
             <span className="text-xs text-neutral-400">
-              Pagamento 100% seguro via Nubank PJ (PIX ou Cartão em até 12x).
+              Pagamento 100% seguro com ativação imediata (PIX ou Cartão em até 12x).
             </span>
             <Button
               variant="primary"
@@ -168,7 +249,7 @@ export default function TrialBanner({
         <div className="space-y-5 text-left">
           <p className="text-xs text-neutral-400">
             Mantenha sua agenda online, cálculo de comissões e controle de caixa
-            ativos sem interrupções.
+            ativos sem interrupções com os planos oficiais da plataforma.
           </p>
 
           {errorMessage && (
@@ -177,238 +258,157 @@ export default function TrialBanner({
             </Alert>
           )}
 
-          {/* GRADE DE CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
-            {/* Plano Solo */}
-            <div
-              onClick={() => handleSelectPlan("starter")}
-              className={`
-                p-5 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between space-y-4 text-left relative
-                ${
-                  selectedPlan === "starter"
-                    ? "bg-amber-950/20 border-amber-500 shadow-xl ring-2 ring-amber-500/40 scale-[1.02]"
-                    : "bg-neutral-950/60 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-950"
-                }
-              `}
-            >
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold uppercase text-neutral-400 tracking-wider">
-                  Individual
-                </span>
-                <h4 className="text-base font-bold text-white">Plano Solo</h4>
-                <p className="text-2xl font-black text-amber-400 font-mono">
-                  R$ 69,90
-                  <span className="text-xs text-neutral-500 font-normal">
-                    /mês
-                  </span>
-                </p>
-                <p className="text-xs text-neutral-400">
-                  Para barbeiros autônomos ou cadeira individual.
-                </p>
-              </div>
-
-              <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl text-xs space-y-1">
-                <p className="text-neutral-300">
-                  Capacidade:{" "}
-                  <strong className="text-white">1 Barbeiro / Cadeira</strong>
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-neutral-800/80 text-xs text-neutral-300">
-                <div className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
-                  <span>Agenda Online 24h</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
-                  <span>Controle de Fila & PDV</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className={`w-full py-2 rounded-xl text-xs font-bold transition-colors ${
-                  selectedPlan === "starter"
-                    ? "bg-amber-600 text-white"
-                    : "bg-neutral-900 text-neutral-400 hover:text-white"
-                }`}
-              >
-                {selectedPlan === "starter" ? (
-                  <span className="flex items-center justify-center gap-1">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Selecionado</span>
-                  </span>
-                ) : (
-                  "Escolher Plano Solo"
-                )}
-              </button>
+          {isLoadingPlans && displayPlans.length === 0 ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-3">
+              <Spinner size="lg" color="primary" label="Carregando planos..." />
+              <p className="text-xs text-neutral-400">Buscando planos atualizados da plataforma...</p>
             </div>
+          ) : (
+            /* GRADE DINÂMICA DE CARDS DE PLANOS */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
+              {displayPlans.map((plan) => {
+                const isSelected = selectedPlan === plan.id;
+                const isHighlighted =
+                  (plan.tag || "").toLowerCase().includes("popular") ||
+                  (plan.tag || "").toLowerCase().includes("escolhido") ||
+                  (plan.tag || "").toLowerCase().includes("destaque");
 
-            {/* Plano Pro */}
-            <div
-              onClick={() => handleSelectPlan("pro")}
-              className={`
-                p-5 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between space-y-4 text-left relative
-                ${
-                  selectedPlan === "pro"
-                    ? "bg-amber-950/25 border-amber-500 shadow-2xl ring-2 ring-amber-500/50 scale-[1.03]"
-                    : "bg-neutral-950/60 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-950"
-                }
-              `}
-            >
-              <span className="absolute -top-3 right-4 text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-amber-500 text-neutral-950 shadow-md flex items-center gap-1">
-                <span>Mais Escolhido</span>
-                <Star className="w-2.5 h-2.5 fill-neutral-950 text-neutral-950" />
-              </span>
+                const formattedPrice = Number(plan.price || 0)
+                  .toFixed(2)
+                  .replace(".", ",");
 
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold uppercase text-neutral-400 tracking-wider">
-                  Equipes Médias
-                </span>
-                <h4 className="text-base font-bold text-white">Plano Pro</h4>
-                <p className="text-2xl font-black text-amber-400 font-mono">
-                  R$ 149,90
-                  <span className="text-xs text-neutral-500 font-normal">
-                    /mês
-                  </span>
-                </p>
-                <p className="text-xs text-neutral-400">
-                  Comissões automáticas e equipe.
-                </p>
-              </div>
+                return (
+                  <div
+                    key={plan.id}
+                    onClick={() => handleSelectPlan(plan.id)}
+                    className={`
+                      p-5 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between space-y-4 text-left relative
+                      ${
+                        isSelected
+                          ? "bg-amber-950/25 border-amber-500 shadow-2xl ring-2 ring-amber-500/50 scale-[1.02]"
+                          : "bg-neutral-950/60 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-950"
+                      }
+                    `}
+                  >
+                    {plan.tag && (
+                      <span
+                        className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full shadow-md flex items-center gap-1 w-fit ${
+                          isHighlighted
+                            ? "bg-amber-500 text-neutral-950 absolute -top-3 right-4 font-black"
+                            : "bg-neutral-800 text-neutral-300 font-bold"
+                        }`}
+                      >
+                        <span>{plan.tag}</span>
+                        {isHighlighted && (
+                          <Star className="w-2.5 h-2.5 fill-neutral-950 text-neutral-950" />
+                        )}
+                      </span>
+                    )}
 
-              <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl text-xs space-y-1">
-                <p className="text-neutral-300">
-                  Capacidade:{" "}
-                  <strong className="text-white">Até 6 Barbeiros</strong>
-                </p>
-                <p className="text-[11px] font-bold text-amber-400">
-                  + R$ 19,90/mês por cadeira extra
-                </p>
-              </div>
+                    <div className="space-y-2 pt-1">
+                      <h4 className="text-base font-bold text-white">{plan.name}</h4>
+                      <p className="text-2xl font-black text-amber-400 font-mono">
+                        R$ {formattedPrice}
+                        <span className="text-xs text-neutral-500 font-normal">
+                          /mês
+                        </span>
+                      </p>
+                      <p className="text-xs text-neutral-400">
+                        {plan.maxBarbers >= 999
+                          ? "Barbeiros ilimitados para grandes redes e franquias."
+                          : plan.maxBarbers === 1
+                            ? "Para barbeiros autônomos ou cadeira individual."
+                            : `Para equipes de até ${plan.maxBarbers} profissionais.`}
+                      </p>
+                    </div>
 
-              <div className="space-y-2 pt-2 border-t border-neutral-800/80 text-xs text-neutral-300">
-                <div className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
-                  <span>Tudo do Plano Solo</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
-                  <strong className="text-white">Comissões Automáticas</strong>
-                </div>
-              </div>
+                    <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl text-xs space-y-1">
+                      <p className="text-neutral-300">
+                        Capacidade:{" "}
+                        <strong className="text-white">
+                          {plan.maxBarbers >= 999
+                            ? "Barbeiros Ilimitados"
+                            : plan.maxBarbers === 1
+                              ? "1 Barbeiro / Cadeira"
+                              : `Até ${plan.maxBarbers} Barbeiros`}
+                        </strong>
+                      </p>
+                      {plan.extraBarberPrice > 0 && (
+                        <p className="text-[11px] font-bold text-amber-400">
+                          + R${" "}
+                          {Number(plan.extraBarberPrice)
+                            .toFixed(2)
+                            .replace(".", ",")}/mês por cadeira extra
+                        </p>
+                      )}
+                    </div>
 
-              <button
-                type="button"
-                className={`w-full py-2 rounded-xl text-xs font-bold transition-colors ${
-                  selectedPlan === "pro"
-                    ? "bg-amber-600 text-white"
-                    : "bg-neutral-900 text-neutral-400 hover:text-white"
-                }`}
-              >
-                {selectedPlan === "pro" ? (
-                  <span className="flex items-center justify-center gap-1">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Selecionado</span>
-                  </span>
-                ) : (
-                  "Escolher Plano Pro"
-                )}
-              </button>
+                    <div className="space-y-2 pt-2 border-t border-neutral-800/80 text-xs text-neutral-300 grow">
+                      {Array.isArray(plan.features) && plan.features.length > 0 ? (
+                        plan.features.map((feat, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
+                            <span>{feat}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
+                            <span>Agenda Online 24/7</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
+                            <span>Gestão de Comissões e Caixa</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                          : "bg-neutral-900 text-neutral-400 hover:text-white hover:bg-neutral-800"
+                      }`}
+                    >
+                      {isSelected ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Selecionado</span>
+                        </span>
+                      ) : (
+                        `Escolher ${plan.name}`
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-
-            {/* Plano Redes */}
-            <div
-              onClick={() => handleSelectPlan("enterprise")}
-              className={`
-                p-5 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between space-y-4 text-left relative
-                ${
-                  selectedPlan === "enterprise"
-                    ? "bg-amber-950/20 border-amber-500 shadow-xl ring-2 ring-amber-500/40 scale-[1.02]"
-                    : "bg-neutral-950/60 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-950"
-                }
-              `}
-            >
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold uppercase text-neutral-400 tracking-wider">
-                  Escala & Redes
-                </span>
-                <h4 className="text-base font-bold text-white">
-                  Redes & Franquias
-                </h4>
-                <p className="text-2xl font-black text-amber-400 font-mono">
-                  R$ 279,90
-                  <span className="text-xs text-neutral-500 font-normal">
-                    /mês
-                  </span>
-                </p>
-                <p className="text-xs text-neutral-400">
-                  Grandes equipes e multi-unidades.
-                </p>
-              </div>
-
-              <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl text-xs space-y-1">
-                <p className="text-emerald-400 font-bold flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400 shrink-0" />
-                  <span>Barbeiros Ilimitados</span>
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-neutral-800/80 text-xs text-neutral-300">
-                <div className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
-                  <span>Tudo do Plano Pro</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
-                  <strong className="text-amber-400">
-                    White-Label Incluso
-                  </strong>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className={`w-full py-2 rounded-xl text-xs font-bold transition-colors ${
-                  selectedPlan === "enterprise"
-                    ? "bg-amber-600 text-white"
-                    : "bg-neutral-900 text-neutral-400 hover:text-white"
-                }`}
-              >
-                {selectedPlan === "enterprise" ? (
-                  <span className="flex items-center justify-center gap-1">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Selecionado</span>
-                  </span>
-                ) : (
-                  "Escolher Redes & Franquias"
-                )}
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </Modal>
 
       {/* ======================================================== */}
-      {/* 3. NOVO: MODAL COM SPINNER DE REDIRECIONAMENTO NUBANK PJ */}
+      {/* 3. MODAL COM SPINNER DE REDIRECIONAMENTO DE CHECKOUT    */}
       {/* ======================================================== */}
       <Modal
         isOpen={isRedirectModalOpen}
-        onClose={() => {}} // Não fecha clicando fora durante a transição!
+        onClose={() => {}}
         title="Redirecionando para Pagamento"
         size="sm"
       >
         <div className="py-6 px-2 flex flex-col items-center justify-center text-center space-y-4 select-none">
-          {/* Spinner Grande em Destaque */}
           <Spinner
             size="xl"
             color="primary"
-            label="Conectando com Nubank PJ..."
+            label="Conectando com Gateway Seguro..."
           />
 
           <div className="space-y-1">
             <h4 className="text-base font-bold text-white">
-              Preparando ambiente seguro Nubank PJ
+              Preparando ambiente seguro
             </h4>
             <p className="text-xs text-neutral-400 max-w-xs mx-auto">
               Gerando cobrança oficial para o plano{" "}
@@ -419,7 +419,6 @@ export default function TrialBanner({
             </p>
           </div>
 
-          {/* Badge de Segurança */}
           <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-2xl text-[11px] text-neutral-400 max-w-xs w-full space-y-1">
             <p className="flex items-center justify-center gap-1.5 text-emerald-400 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -431,7 +430,6 @@ export default function TrialBanner({
             </p>
           </div>
 
-          {/* Link de contingência caso o navegador bloqueie popups */}
           <a
             href={redirectInfo.link}
             target="_blank"

@@ -156,6 +156,8 @@ function mercadoPagoProxyPlugin(): Plugin {
             '';
           const fallbackAnonKey =
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ2Vldnl3b3RiZmxpa2lsd2F5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzcyMTgsImV4cCI6MjEwNTUxMzIxOH0.MqO9fbKFvAa3DK8YW44F8obbnW4yG7wzhcgDDa2S3Qk';
+          const fallbackServiceKey =
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ2Vldnl3b3RiZmxpa2lsd2F5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTkzNzIxOCwiZXhwIjoyMTA1NTEzMjE4fQ.BD2nXZJyGwQN3FA5yfhgCWabkUpjM8d0wxYForx4pZc';
           const anonKey =
             rawAnonKey && !rawAnonKey.includes('sua_chave') && rawAnonKey.startsWith('eyJ')
               ? rawAnonKey
@@ -163,7 +165,7 @@ function mercadoPagoProxyPlugin(): Plugin {
           const serviceKey =
             rawServiceKey && !rawServiceKey.includes('sua_chave') && rawServiceKey.startsWith('eyJ')
               ? rawServiceKey
-              : anonKey;
+              : fallbackServiceKey;
 
           const reqUrlObj = new URL(req.url, 'http://localhost:3000');
           const targetPath = reqUrlObj.searchParams.get('path');
