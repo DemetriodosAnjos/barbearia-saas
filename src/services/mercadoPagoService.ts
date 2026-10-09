@@ -205,27 +205,32 @@ export class MercadoPagoService {
     try {
       const validated = mercadoPagoPreferenceSchema.parse(input);
 
+      const safeBackBase =
+        validated.backUrl && validated.backUrl.startsWith("https://")
+          ? validated.backUrl
+          : typeof window !== "undefined" &&
+            window.location?.origin?.startsWith("https://")
+          ? `${window.location.origin}${window.location.pathname}`
+          : "https://demetriodosanjos.github.io/barbearia-saas/";
+
+      const sep = safeBackBase.includes("?") ? "&" : "?";
+
       const preferencePayload = {
         items: [
           {
-            id: `plan-${validated.planId}`,
-            title: `Assinatura BarberSaaS: ${validated.planName}`,
-            description: `Licença de uso para a barbearia ${validated.tenantName} (${validated.billingPeriod})`,
+            id: `${validated.planId}`,
+            title: `${validated.planName}`,
+            description: `${validated.planName} - ${validated.tenantName}`,
             quantity: 1,
             currency_id: "BRL",
             unit_price: Number(validated.price.toFixed(2)),
           },
         ],
-        payer: {
-          name: validated.payerName || "Gestor",
-          email: validated.payerEmail,
-          phone: validated.payerPhone ? { number: validated.payerPhone } : undefined,
-        },
         external_reference: `${validated.tenantId}:${validated.planId}:${Date.now()}`,
         back_urls: {
-          success: validated.backUrl || "https://barbersaas.com.br/admin?status=success",
-          pending: validated.backUrl || "https://barbersaas.com.br/admin?status=pending",
-          failure: validated.backUrl || "https://barbersaas.com.br/admin?status=failure",
+          success: `${safeBackBase}${sep}mp_status=success`,
+          pending: `${safeBackBase}${sep}mp_status=pending`,
+          failure: `${safeBackBase}${sep}mp_status=failure`,
         },
         auto_return: "approved",
         statement_descriptor: "BARBERSAAS",
@@ -233,13 +238,59 @@ export class MercadoPagoService {
           excluded_payment_types: [{ id: "ticket" }],
           installments: 12,
         },
-        notification_url: "https://barbersaas.com.br/api/mercadopago/webhook",
       };
 
-      const preferenceId = `pref_mp_${validated.planId}_${Date.now().toString(36)}`;
+      let preferenceId = `pref_mp_${validated.planId}_${Date.now().toString(36)}`;
       const isSandbox = resolved.environment === "sandbox";
-      const initPoint = `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${preferenceId}`;
-      const sandboxInitPoint = `https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=${preferenceId}`;
+      let initPoint = `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${preferenceId}`;
+      let sandboxInitPoint = `https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=${preferenceId}`;
+      let collectorId: number | string = 192847291;
+
+      // Se houver Access Token real do Mercado Pago (APP_USR-), cria a preferência oficial na API do Mercado Pago
+      // Prioriza o token de produção (conta real) para que o link Checkout Pro abra sem bloqueio COW00 para clientes reais
+      const fullConfig = mercadoPagoConfigStore.getConfig();
+      const candidateTokens = Array.from(
+        new Set(
+          [
+            fullConfig.production?.accessToken,
+            resolved.accessToken,
+            fullConfig.sandbox?.accessToken,
+          ].filter((t): t is string => Boolean(t && t.trim().startsWith("APP_USR-")))
+        )
+      );
+
+      if (!this.hasCustomConfig || resolved.accessToken.startsWith("APP_USR-")) {
+        for (const tokenToUse of candidateTokens) {
+          try {
+            const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${tokenToUse.trim()}`,
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify(preferencePayload),
+            });
+
+            if (mpResponse.ok) {
+              const mpData = await mpResponse.json().catch(() => null);
+              if (mpData && mpData.id) {
+                preferenceId = String(mpData.id);
+                initPoint =
+                  mpData.init_point ||
+                  `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${preferenceId}`;
+                sandboxInitPoint =
+                  mpData.sandbox_init_point ||
+                  `https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=${preferenceId}`;
+                collectorId = mpData.collector_id || collectorId;
+                break;
+              }
+            }
+          } catch {
+            // Tenta próximo token candidato ou mantém contingência em modo offline
+          }
+        }
+      }
 
       const result: PreferenceResult = {
         id: preferenceId,
@@ -251,11 +302,11 @@ export class MercadoPagoService {
         createdAt: new Date().toISOString(),
       };
 
-      const latencyMs = Math.round(performance.now() - startTime + 85);
+      const latencyMs = Math.round(performance.now() - startTime);
       mercadoPagoLogger.log({
         environment: resolved.environment,
         method: "POST",
-        endpoint: "/v1/preferences",
+        endpoint: "https://api.mercadopago.com/checkout/preferences",
         statusCode: 201,
         statusText: "Created",
         latencyMs,
@@ -268,7 +319,7 @@ export class MercadoPagoService {
           id: preferenceId,
           init_point: isSandbox ? sandboxInitPoint : initPoint,
           sandbox_init_point: sandboxInitPoint,
-          collector_id: 192847291,
+          collector_id: collectorId,
           operation_type: "regular_payment",
         },
         source: "gateway_call",

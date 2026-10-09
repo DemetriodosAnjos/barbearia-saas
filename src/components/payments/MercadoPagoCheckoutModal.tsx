@@ -63,7 +63,7 @@ export default function MercadoPagoCheckoutModal({
   onPaymentSuccess,
 }: MercadoPagoCheckoutModalProps) {
   const [activeTab, setActiveTab] = useState<"pix" | "checkout_pro" | "whatsapp">("pix");
-  const [, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Determina se o checkout é de um agendamento individual ou de plano SaaS
@@ -104,6 +104,7 @@ export default function MercadoPagoCheckoutModal({
     setIsLoading(true);
     setErrorMsg(null);
     setPixStatus("pending");
+    setPreferenceData(null);
 
     const defaultTenant = tenant || {
       id: "superadmin_checkout",
@@ -245,9 +246,41 @@ export default function MercadoPagoCheckoutModal({
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
-  const checkoutUrl =
-    preferenceData?.initPoint ||
-    `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_${targetId}`;
+  const checkoutUrl = preferenceData?.initPoint || "";
+
+  const handleOpenMercadoPagoCheckout = async () => {
+    if (checkoutUrl) {
+      window.open(checkoutUrl, "_blank");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const defaultTenant = tenant || {
+        id: "superadmin_checkout",
+        name: "Barbearia em Ativação",
+        ownerName: "Gestor",
+        ownerEmail: "gestor@barbearia.com.br",
+        ownerPhone: "11999998888",
+      };
+      const res = await createPreferenceEndpoint({
+        planId: targetId as any,
+        planName: targetName,
+        price: targetPrice,
+        tenantId: defaultTenant.id,
+        tenantName: defaultTenant.name,
+        payerEmail: defaultTenant.ownerEmail || "pagamento@barbearia.com.br",
+        payerName: targetClientName,
+        payerPhone: targetClientPhone || defaultTenant.ownerPhone,
+      });
+      if (res.success && res.data?.initPoint) {
+        setPreferenceData(res.data);
+        window.open(res.data.initPoint, "_blank");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const ownerPhoneClean = (
     targetClientPhone ||
     tenant?.ownerPhone ||
@@ -501,12 +534,13 @@ export default function MercadoPagoCheckoutModal({
                 <input
                   type="text"
                   readOnly
-                  value={checkoutUrl}
+                  value={checkoutUrl || "Gerando link oficial no Mercado Pago..."}
                   className="w-full bg-neutral-900 border border-neutral-700 text-neutral-200 text-xs font-mono p-2.5 rounded-xl outline-none"
                 />
                 <Button
                   variant="secondary"
                   onClick={handleCopyPreferenceLink}
+                  disabled={!checkoutUrl}
                   className="text-xs py-2 px-3 shrink-0"
                 >
                   {copiedLink ? "Copiado!" : "Copiar Link"}
@@ -516,7 +550,8 @@ export default function MercadoPagoCheckoutModal({
 
             <Button
               variant="primary"
-              onClick={() => window.open(checkoutUrl, "_blank")}
+              onClick={handleOpenMercadoPagoCheckout}
+              disabled={isLoading && !checkoutUrl}
               className="w-full text-xs py-3 bg-amber-600 hover:bg-amber-500 text-white font-extrabold shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 cursor-pointer"
             >
               <ProjectIcon
@@ -525,7 +560,7 @@ export default function MercadoPagoCheckoutModal({
                 colorVariant="white"
                 className="text-white"
               />
-              <span>Abrir Checkout Pro no Mercado Pago</span>
+              <span>{isLoading && !checkoutUrl ? "Gerando Link no Mercado Pago..." : "Pagar com Mercado Pago"}</span>
             </Button>
           </div>
         )}
