@@ -306,11 +306,17 @@ export const BASELINE_ENV_CONFIG: ApiKeysFullConfig = {
   },
   supabase: {
     projectUrl:
-      (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_URL) ||
-      "https://njgeevywotbflikilway.supabase.co",
+      (typeof import.meta !== "undefined" &&
+        import.meta.env?.VITE_SUPABASE_URL &&
+        !String(import.meta.env.VITE_SUPABASE_URL).includes("seu-projeto"))
+        ? import.meta.env.VITE_SUPABASE_URL
+        : "https://njgeevywotbflikilway.supabase.co",
     anonKey:
-      (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_ANON_KEY) ||
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ2Vldnl3b3RiZmxpa2lsd2F5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzcyMTgsImV4cCI6MjEwNTUxMzIxOH0.MqO9fbKFvAa3DK8YW44F8obbnW4yG7wzhcgDDa2S3Qk",
+      (typeof import.meta !== "undefined" &&
+        import.meta.env?.VITE_SUPABASE_ANON_KEY &&
+        !String(import.meta.env.VITE_SUPABASE_ANON_KEY).includes("sua_chave"))
+        ? import.meta.env.VITE_SUPABASE_ANON_KEY
+        : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ2Vldnl3b3RiZmxpa2lsd2F5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MzcyMTgsImV4cCI6MjEwNTUxMzIxOH0.MqO9fbKFvAa3DK8YW44F8obbnW4yG7wzhcgDDa2S3Qk",
     serviceRoleKey:
       "",
   },

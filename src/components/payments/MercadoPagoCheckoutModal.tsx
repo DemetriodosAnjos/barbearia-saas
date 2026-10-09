@@ -1,9 +1,8 @@
 /**
  * src/components/payments/MercadoPagoCheckoutModal.tsx
  *
- * Modal de Checkout e Cobrança do Mercado Pago para o painel SuperAdmin e Barbearias.
- * Suporta Pix Instantâneo (QR Code + Copia-e-Cola), Checkout Pro (Cartão de Crédito)
- * e Disparo Oficial via WhatsApp com Link do Mercado Pago.
+ * Modal de Pagamento (Pix com QR Code real da Chave PIX Cadastrada em Meu Perfil,
+ * Cartão de Crédito / Débito via Checkout Pro e Link WhatsApp).
  */
 
 import React, { useState, useEffect } from "react";
@@ -12,6 +11,13 @@ import Button from "../ui/Button";
 import ProjectIcon from "../ui/ProjectIcon";
 import { createPreferenceEndpoint, createPixEndpoint } from "../../api/mercadoPagoEndpoints";
 import type { PixPaymentResult, PreferenceResult } from "../../services/mercadoPagoService";
+import { supabase } from "../../lib/supabase";
+import {
+  getRegisteredUserPixKey,
+  saveRegisteredUserPixKey,
+  generatePixBrCodePayload,
+  generatePixQrCodeDataUrl,
+} from "../../utils/pixQrCode";
 
 export interface MercadoPagoCheckoutModalProps {
   isOpen: boolean;
@@ -39,7 +45,11 @@ export interface MercadoPagoCheckoutModalProps {
     ownerName?: string;
     ownerEmail?: string;
     ownerPhone?: string;
+    city?: string;
+    pix_key?: string;
+    pixKey?: string;
   };
+  user?: any;
   onPaymentSuccess?: (paymentInfo: any) => void;
 }
 
@@ -49,10 +59,11 @@ export default function MercadoPagoCheckoutModal({
   plan,
   appointment,
   tenant,
+  user,
   onPaymentSuccess,
 }: MercadoPagoCheckoutModalProps) {
   const [activeTab, setActiveTab] = useState<"pix" | "checkout_pro" | "whatsapp">("pix");
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Determina se o checkout é de um agendamento individual ou de plano SaaS
@@ -71,8 +82,13 @@ export default function MercadoPagoCheckoutModal({
     ? (appointment?.clientPhone || "")
     : (tenant?.ownerPhone || "");
 
-  // Estados do Pix
+  // Estados do Pix e QR Code real da Chave PIX Cadastrada em Meu Perfil
   const [pixData, setPixData] = useState<PixPaymentResult | null>(null);
+  const [registeredPixKey, setRegisteredPixKey] = useState<string>(() =>
+    getRegisteredUserPixKey(user, tenant)
+  );
+  const [realQrCodeDataUrl, setRealQrCodeDataUrl] = useState<string>("");
+  const [realPixPayload, setRealPixPayload] = useState<string>("");
   const [copiedPix, setCopiedPix] = useState(false);
   const [pixStatus, setPixStatus] = useState<"pending" | "approved">("pending");
 
@@ -95,6 +111,7 @@ export default function MercadoPagoCheckoutModal({
       ownerName: "Gestor",
       ownerEmail: "gestor@barbearia.com.br",
       ownerPhone: "11999998888",
+      city: "SAO PAULO",
     };
 
     const payerName = targetClientName;
@@ -104,7 +121,58 @@ export default function MercadoPagoCheckoutModal({
       ? `Atendimento #${appointment?.id} (${appointment?.serviceName}) - BarberSaaS`
       : `Assinatura ${plan?.name} - BarberSaaS`;
 
-    // 1. Gera Pix via API Mercado Pago
+    // Resolve a chave PIX cadastrada em "Meu Perfil" => "Perfil & Chave PIX" ("Chave PIX Cadastrada")
+    async function resolveProfilePixAndGenerateQr() {
+      let resolvedKey = getRegisteredUserPixKey(user, tenant);
+
+      if (!resolvedKey) {
+        try {
+          const { data } = await supabase.auth.getUser();
+          const metaKey =
+            data?.user?.user_metadata?.pix_key ||
+            data?.user?.user_metadata?.pixKey ||
+            "";
+          if (metaKey && String(metaKey).trim()) {
+            resolvedKey = String(metaKey).trim();
+            saveRegisteredUserPixKey(resolvedKey);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Se ainda não houver chave explícita salva no perfil, usa o e-mail/telefone do proprietário como contingência para gerar um BR Code real
+      const effectiveKeyForQr =
+        resolvedKey ||
+        user?.email ||
+        defaultTenant.ownerEmail ||
+        defaultTenant.ownerPhone ||
+        "";
+
+      if (isMounted) {
+        setRegisteredPixKey(resolvedKey || effectiveKeyForQr);
+      }
+
+      if (effectiveKeyForQr) {
+        const brCode = generatePixBrCodePayload({
+          pixKey: effectiveKeyForQr,
+          merchantName: defaultTenant.name || "BARBEARIA",
+          merchantCity: (defaultTenant as any).city || "SAO PAULO",
+          amount: targetPrice,
+          txid: "***",
+        });
+
+        const qrDataUrl = await generatePixQrCodeDataUrl(brCode);
+        if (isMounted) {
+          setRealPixPayload(brCode);
+          setRealQrCodeDataUrl(qrDataUrl);
+        }
+      }
+    }
+
+    resolveProfilePixAndGenerateQr();
+
+    // 1. Registra telemetria Pix via endpoint Mercado Pago
     createPixEndpoint({
       planId: targetId,
       amount: targetPrice,
@@ -144,11 +212,27 @@ export default function MercadoPagoCheckoutModal({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, plan, appointment, tenant, targetId, targetName, targetPrice, targetClientName, targetClientPhone, isAppointmentMode]);
+  }, [
+    isOpen,
+    plan,
+    appointment,
+    tenant,
+    user,
+    targetId,
+    targetName,
+    targetPrice,
+    targetClientName,
+    targetClientPhone,
+    isAppointmentMode,
+  ]);
+
+  const activePixCode = realPixPayload || pixData?.qrCode || "";
+  const activeQrImage = realQrCodeDataUrl || pixData?.qrCodeBase64 || "";
 
   const handleCopyPix = () => {
-    if (!pixData?.qrCode) return;
-    navigator.clipboard.writeText(pixData.qrCode);
+    const codeToCopy = activePixCode || registeredPixKey;
+    if (!codeToCopy) return;
+    navigator.clipboard.writeText(codeToCopy);
     setCopiedPix(true);
     setTimeout(() => setCopiedPix(false), 3000);
   };
@@ -161,22 +245,14 @@ export default function MercadoPagoCheckoutModal({
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
-  const handleSimulatePaymentApproval = () => {
-    setPixStatus("approved");
-    if (onPaymentSuccess) {
-      onPaymentSuccess({
-        paymentId: pixData?.id || `sim_${Date.now()}`,
-        status: "approved",
-        appointmentId: appointment?.id,
-        planId: plan?.id,
-        amount: targetPrice,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  };
-
-  const checkoutUrl = preferenceData?.initPoint || `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_${targetId}`;
-  const ownerPhoneClean = (targetClientPhone || tenant?.ownerPhone || "11999998888").replace(/\D/g, "");
+  const checkoutUrl =
+    preferenceData?.initPoint ||
+    `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_${targetId}`;
+  const ownerPhoneClean = (
+    targetClientPhone ||
+    tenant?.ownerPhone ||
+    "11999998888"
+  ).replace(/\D/g, "");
   const whatsappMessage = encodeURIComponent(
     isAppointmentMode
       ? `Olá ${targetClientName}! Segue o link oficial do Mercado Pago para quitação do seu atendimento #${appointment?.id} (${appointment?.serviceName} - R$ ${targetPrice.toFixed(2).replace(".", ",")}):\n\n${checkoutUrl}\n\nVocê pode pagar via PIX Instantâneo ou Cartão de Crédito/Débito no ambiente seguro da barbearia.`
@@ -184,28 +260,9 @@ export default function MercadoPagoCheckoutModal({
   );
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={
-        isAppointmentMode
-          ? `Pagamento Mercado Pago: Atendimento #${appointment?.id}`
-          : `Pagamento via Mercado Pago: ${plan?.name}`
-      }
-      footer={
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-mono">
-            <ProjectIcon name="ShieldCheck" size={14} className="text-emerald-400" />
-            <span>Mercado Pago API v1 • Criptografia SSL 256-bit</span>
-          </div>
-          <Button variant="secondary" onClick={onClose} className="text-xs">
-            Fechar
-          </Button>
-        </div>
-      }
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title="Pagamento">
       <div className="space-y-5 text-left text-xs">
-        {/* Resumo do Atendimento ou Plano Contratado */}
+        {/* CardInfo #02: Resumo do Atendimento ou Plano Contratado (Nome do Barbeiro na cor branca) */}
         <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <span className="text-[10px] font-bold uppercase text-amber-500 tracking-wider">
@@ -228,12 +285,19 @@ export default function MercadoPagoCheckoutModal({
                 <>
                   Cliente: <strong className="text-neutral-200">{targetClientName}</strong>
                   {appointment?.barberName && (
-                    <span> • Barbeiro: <strong className="text-amber-400">{appointment.barberName}</strong></span>
+                    <span>
+                      {" "}
+                      • Barbeiro:{" "}
+                      <strong className="text-white">{appointment.barberName}</strong>
+                    </span>
                   )}
                 </>
               ) : (
                 <>
-                  Assinante: <strong className="text-neutral-200">{tenant?.name || "Barbearia Cliente"}</strong>
+                  Assinante:{" "}
+                  <strong className="text-neutral-200">
+                    {tenant?.name || "Barbearia Cliente"}
+                  </strong>
                 </>
               )}
             </p>
@@ -248,50 +312,60 @@ export default function MercadoPagoCheckoutModal({
           </div>
         </div>
 
-        {/* Seletor de Modo de Pagamento: Pix / Checkout Pro / WhatsApp */}
+        {/* CardInfo #03: Seletores Pix / Cartão Crédito / Débito / Link WhatsApp (Ativo: Cor Âmbar, Ícones e Fonte: Cor Branca) */}
         <div className="flex rounded-xl p-1 bg-neutral-950 border border-neutral-800 gap-1">
           <button
             type="button"
             onClick={() => setActiveTab("pix")}
-            className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-white ${
               activeTab === "pix"
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-                : "text-neutral-400 hover:text-white"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                : "text-white hover:bg-neutral-900"
             }`}
           >
-            <ProjectIcon name="Zap" size={14} />
-            <span>Pix Instantâneo</span>
+            <ProjectIcon name="Zap" size={14} colorVariant="white" className="text-white" />
+            <span className="text-white">Pix</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("checkout_pro")}
-            className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-white ${
               activeTab === "checkout_pro"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                : "text-neutral-400 hover:text-white"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                : "text-white hover:bg-neutral-900"
             }`}
           >
-            <ProjectIcon name="CreditCard" size={14} />
-            <span>Cartão Crédito / Débito</span>
+            <ProjectIcon
+              name="CreditCard"
+              size={14}
+              colorVariant="white"
+              className="text-white"
+            />
+            <span className="text-white">Cartão Crédito / Débito</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("whatsapp")}
-            className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer text-white ${
               activeTab === "whatsapp"
-                ? "bg-emerald-700 text-white shadow-md shadow-emerald-700/30"
-                : "text-neutral-400 hover:text-white"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                : "text-white hover:bg-neutral-900"
             }`}
           >
-            <ProjectIcon name="Smartphone" size={14} />
-            <span>Link WhatsApp</span>
+            <ProjectIcon
+              name="Smartphone"
+              size={14}
+              colorVariant="white"
+              className="text-white"
+            />
+            <span className="text-white">Link WhatsApp</span>
           </button>
         </div>
 
         {/* ======================================================== */}
-        {/* ABA 1: PIX INSTANTÂNEO (MERCADO PAGO)                    */}
+        {/* ABA 1: PIX (QR CODE REAL DA CHAVE CADASTRADA NO PERFIL)  */}
         {/* ======================================================== */}
         {activeTab === "pix" && (
           <div className="space-y-4">
@@ -304,42 +378,50 @@ export default function MercadoPagoCheckoutModal({
                   Pagamento Aprovado com Sucesso!
                 </h4>
                 <p className="text-neutral-300 text-xs max-w-sm mx-auto">
-                  A transação do Mercado Pago foi confirmada. {isAppointmentMode ? "O atendimento " : "O plano "}
-                  <strong className="text-emerald-400">{targetName}</strong> encontra-se quitado com sucesso.
+                  A transação foi confirmada.{" "}
+                  {isAppointmentMode ? "O atendimento " : "O plano "}
+                  <strong className="text-emerald-400">{targetName}</strong>{" "}
+                  encontra-se quitado com sucesso.
                 </p>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/30 inline-block">
-                  TxID: {pixData?.id || "pay_mp_pix_confirmed"}
-                </span>
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-neutral-950 border border-neutral-800 rounded-2xl">
-                {/* Visual QR Code SVG */}
+                {/* Visual QR Code Real gerado da Chave PIX Cadastrada em Meu Perfil */}
                 <div className="p-3 bg-white rounded-xl shadow-lg shrink-0 flex flex-col items-center">
-                  {pixData?.qrCodeBase64 ? (
+                  {activeQrImage ? (
                     <img
-                      src={pixData.qrCodeBase64}
-                      alt="QR Code Pix Mercado Pago"
+                      src={activeQrImage}
+                      alt="QR Code PIX Oficial"
                       className="w-36 h-36 object-contain"
                     />
                   ) : (
-                    <div className="w-36 h-36 flex items-center justify-center text-neutral-400 font-mono text-xs">
+                    <div className="w-36 h-36 flex items-center justify-center text-neutral-400 font-mono text-xs text-center">
                       Gerando QR Code...
                     </div>
                   )}
                   <span className="text-[10px] text-neutral-900 font-mono font-bold mt-1">
-                    PIX MERCADO PAGO
+                    QR CODE PIX
                   </span>
                 </div>
 
-                {/* Instruções e Copia-e-Cola */}
-                <div className="space-y-3 flex-1 min-w-0">
+                {/* Instruções, Chave PIX Cadastrada e Copia-e-Cola */}
+                <div className="space-y-3 flex-1 min-w-0 w-full">
                   <div className="space-y-1">
                     <span className="text-[11px] font-bold text-white block">
                       Escaneie com o app do seu Banco
                     </span>
                     <p className="text-neutral-400 text-[11px] leading-relaxed">
-                      Abra o aplicativo onde você tem chave Pix cadastrada e aponte a câmera para o QR Code ao lado. A compensação é instantânea.
+                      Abra o aplicativo do seu banco e aponte a câmera para o QR
+                      Code ao lado gerado a partir da sua Chave PIX Cadastrada.
                     </p>
+                    {registeredPixKey && (
+                      <p className="text-[11px] text-neutral-300 pt-0.5">
+                        Chave PIX Cadastrada:{" "}
+                        <strong className="text-white font-mono">
+                          {registeredPixKey}
+                        </strong>
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -350,7 +432,7 @@ export default function MercadoPagoCheckoutModal({
                       <input
                         type="text"
                         readOnly
-                        value={pixData?.qrCode || "Gerando código PIX..."}
+                        value={activePixCode || "Gerando código PIX..."}
                         className="w-full bg-neutral-900 border border-neutral-700 text-neutral-300 text-[11px] font-mono p-2 rounded-lg outline-none select-all truncate"
                       />
                       <Button
@@ -373,19 +455,15 @@ export default function MercadoPagoCheckoutModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 text-[11px] text-neutral-400">
+                  <div className="flex items-center justify-start pt-1 text-[11px] text-neutral-400">
                     <span className="flex items-center gap-1 font-mono">
-                      <ProjectIcon name="Clock" size={12} className="text-amber-400" />
+                      <ProjectIcon
+                        name="Clock"
+                        size={12}
+                        className="text-amber-400"
+                      />
                       <span>Expira em 30 minutos</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleSimulatePaymentApproval}
-                      className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer text-[10px]"
-                      title="Simular confirmação automática do Webhook para testes"
-                    >
-                      [Simular Confirmação Webhook]
-                    </button>
                   </div>
                 </div>
               </div>
@@ -400,11 +478,18 @@ export default function MercadoPagoCheckoutModal({
           <div className="space-y-4 p-4 bg-neutral-950 border border-neutral-800 rounded-2xl">
             <div className="space-y-1.5">
               <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                <ProjectIcon name="ExternalLink" size={15} className="text-blue-400" />
+                <ProjectIcon
+                  name="ExternalLink"
+                  size={15}
+                  className="text-amber-400"
+                />
                 <span>Checkout Pro Oficial do Mercado Pago</span>
               </h4>
               <p className="text-neutral-400 text-xs leading-relaxed">
-                O cliente é redirecionado para a tela oficial de pagamentos do Mercado Pago com suporte a Cartão de Crédito (até 12x), Cartão de Débito Virtual da Caixa, Saldo em Conta Mercado Pago e Linha de Crédito.
+                O cliente é redirecionado para a tela oficial de pagamentos do
+                Mercado Pago com suporte a Cartão de Crédito (até 12x), Cartão
+                de Débito Virtual da Caixa, Saldo em Conta Mercado Pago e Linha
+                de Crédito.
               </p>
             </div>
 
@@ -432,9 +517,14 @@ export default function MercadoPagoCheckoutModal({
             <Button
               variant="primary"
               onClick={() => window.open(checkoutUrl, "_blank")}
-              className="w-full text-xs py-3 bg-blue-600 hover:bg-blue-500 font-extrabold shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full text-xs py-3 bg-amber-600 hover:bg-amber-500 text-white font-extrabold shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 cursor-pointer"
             >
-              <ProjectIcon name="CreditCard" size={15} className="text-white" />
+              <ProjectIcon
+                name="CreditCard"
+                size={15}
+                colorVariant="white"
+                className="text-white"
+              />
               <span>Abrir Checkout Pro no Mercado Pago</span>
             </Button>
           </div>
@@ -447,35 +537,72 @@ export default function MercadoPagoCheckoutModal({
           <div className="space-y-4 p-4 bg-neutral-950 border border-neutral-800 rounded-2xl">
             <div className="space-y-1">
               <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                <ProjectIcon name="Smartphone" size={15} className="text-emerald-400" />
+                <ProjectIcon
+                  name="Smartphone"
+                  size={15}
+                  className="text-emerald-400"
+                />
                 <span>Mensagem Pronta para WhatsApp</span>
               </h4>
               <p className="text-neutral-400 text-xs">
-                Destinatário: <strong className="text-white">{tenant?.ownerName || "Gestor"}</strong> (
-                {tenant?.ownerPhone || "Telefone não cadastrado"})
+                Destinatário:{" "}
+                <strong className="text-white">{targetClientName}</strong> (
+                {targetClientPhone ||
+                  tenant?.ownerPhone ||
+                  "Telefone não cadastrado"}
+                )
               </p>
             </div>
 
             <div className="p-3.5 bg-neutral-900 border border-neutral-800 rounded-xl space-y-2 text-xs text-neutral-300 font-sans leading-relaxed">
               <p>
-                Olá <strong>{tenant?.ownerName || "Gestor"}</strong>! Segue o link oficial do Mercado Pago para ativação/renovação do seu plano <strong>{plan?.name}</strong> (R$ {Number(plan?.price).toFixed(2).replace(".", ",")}):
+                {isAppointmentMode ? (
+                  <>
+                    Olá <strong>{targetClientName}</strong>! Segue o link
+                    oficial do Mercado Pago para quitação do seu atendimento{" "}
+                    <strong>#{appointment?.id}</strong> ({targetName} - R${" "}
+                    {Number(targetPrice || 0)
+                      .toFixed(2)
+                      .replace(".", ",")}
+                    ):
+                  </>
+                ) : (
+                  <>
+                    Olá <strong>{tenant?.ownerName || "Gestor"}</strong>! Segue
+                    o link oficial do Mercado Pago para ativação/renovação do
+                    seu plano <strong>{plan?.name}</strong> (R${" "}
+                    {Number(plan?.price || 0)
+                      .toFixed(2)
+                      .replace(".", ",")}
+                    ):
+                  </>
+                )}
               </p>
-              <p className="font-mono text-blue-400 break-all bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+              <p className="font-mono text-amber-400 break-all bg-neutral-950 p-2 rounded-lg border border-neutral-800">
                 {checkoutUrl}
               </p>
               <p className="text-[11px] text-neutral-400">
-                Você pode pagar via PIX Instantâneo ou Cartão de Crédito em até 12x no ambiente seguro do Mercado Pago.
+                Você pode pagar via PIX Instantâneo ou Cartão de Crédito/Débito
+                no ambiente seguro do Mercado Pago.
               </p>
             </div>
 
             <Button
               variant="primary"
               onClick={() => {
-                window.open(`https://wa.me/55${ownerPhoneClean}?text=${whatsappMessage}`, "_blank");
+                window.open(
+                  `https://wa.me/55${ownerPhoneClean}?text=${whatsappMessage}`,
+                  "_blank"
+                );
               }}
-              className="w-full text-xs py-2.5 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full text-xs py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold shadow-md flex items-center justify-center gap-2 cursor-pointer"
             >
-              <ProjectIcon name="Smartphone" size={14} className="text-white" />
+              <ProjectIcon
+                name="Smartphone"
+                size={14}
+                colorVariant="white"
+                className="text-white"
+              />
               <span>Abrir WhatsApp Web com Mensagem</span>
             </Button>
           </div>
@@ -483,7 +610,11 @@ export default function MercadoPagoCheckoutModal({
 
         {errorMsg && (
           <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
-            <ProjectIcon name="AlertTriangle" size={14} className="text-rose-400 shrink-0" />
+            <ProjectIcon
+              name="AlertTriangle"
+              size={14}
+              className="text-rose-400 shrink-0"
+            />
             <span>{errorMsg}</span>
           </div>
         )}

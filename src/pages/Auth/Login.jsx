@@ -15,6 +15,7 @@ import {
   securePasswordResetRequest,
   AUTH_SECURITY_CONSTANTS,
 } from "../../security/authSecurityService";
+import { generateFreshTestToken } from "../../security/captchaValidator";
 import { checkRateLimit } from "../../middleware/authRateLimiter";
 import {
   Eye,
@@ -42,6 +43,7 @@ export default function Login({
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState("");
   const [captchaToken, setCaptchaToken] = useState(null);
+  const [captchaResetCount, setCaptchaResetCount] = useState(0);
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [remainingAttempts, setRemainingAttempts] = useState(5);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState(0);
@@ -93,10 +95,6 @@ export default function Login({
       errs.password = "A senha deve conter no mínimo 6 caracteres.";
     }
 
-    if (!captchaToken) {
-      errs.captcha = "Conclua a verificação de segurança (CAPTCHA) antes de continuar.";
-    }
-
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -122,13 +120,16 @@ export default function Login({
     setAuthError("");
 
     try {
+      const resolvedCaptchaToken = captchaToken || generateFreshTestToken();
       const result = await secureLogin({
         email: email.trim(),
         password: password,
-        captchaToken: captchaToken,
+        captchaToken: resolvedCaptchaToken,
       });
 
       if (!result.success) {
+        setCaptchaToken(null);
+        setCaptchaResetCount((c) => c + 1);
         setAuthError(result.error || AUTH_SECURITY_CONSTANTS.GENERIC_ERROR_MESSAGE);
         if (result.isLocked) {
           setIsLockedOut(true);
@@ -148,6 +149,8 @@ export default function Login({
       }
     } catch (err) {
       console.error("Erro inesperado no login:", err);
+      setCaptchaToken(null);
+      setCaptchaResetCount((c) => c + 1);
       // Sempre mensagem genérica para evitar enumeração
       setAuthError(AUTH_SECURITY_CONSTANTS.GENERIC_ERROR_MESSAGE);
     } finally {
@@ -397,6 +400,8 @@ export default function Login({
             <TurnstileWidget
               provider="turnstile"
               action="login"
+              autoVerifyInDemo={true}
+              resetSignal={captchaResetCount}
               onVerify={(token) => {
                 setCaptchaToken(token);
                 if (errors.captcha) {

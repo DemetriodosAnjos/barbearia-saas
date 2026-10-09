@@ -5,7 +5,12 @@ O módulo financeiro é composto por duas interfaces integradas:
 1. **Frente de Caixa / PDV (`CashierPosView.jsx`):**
    - Gestão integrada de comandas e atendimentos concluídos/em andamento vindos da agenda (ex: Atendimento `#apt-179138762174` concluído com valor R$ 20,00 e status Pendente).
    - **Controle Manual de Status:** Opção nos cards para o operador alterar manualmente o status entre `Pendente (Aguardando Pagamento)`, `Pago (Liquidado no Caixa)`, `Na Cadeira (Em Andamento)` e `Cancelado`, com sincronização bidirecional em tempo real com a tabela `appointments` e a tela de Agenda (`ScheduleView.jsx`).
-   - **Checkout Oficial Mercado Pago API (v1):** Botão direto no card da comanda para quitação via Pix Instantâneo (QR Code dinâmico + Copia-e-Cola) ou Cartão de Crédito/Débito (Checkout Pro), com compensação e baixa automática.
+   - **Checkout Oficial de Pagamento (`MercadoPagoCheckoutModal.tsx`):**
+     - **CardInfo #01 (Título):** Título unificado e limpo `"Pagamento"`.
+     - **CardInfo #02 (Resumo do Atendimento):** Nome do barbeiro exibido na cor branca (`text-white`).
+     - **CardInfo #03 (Seletores de Modo):** Botões `Pix`, `Cartão Crédito / Débito` e `Link WhatsApp` com estado ativo na cor Âmbar (`bg-amber-600`) e ícones + fonte na cor branca (`text-white`).
+     - **CardInfo #04 (PIX & QR Code Real):** Geração de QR Code real (padrão EMV® QRCPS-MPM BR Code do Banco Central com CRC16-CCITT) a partir da chave cadastrada pelo usuário em `"Meu Perfil" => Perfil & Chave PIX / Chave PIX Cadastrada` (`src/utils/pixQrCode.ts`), sem botões ou textos de simulação de webhook.
+     - **CardInfo #05 (Rodapé Limpo):** Sem rodapé técnico (`Mercado Pago API v1...`) e sem botão inferior `Fechar` redundante.
    - Adição de serviços realizados e consumo do bar/produtos.
    - Fechamento tradicional de conta no balcão com rateio de comissões por profissional.
 2. **Dashboard Financeiro & Métricas (`FinancialDashboardView.jsx`):**

@@ -1,6 +1,10 @@
 import ProjectIcon from "./components/ui/ProjectIcon";
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "./lib/supabase";
+import {
+  supabase,
+  buildTenantRecordPayload,
+  normalizeTenantRecord,
+} from "./lib/supabase";
 import DesignSystem from "./pages/DesignSystem";
 import OnboardingWizard from "./pages/Onboarding/OnboardingWizard";
 import Login from "./pages/Auth/Login";
@@ -61,6 +65,218 @@ export default function App() {
     return USER_ROLES.ANON;
   });
 
+  // Estados Centrais do SaaS
+  const [tenant, setTenant] = useState(() =>
+    normalizeTenantRecord({
+      id: "a0000000-0000-0000-0000-000000000001",
+      name: "Vintage Club Barber Shop",
+      slug: "vintage-club",
+      plan: "pro",
+      status: "active",
+    })
+  );
+
+  // Resolve e sincroniza o registro do tenant do usuário autenticado na tabela `tenants`
+  const resolveAndSyncUserTenant = useCallback(async (authUser) => {
+    if (!authUser) return null;
+
+    try {
+      const userMeta = authUser.user_metadata || {};
+      const userEmail = (authUser.email || userMeta.owner_email || "").trim().toLowerCase();
+      let candidateTenantId = userMeta.barbershop_id || userMeta.tenant_id || null;
+
+      let tenantRow = null;
+      let barbershopRow = null;
+      let profileRow = null;
+
+      // 1. Consulta perfil se existir ID de usuário válido
+      if (authUser.id && authUser.id !== "owner-usr-01") {
+        try {
+          const { data: pData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", authUser.id)
+            .maybeSingle();
+          if (pData) {
+            profileRow = pData;
+            if (!candidateTenantId && pData.barbershop_id) {
+              candidateTenantId = pData.barbershop_id;
+            }
+          }
+        } catch {
+          // Segue resolução
+        }
+      }
+
+      // 2. Busca na tabela oficial `tenants` por ID ou por owner_email
+      if (candidateTenantId) {
+        try {
+          const { data: tById } = await supabase
+            .from("tenants")
+            .select("*")
+            .eq("id", candidateTenantId)
+            .maybeSingle();
+          if (tById) tenantRow = tById;
+        } catch {
+          // Continua busca
+        }
+      }
+
+      if (!tenantRow && userEmail) {
+        try {
+          const { data: tByEmail } = await supabase
+            .from("tenants")
+            .select("*")
+            .eq("owner_email", userEmail)
+            .order("created_at", { ascending: false })
+            .limit(1);
+          const firstMatch = Array.isArray(tByEmail) ? tByEmail[0] : tByEmail;
+          if (firstMatch) {
+            tenantRow = firstMatch;
+            if (!candidateTenantId) candidateTenantId = firstMatch.id;
+          }
+        } catch {
+          // Continua busca
+        }
+      }
+
+      // 3. Busca dados complementares na tabela `barbershops`
+      const lookupShopId = candidateTenantId || tenantRow?.id;
+      if (lookupShopId) {
+        try {
+          const { data: bData } = await supabase
+            .from("barbershops")
+            .select("*")
+            .eq("id", lookupShopId)
+            .maybeSingle();
+          if (bData) barbershopRow = bData;
+        } catch {
+          // Continua
+        }
+      }
+
+      const resolvedId =
+        tenantRow?.id ||
+        barbershopRow?.id ||
+        candidateTenantId ||
+        "a0000000-0000-0000-0000-000000000001";
+
+      const resolvedName =
+        (barbershopRow?.name && (!tenantRow?.name || tenantRow.name.startsWith("Barbearia ")))
+          ? barbershopRow.name
+          : tenantRow?.name || barbershopRow?.name || userMeta.barbershop_name || "Minha Barbearia";
+
+      const resolvedSlug =
+        (barbershopRow?.slug && (!tenantRow?.slug || tenantRow.slug.startsWith("barbearia-")))
+          ? barbershopRow.slug
+          : tenantRow?.slug || barbershopRow?.slug || userMeta.slug || "minha-barbearia";
+
+      const resolvedOwnerName =
+        tenantRow?.owner_name ||
+        profileRow?.full_name ||
+        userMeta.owner_name ||
+        userMeta.name ||
+        "Gestor";
+
+      const resolvedPhone =
+        tenantRow?.phone ||
+        barbershopRow?.phone ||
+        profileRow?.phone ||
+        userMeta.phone ||
+        "";
+
+      const resolvedPlan =
+        tenantRow?.plan || barbershopRow?.plan || userMeta.plan || "pro";
+
+      const resolvedTrialEndsAt =
+        tenantRow?.trial_ends_at ||
+        barbershopRow?.trial_ends_at ||
+        userMeta.trial_ends_at ||
+        null;
+
+      // Se o usuário é real (UUID) e a linha em `tenants` não existia ou estava incompleta, sincroniza
+      const isUuidUser = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        String(authUser.id || "")
+      );
+      const needsTenantUpsert =
+        isUuidUser &&
+        (!tenantRow ||
+          !tenantRow.phone ||
+          !tenantRow.owner_email ||
+          Number(tenantRow.mrr || 0) === 0 ||
+          tenantRow.name !== resolvedName ||
+          tenantRow.slug !== resolvedSlug);
+
+      let syncedTenantData = tenantRow;
+      if (needsTenantUpsert) {
+        const upsertPayload = buildTenantRecordPayload({
+          id: resolvedId,
+          name: resolvedName,
+          slug: resolvedSlug,
+          ownerName: resolvedOwnerName,
+          ownerEmail: userEmail,
+          phone: resolvedPhone,
+          plan: resolvedPlan,
+          status: tenantRow?.status || "active",
+          barbersCount: Number(tenantRow?.barbers_count || 1),
+          mrr: Number(tenantRow?.mrr || 0) > 0 ? Number(tenantRow.mrr) : undefined,
+          trialDaysLeft: Number(tenantRow?.trial_days_left || 7),
+          trialEndsAt: resolvedTrialEndsAt,
+          hasWhiteLabel: Boolean(tenantRow?.has_white_label),
+          brandPrimary: tenantRow?.brand_primary || "#ea580c",
+          brandSecondary: tenantRow?.brand_secondary || "#16a34a",
+          logoUrl: tenantRow?.logo_url || "",
+          createdAt: tenantRow?.created_at,
+        });
+
+        try {
+          const { data: upserted } = await supabase
+            .from("tenants")
+            .upsert([upsertPayload], { onConflict: "id" })
+            .select()
+            .maybeSingle();
+          syncedTenantData = upserted || upsertPayload;
+        } catch {
+          syncedTenantData = upsertPayload;
+        }
+      }
+
+      const finalNormalized = normalizeTenantRecord(
+        {
+          ...(barbershopRow || {}),
+          ...(syncedTenantData || {}),
+          id: resolvedId,
+          name: resolvedName,
+          slug: resolvedSlug,
+          owner_name: resolvedOwnerName,
+          owner_email: userEmail,
+          phone: resolvedPhone,
+          plan: resolvedPlan,
+          trial_ends_at: resolvedTrialEndsAt,
+        },
+        authUser
+      );
+
+      setTenant(finalNormalized);
+      return finalNormalized;
+    } catch (err) {
+      console.warn("Aviso ao resolver tenant do usuário autenticado:", err);
+      const fallback = normalizeTenantRecord(
+        {
+          id: authUser?.user_metadata?.barbershop_id || "a0000000-0000-0000-0000-000000000001",
+          name: authUser?.user_metadata?.barbershop_name || "Minha Barbearia",
+          slug: authUser?.user_metadata?.slug || "minha-barbearia",
+          owner_name: authUser?.user_metadata?.name || "Gestor",
+          owner_email: authUser?.email || "",
+          phone: authUser?.user_metadata?.phone || "",
+        },
+        authUser
+      );
+      setTenant(fallback);
+      return fallback;
+    }
+  }, []);
+
   // Sincronização e validação de sessão real do Supabase ao recarregar a página
   useEffect(() => {
     let isMounted = true;
@@ -79,9 +295,27 @@ export default function App() {
           }
         } else {
           if (!isMounted) return;
-          setCurrentUser(session.user);
-          const role = session.user.user_metadata?.role || USER_ROLES.ADMIN;
-          setActiveUserRole(role);
+          const rawRole = session.user.user_metadata?.role;
+          const normalizedRole =
+            !rawRole || rawRole === "owner" || rawRole === "tenant"
+              ? USER_ROLES.ADMIN
+              : rawRole;
+          const userWithRole = {
+            ...session.user,
+            user_metadata: {
+              ...(session.user.user_metadata || {}),
+              role: normalizedRole,
+            },
+          };
+          setCurrentUser(userWithRole);
+          setActiveUserRole(normalizedRole);
+          resolveAndSyncUserTenant(userWithRole);
+
+          if (currentScreen === "login" && !storageAudit.tamperingDetected && !isDirectProtectedUrl) {
+            setCurrentScreen(
+              normalizedRole === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
+            );
+          }
         }
       } catch (err) {
         console.error("Erro na verificação de sessão Supabase:", err);
@@ -94,12 +328,30 @@ export default function App() {
 
     syncAuthSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       if (session?.user) {
-        setCurrentUser(session.user);
-        const role = session.user.user_metadata?.role || USER_ROLES.ADMIN;
-        setActiveUserRole(role);
+        const rawRole = session.user.user_metadata?.role;
+        const normalizedRole =
+          !rawRole || rawRole === "owner" || rawRole === "tenant"
+            ? USER_ROLES.ADMIN
+            : rawRole;
+        const userWithRole = {
+          ...session.user,
+          user_metadata: {
+            ...(session.user.user_metadata || {}),
+            role: normalizedRole,
+          },
+        };
+        setCurrentUser(userWithRole);
+        setActiveUserRole(normalizedRole);
+        resolveAndSyncUserTenant(userWithRole);
+
+        if (event === "SIGNED_IN" && currentScreen === "login") {
+          setCurrentScreen(
+            normalizedRole === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
+          );
+        }
       } else {
         setCurrentUser(null);
         if (currentScreen === "barbershop" || currentScreen === "superadmin") {
@@ -113,7 +365,7 @@ export default function App() {
       isMounted = false;
       subscription?.unsubscribe();
     };
-  }, [currentScreen]);
+  }, [currentScreen, isDirectProtectedUrl, resolveAndSyncUserTenant, storageAudit.tamperingDetected]);
 
   // Efeito de auditoria contínua a cada alteração de tela
   useEffect(() => {
@@ -143,14 +395,10 @@ export default function App() {
     notes: "Acabamento navalhado. Atendimento concluído pelo barbeiro, pagamento pendente no caixa.",
   };
 
-  // Estados Centrais do SaaS
-  const [tenant, setTenant] = useState({
-    id: "a0000000-0000-0000-0000-000000000001",
-    name: "Vintage Club Barber Shop",
-  });
   const [services, setServices] = useState([]);
   const [products, setProducts] = useState([]);
   const [barbers, setBarbers] = useState([]);
+  const [clients, setClients] = useState([]);
   const [appointments, setAppointments] = useState([DEFAULT_APPOINTMENT_179138762174]);
   const [comandas, setComandas] = useState([
     {
@@ -243,11 +491,12 @@ export default function App() {
       setConnectionError(null);
       setContractNotice(null);
 
-      const [servicesRes, productsRes, barbersRes, appointmentsRes] = await Promise.all([
+      const [servicesRes, productsRes, barbersRes, appointmentsRes, clientsRes] = await Promise.all([
         supabase.from("services").select("*").order("name"),
         supabase.from("products").select("*").order("name"),
         supabase.from("barbers").select("*").order("name"),
         supabase.from("appointments").select("*").order("start_time"),
+        supabase.from("clients").select("*").order("name"),
       ]);
 
       if (servicesRes.error) throw servicesRes.error;
@@ -260,6 +509,9 @@ export default function App() {
 
       setServices(servicesResult.data);
       setBarbers(barbersResult.data);
+      if (clientsRes?.data) {
+        setClients(clientsRes.data);
+      }
       const rawAppts = appointmentsResult.data || [];
       const hasTarget = rawAppts.some((a) => a.id === "apt-179138762174" || a.id === "#apt-179138762174");
       const mergedAppts = hasTarget ? rawAppts : [DEFAULT_APPOINTMENT_179138762174, ...rawAppts];
@@ -410,8 +662,12 @@ export default function App() {
       <ErrorBoundary componentName="Tela de Login">
         <Login
           onGoToSignup={() => setCurrentScreen("onboarding")}
-          onLoginSuccess={(loggedUser) => {
-            const role = loggedUser?.user_metadata?.role || USER_ROLES.ADMIN;
+          onLoginSuccess={async (loggedUser) => {
+            const rawRole = loggedUser?.user_metadata?.role;
+            const role =
+              !rawRole || rawRole === "owner" || rawRole === "tenant"
+                ? USER_ROLES.ADMIN
+                : rawRole;
             const userWithRole = {
               ...loggedUser,
               user_metadata: {
@@ -421,7 +677,10 @@ export default function App() {
             };
             setCurrentUser(userWithRole);
             setActiveUserRole(role);
-            setCurrentScreen("barbershop");
+            await resolveAndSyncUserTenant(userWithRole);
+            setCurrentScreen(
+              role === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
+            );
           }}
         />
       </ErrorBoundary>
@@ -436,7 +695,7 @@ export default function App() {
           onGoToLogin={() => setCurrentScreen("login")}
           onCompleteOnboarding={({ user: newUser, tenant: newTenant }) => {
             if (newUser) setCurrentUser(newUser);
-            if (newTenant) setTenant(newTenant);
+            if (newTenant) setTenant(normalizeTenantRecord(newTenant, newUser));
             setActiveUserRole(USER_ROLES.ADMIN);
             setCurrentScreen("barbershop");
           }}
@@ -625,9 +884,15 @@ export default function App() {
           <ErrorBoundary componentName="Painel Administrativo da Barbearia">
             <BarbershopDashboard
               tenant={tenant}
+              onUpdateTenant={(updatedTenant) =>
+                setTenant((prev) => normalizeTenantRecord({ ...prev, ...updatedTenant }, currentUser))
+              }
               user={currentUser}
+              onUpdateUser={setCurrentUser}
               appointments={appointments}
               onUpdateAppointments={setAppointments}
+              clients={clients}
+              onUpdateClients={setClients}
               comandas={comandas}
               onUpdateComandas={setComandas}
               services={services}
@@ -657,9 +922,17 @@ export default function App() {
         {currentScreen === "superadmin" && (
           <ErrorBoundary componentName="Painel SuperAdmin">
             <SuperAdminDashboard
+              onImpersonateTenant={(selectedTenant) => {
+                if (selectedTenant) {
+                  setTenant(normalizeTenantRecord(selectedTenant, currentUser));
+                }
+                setCurrentScreen("barbershop");
+              }}
               onLogout={() => {
                 setCurrentUser(null);
-                handleSecureLogout({ reason: "MANUAL_LOGOUT_SUPERADMIN" });
+                setActiveUserRole(USER_ROLES.ANON);
+                setCurrentScreen("login");
+                handleSecureLogout({ reason: "MANUAL_LOGOUT_SUPERADMIN" }).catch(() => {});
               }}
             />
           </ErrorBoundary>
@@ -672,7 +945,7 @@ export default function App() {
               onGoToLogin={() => setCurrentScreen("login")}
               onCompleteOnboarding={({ user: newUser, tenant: newTenant }) => {
                 if (newUser) setCurrentUser(newUser);
-                if (newTenant) setTenant(newTenant);
+                if (newTenant) setTenant(normalizeTenantRecord(newTenant, newUser));
                 setActiveUserRole(USER_ROLES.ADMIN);
                 setCurrentScreen("barbershop");
               }}
@@ -685,11 +958,25 @@ export default function App() {
           <ErrorBoundary componentName="Tela de Login">
             <Login
               onGoToSignup={() => setCurrentScreen("onboarding")}
-              onLoginSuccess={(loggedUser) => {
-                setCurrentUser(loggedUser);
-                const role = loggedUser?.user_metadata?.role || USER_ROLES.ADMIN;
+              onLoginSuccess={async (loggedUser) => {
+                const rawRole = loggedUser?.user_metadata?.role;
+                const role =
+                  !rawRole || rawRole === "owner" || rawRole === "tenant"
+                    ? USER_ROLES.ADMIN
+                    : rawRole;
+                const userWithRole = {
+                  ...loggedUser,
+                  user_metadata: {
+                    ...(loggedUser?.user_metadata || {}),
+                    role: role,
+                  },
+                };
+                setCurrentUser(userWithRole);
                 setActiveUserRole(role);
-                setCurrentScreen("barbershop");
+                await resolveAndSyncUserTenant(userWithRole);
+                setCurrentScreen(
+                  role === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
+                );
               }}
             />
           </ErrorBoundary>

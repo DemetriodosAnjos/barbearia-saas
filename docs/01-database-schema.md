@@ -59,18 +59,47 @@ Mapeamento exato de todas as 20 colunas SQL oficiais no Supabase:
 
 ---
 
-## 3. Tabela: `authentication / users` (Supabase Auth & Perfis)
+## 3. Tabela: `tenants` (Barbearias / Clientes SaaS - Painel SuperAdmin & Onboarding)
 
-| Nome da Coluna | Tipo de Dado | Descrição |
-|---|---|---|
-| `id` | `uuid` | ID único do usuário no Supabase Auth (`auth.users.id`). |
-| `email` | `text` | E-mail corporativo / credencial de acesso. |
-| `raw_user_meta_data` | `jsonb` | Metadados do usuário (ex: `{ role: 'admin', barbershop_id: 'uuid' }`). |
-| `role` | `text` | Papel RBAC: `'superadmin'`, `'admin'`, `'barber'`, `'client'`. |
+Mapeamento exato das **18 colunas SQL oficiais** da tabela `public.tenants` no Supabase, compartilhada de maneira unificada entre o fluxo de **Onboarding (`OnboardingWizard.jsx`)**, a sincronização de sessão (`App.jsx`) e o **Painel SuperAdmin (`SuperAdminDashboard.jsx`)**:
+
+| Nome da Coluna | Tipo de Dado (PostgreSQL) | Obrigatório | Descrição / Regra |
+|---|---|---|---|
+| `id` | `uuid` | Sim | Identificador único da barbearia/tenant (chave primária compartilhada com `barbershops.id` e `profiles.barbershop_id`). |
+| `name` | `text` | Sim | Nome comercial da barbearia (ex: `"Barbearia Dos Anjos"`). |
+| `slug` | `text` | Sim | Identificador amigável de URL da barbearia (ex: `"barbearia-dos-anjos"`). |
+| `created_at` | `timestamp with time zone` | Sim | Data e hora de criação do registro do tenant. |
+| `updated_at` | `timestamp with time zone` | Sim | Data e hora da última atualização cadastral ou de plano. |
+| `owner_name` | `text` | Sim | Nome completo do proprietário / gestor responsável. |
+| `owner_email` | `text` | Sim | E-mail de login do proprietário (`auth.users.email` em minúsculas). |
+| `phone` | `text` | Não | Telefone / WhatsApp comercial com DDD (ex: `"(11) 94060-3522"`). |
+| `plan` | `text` | Sim | Plano contratado: `'starter'`, `'pro'` ou `'enterprise'`. |
+| `status` | `text` | Sim | Status operacional da assinatura: `'active'`, `'trial'`, `'past_due'`, `'suspended'`, `'cancelled'`. |
+| `barbers_count` | `integer` | Sim | Quantidade de profissionais vinculados / limite ativo (padrão inicial: `1`). |
+| `mrr` | `numeric` | Sim | Receita recorrente mensal estimada do plano (ex: `69.90`, `149.90`, `279.90`). |
+| `trial_days_left` | `integer` | Sim | Dias restantes de avaliação gratuita (padrão no Onboarding: `7`). |
+| `trial_ends_at` | `timestamp with time zone` | Não | Data/hora limite do período de avaliação gratuita (`now() + 7 days`). |
+| `has_white_label` | `boolean` | Sim | Indica se o recurso White-Label está habilitado para o tenant (`true` / `false`). |
+| `brand_primary` | `text` | Não | Cor hexadecimal primária da marca (padrão: `'#ea580c'`). |
+| `brand_secondary` | `text` | Não | Cor hexadecimal secundária da marca (padrão: `'#16a34a'`). |
+| `logo_url` | `text` | Não | URL da logomarca customizada da barbearia. |
+
+> **Atenção:** A tabela `public.tenants` **NÃO** possui coluna `owner_id`. O vínculo com o proprietário autenticado ocorre via `id` (`user_metadata.barbershop_id` / `profiles.barbershop_id`) e `owner_email`. Toda criação ou atualização deve utilizar `buildTenantRecordPayload()` (`src/lib/supabase.js`).
 
 ---
 
-## 3. Tabela: `services` (Catálogo de Serviços)
+## 4. Tabela: `authentication / users` & `profiles` (Supabase Auth & Perfis)
+
+| Nome da Coluna | Tipo de Dado | Descrição |
+|---|---|---|
+| `id` | `uuid` | ID único do usuário no Supabase Auth (`auth.users.id` / `profiles.id`). |
+| `email` | `text` | E-mail corporativo / credencial de acesso (`owner_email` na tabela `tenants`). |
+| `raw_user_meta_data` | `jsonb` | Metadados sincronizados (`{ role: 'admin', barbershop_id, tenant_id, name, owner_name, owner_email, barbershop_name, slug, phone, plan, status, trial_days_left, trial_ends_at }`). |
+| `role` | `text` | Papel RBAC compatível com a constraint `profiles_role_check` (`'admin'`, `'employee'`, `'client'`) e `'superadmin'` no JWT. Papéis legados (`'owner'`, `'tenant'`) são normalizados automaticamente para `'admin'`. |
+
+---
+
+## 5. Tabela: `services` (Catálogo de Serviços)
 
 | Nome da Coluna | Tipo de Dado | Descrição |
 |---|---|---|

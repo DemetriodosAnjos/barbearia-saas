@@ -21,7 +21,9 @@ import ProjectIcon from "../../components/ui/ProjectIcon";
 
 export default function BarbershopDashboard({
   tenant, // Objeto real da barbearia vindo do Supabase
+  onUpdateTenant,
   user, // Objeto do usuário autenticado (Auth Supabase)
+  onUpdateUser,
   barbers = [],
   onUpdateBarbers,
   appointments = [],
@@ -157,6 +159,7 @@ export default function BarbershopDashboard({
                   <ErrorBoundary componentName="Agenda de Atendimentos">
                     <ScheduleView
                       tenant={tenant}
+                      user={user}
                       barbers={barbers}
                       appointments={appointments}
                       onUpdateAppointments={onUpdateAppointments}
@@ -219,6 +222,7 @@ export default function BarbershopDashboard({
                   appointments={appointments}
                   onUpdateAppointments={onUpdateAppointments}
                   tenant={tenant}
+                  user={user}
                   barbers={barbers}
                   products={products}
                   onUpdateProducts={onUpdateProducts}
@@ -239,7 +243,10 @@ export default function BarbershopDashboard({
             {/* Telas secundárias */}
             {activeMenuTab === "indicacoes" && (
               <ErrorBoundary componentName="Programa de Indicações">
-                <ReferralProgramView onBack={() => setActiveMenuTab("agenda")} />
+                <ReferralProgramView
+                  tenant={tenant}
+                  onBack={() => setActiveMenuTab("agenda")}
+                />
               </ErrorBoundary>
             )}
             {activeMenuTab === "perfil" && (
@@ -247,6 +254,8 @@ export default function BarbershopDashboard({
                 <UserProfileView
                   user={user}
                   tenant={tenant}
+                  onUpdateUser={onUpdateUser}
+                  onUpdateTenant={onUpdateTenant}
                   onBack={() => setActiveMenuTab("agenda")}
                 />
               </ErrorBoundary>
@@ -254,6 +263,8 @@ export default function BarbershopDashboard({
             {activeMenuTab === "configuracoes" && (
               <ErrorBoundary componentName="Configurações da Barbearia">
                 <BarbershopSettingsView
+                  tenant={tenant}
+                  onUpdateTenant={onUpdateTenant}
                   onBack={() => setActiveMenuTab("agenda")}
                 />
               </ErrorBoundary>

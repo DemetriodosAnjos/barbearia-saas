@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DOMPurify from "dompurify";
 // [Import: cliente Supabase para persistência real no banco de dados]
 import { supabase } from "../../lib/supabase";
@@ -57,6 +57,27 @@ export default function BarbershopSettingsView({
     city: tenant?.city || "",
     state: tenant?.state || "",
   });
+
+  useEffect(() => {
+    if (tenant) {
+      setBusinessData((prev) => ({
+        ...prev,
+        tradeName: tenant.name || prev.tradeName || "",
+        corporateName: tenant.corporate_name || tenant.corporateName || prev.corporateName || "",
+        cnpj: tenant.cnpj || prev.cnpj || "",
+        phone: tenant.phone || prev.phone || "",
+        slug: tenant.slug || prev.slug || "",
+        logoUrl: tenant.logo_url || tenant.logoUrl || prev.logoUrl || "",
+        cep: tenant.cep || prev.cep || "",
+        street: tenant.street || prev.street || "",
+        number: tenant.number || prev.number || "",
+        complement: tenant.complement || prev.complement || "",
+        neighborhood: tenant.neighborhood || prev.neighborhood || "",
+        city: tenant.city || prev.city || "",
+        state: tenant.state || prev.state || "",
+      }));
+    }
+  }, [tenant]);
 
   // ========================================================
   // ABA 2: REGRAS DE AGENDAMENTO
@@ -185,7 +206,7 @@ export default function BarbershopSettingsView({
     acceptCash: true,
   });
 
-  // [Função auxiliar assíncrona: persiste payload no Supabase na tabela barbershops]
+  // [Função auxiliar assíncrona: persiste payload no Supabase nas tabelas barbershops e tenants]
   const saveSettingsToSupabase = async (payload, successMsg) => {
     setSuccessMessage("");
     setErrorMessage("");
@@ -193,15 +214,30 @@ export default function BarbershopSettingsView({
 
     try {
       if (tenant?.id) {
+        const nowIso = new Date().toISOString();
         const { error } = await supabase
           .from("barbershops")
-          .update(payload)
+          .update({ ...payload, updated_at: nowIso })
           .eq("id", tenant.id);
 
         if (error) throw error;
 
+        // Espelha colunas equivalentes na tabela `tenants` (mesma estrutura do SuperAdmin)
+        const tenantSyncFields = { updated_at: nowIso };
+        if (payload.name !== undefined) tenantSyncFields.name = payload.name;
+        if (payload.slug !== undefined) tenantSyncFields.slug = payload.slug;
+        if (payload.phone !== undefined) tenantSyncFields.phone = payload.phone;
+        if (payload.logo_url !== undefined) tenantSyncFields.logo_url = payload.logo_url;
+
+        if (Object.keys(tenantSyncFields).length > 1) {
+          await supabase
+            .from("tenants")
+            .update(tenantSyncFields)
+            .eq("id", tenant.id);
+        }
+
         if (onUpdateTenant) {
-          onUpdateTenant({ ...tenant, ...payload });
+          onUpdateTenant({ ...tenant, ...payload, ...tenantSyncFields });
         }
       }
       setSuccessMessage(successMsg);

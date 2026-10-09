@@ -355,12 +355,13 @@ export default function MercadoPagoApiSettings({ onOpenPixCheckoutModal }) {
     return "bg-neutral-800 text-neutral-300 border-neutral-700";
   };
 
+  const PROD_CLOUD_RUN_ORIGIN = "https://ais-pre-musfj3getfoi6faqf7vpul-705341666319.us-west2.run.app";
   const currentOrigin = typeof window !== "undefined" && window.location.origin
     ? window.location.origin
-    : "https://barbersaas.com.br";
+    : PROD_CLOUD_RUN_ORIGIN;
   const webhookUrl = webhookMode === "current"
-    ? `${currentOrigin}/api/mercadopago/webhook`
-    : "https://barbersaas.com.br/api/mercadopago/webhook";
+    ? `${PROD_CLOUD_RUN_ORIGIN}/api/mercadopago/webhook`
+    : `${currentOrigin}/api/mercadopago/webhook`;
 
   return (
     <div className="space-y-6 text-left max-w-7xl mx-auto pb-12">

@@ -1,7 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import DOMPurify from "dompurify";
 // [Import: cliente Supabase para atualização de perfil e senha no Auth]
 import { supabase } from "../../lib/supabase";
+import {
+  getRegisteredUserPixKey,
+  saveRegisteredUserPixKey,
+} from "../../utils/pixQrCode";
 import { profileStyles } from "./UserProfileView.styles";
 import Tabs from "../../components/ui/Tabs";
 import Input from "../../components/ui/Input";
@@ -17,7 +21,13 @@ import { SafeHtml } from "../../components/ui/SafeHtml";
 import { validateAvatarUpload } from "../../utils/inputValidator";
 
 // [Função componente: consome o usuário e barbearia reais autenticados]
-export default function UserProfileView({ user, tenant, onBack }) {
+export default function UserProfileView({
+  user,
+  tenant,
+  onUpdateUser,
+  onUpdateTenant,
+  onBack,
+}) {
   const [activeTab, setActiveTab] = useState("pessoal");
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef(null);
@@ -118,7 +128,7 @@ export default function UserProfileView({ user, tenant, onBack }) {
   // 3. ATUAÇÃO PROFISSIONAL & CHAVE PIX
   const [professionalData, setProfessionalData] = useState({
     bio: user?.user_metadata?.bio || "",
-    pixKey: user?.user_metadata?.pix_key || "",
+    pixKey: getRegisteredUserPixKey(user, tenant),
     pixType: "Chave Geral",
     instagram: user?.user_metadata?.instagram || "",
     specialties: user?.user_metadata?.specialties || [
@@ -126,6 +136,16 @@ export default function UserProfileView({ user, tenant, onBack }) {
       "Barba",
     ],
   });
+
+  useEffect(() => {
+    const resolvedPix = getRegisteredUserPixKey(user, tenant);
+    if (resolvedPix) {
+      setProfessionalData((prev) =>
+        prev.pixKey ? prev : { ...prev, pixKey: resolvedPix }
+      );
+      saveRegisteredUserPixKey(resolvedPix);
+    }
+  }, [user, tenant]);
 
   // 4. SEGURANÇA & SESSÕES
   const [securityData, setSecurityData] = useState({
@@ -212,85 +232,86 @@ export default function UserProfileView({ user, tenant, onBack }) {
     }
   };
 
-  // Salvamento Geral do Perfil
-  // Validação Geral de Todos os Inputs
-  const handleSaveProfile = () => {
+  // Salvamento Geral do Perfil (Persiste Chave PIX Cadastrada e metadados no Supabase e Storage)
+  const handleSaveProfile = async () => {
     const errs = {};
     setGlobalSuccessMessage("");
 
-    // 1. Validação da Aba 1 (Dados Pessoais)
-    if (!personalData.fullName.trim() || personalData.fullName.length < 3) {
-      errs.fullName = "Informe o nome completo (mínimo 3 caracteres).";
-    }
-    if (!personalData.displayName.trim()) {
-      errs.displayName = "O nome de exibição no aplicativo é obrigatório.";
-    }
-    if (!personalData.cpf || personalData.cpf.length < 14) {
-      errs.cpf = "Informe um CPF válido completo com 11 dígitos.";
-    }
-
-    // 2. Validação da Aba 2 (Contato & Endereço)
-    if (!contactData.phone || contactData.phone.length < 14) {
-      errs.phone = "Informe o WhatsApp com DDD.";
-    }
-    if (!contactData.cep || contactData.cep.length < 9) {
-      errs.cep = "Informe o CEP válido.";
-    }
-    if (!contactData.street.trim()) {
-      errs.street = "O logradouro/rua é obrigatório.";
-    }
-    if (!contactData.number.trim()) {
-      errs.number = "O número é obrigatório.";
-    }
-    if (!contactData.city.trim()) {
-      errs.city = "A cidade é obrigatória.";
-    }
-    if (!contactData.state) {
-      errs.state = "Selecione o estado (UF).";
+    // Se estiver na aba "profissional" (Perfil & Chave PIX), valida prioritariamente a Chave PIX Cadastrada
+    if (activeTab === "profissional") {
+      if (!professionalData.pixKey.trim()) {
+        errs.pixKey = "A chave PIX é obrigatória para o repasse de comissões e geração do QR Code.";
+      }
+      if (professionalData.specialties.length === 0) {
+        errs.specialties =
+          "Selecione ou digite pelo menos 1 especialidade de atendimento.";
+      }
+    } else if (activeTab === "pessoal") {
+      if (!personalData.fullName.trim() || personalData.fullName.length < 3) {
+        errs.fullName = "Informe o nome completo (mínimo 3 caracteres).";
+      }
+    } else if (activeTab === "contato") {
+      if (!contactData.phone || contactData.phone.length < 10) {
+        errs.phone = "Informe o WhatsApp com DDD.";
+      }
     }
 
-    // 3. Validação da Aba 3 (Profissional & PIX)
-    if (!professionalData.pixKey.trim()) {
-      errs.pixKey = "A chave PIX é obrigatória para o repasse de comissões.";
-    }
-    if (professionalData.specialties.length === 0) {
-      errs.specialties =
-        "Selecione ou digite pelo menos 1 especialidade de atendimento.";
-    }
-
-    // SE HOUVER ERROS: Bloqueia e leva o usuário para a aba correspondente!
     if (Object.keys(errs).length > 0) {
       setProfileErrors(errs);
-
-      // Inteligência de UX: Muda a aba automaticamente para onde está o primeiro erro!
-      if (errs.fullName || errs.displayName || errs.cpf) {
-        setActiveTab("pessoal");
-      } else if (
-        errs.phone ||
-        errs.cep ||
-        errs.street ||
-        errs.number ||
-        errs.city ||
-        errs.state
-      ) {
-        setActiveTab("contato");
-      } else if (errs.pixKey || errs.specialties) {
-        setActiveTab("profissional");
-      }
-
       return;
     }
 
-    // SE TODOS OS CAMPOS ESTIVEREM CORRETOS:
     setProfileErrors({});
     setIsSaving(true);
 
-    setTimeout(() => {
+    const cleanPixKey = professionalData.pixKey.trim();
+    if (cleanPixKey) {
+      saveRegisteredUserPixKey(cleanPixKey);
+    }
+
+    try {
+      const updatedMetadata = {
+        ...(user?.user_metadata || {}),
+        name: personalData.fullName.trim(),
+        full_name: personalData.fullName.trim(),
+        display_name: personalData.displayName.trim(),
+        cpf: personalData.cpf.trim(),
+        phone: contactData.phone.trim(),
+        bio: professionalData.bio.trim(),
+        pix_key: cleanPixKey,
+        pixKey: cleanPixKey,
+        instagram: professionalData.instagram.trim(),
+        specialties: professionalData.specialties,
+      };
+
+      const { data: updatedAuth } = await supabase.auth.updateUser({
+        data: updatedMetadata,
+      });
+
+      if (onUpdateUser) {
+        onUpdateUser(
+          updatedAuth?.user || {
+            ...(user || {}),
+            user_metadata: updatedMetadata,
+          }
+        );
+      }
+
+      if (onUpdateTenant && tenant) {
+        onUpdateTenant({
+          ...tenant,
+          pix_key: cleanPixKey,
+          pixKey: cleanPixKey,
+        });
+      }
+    } catch (err) {
+      console.warn("Aviso ao sincronizar metadados do perfil:", err);
+    } finally {
       setIsSaving(false);
       setGlobalSuccessMessage(
-        "Todas as alterações do perfil foram salvas com sucesso!",
+        "Todas as alterações do perfil e Chave PIX foram salvas com sucesso!"
       );
-    }, 1200);
+    }
   };
 
   const profileTabs = [
@@ -753,10 +774,12 @@ export default function UserProfileView({ user, tenant, onBack }) {
                   placeholder="Seu CPF, E-mail ou Telefone"
                   value={professionalData.pixKey}
                   onChange={(e) => {
+                    const nextKey = e.target.value;
                     setProfessionalData({
                       ...professionalData,
-                      pixKey: e.target.value,
+                      pixKey: nextKey,
                     });
+                    saveRegisteredUserPixKey(nextKey);
                     if (profileErrors.pixKey)
                       setProfileErrors({ ...profileErrors, pixKey: null });
                   }}

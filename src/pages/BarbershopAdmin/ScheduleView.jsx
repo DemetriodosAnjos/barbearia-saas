@@ -17,6 +17,7 @@ import MercadoPagoCheckoutModal from "../../components/payments/MercadoPagoCheck
 // [Função componente: consome serviços reais sem catálogo fictício de fallback]
 export default function ScheduleView({
   tenant,
+  user,
   barbers = [],
   appointments = [],
   onUpdateAppointments,
@@ -907,6 +908,7 @@ export default function ScheduleView({
           onClose={() => setIsMercadoPagoModalOpen(false)}
           appointment={selectedAppointment}
           tenant={tenant}
+          user={user}
           onPaymentSuccess={(paymentInfo) => {
             const updatedAppt = {
               ...selectedAppointment,

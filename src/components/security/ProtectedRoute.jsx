@@ -85,8 +85,12 @@ export default function ProtectedRoute({
   }
 
   // 3. Usuário autenticado, mas com papel insuficiente: HTTP 403
+  const normalizedRole =
+    currentRole === "owner" || currentRole === "tenant"
+      ? USER_ROLES.ADMIN
+      : currentRole;
   const hasAccess =
-    currentRole === USER_ROLES.SUPERADMIN || allowedRoles.includes(currentRole);
+    normalizedRole === USER_ROLES.SUPERADMIN || allowedRoles.includes(normalizedRole);
 
   if (!hasAccess) {
     return (

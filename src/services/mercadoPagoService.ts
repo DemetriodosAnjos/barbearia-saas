@@ -16,6 +16,11 @@ import {
 } from "../schemas/mercadoPagoSchemas";
 import { mercadoPagoLogger } from "./mercadoPagoLogger";
 import { mercadoPagoConfigStore } from "./mercadoPagoConfigStore";
+import {
+  getRegisteredUserPixKey,
+  generatePixBrCodePayload,
+  generatePixQrCodeDataUrl,
+} from "../utils/pixQrCode";
 
 // Configurações do Gateway
 export interface MercadoPagoConfig {
@@ -327,13 +332,18 @@ export class MercadoPagoService {
       const paymentId = `pay_mp_pix_${Math.floor(100000000 + Math.random() * 900000000)}`;
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-      // Montagem do payload EMVCo Pix Copia-e-Cola
-      const formattedAmount = validated.amount.toFixed(2);
-      const pixCopiaECola = `00020101021226840014BR.GOV.BCB.PIX2562mercadopago.com.br/qr/${paymentId}520400005303986540${formattedAmount.length}${formattedAmount}5802BR5915BARBERSAAS SAAS6009SAO PAULO62070503***6304${paymentId.slice(-4).toUpperCase()}`;
+      // Montagem do payload EMVCo Pix Copia-e-Cola a partir da Chave PIX Cadastrada no Perfil
+      const registeredPixKey = getRegisteredUserPixKey() || validated.payerEmail || "pagamento@barbearia.com.br";
+      const pixCopiaECola = generatePixBrCodePayload({
+        pixKey: registeredPixKey,
+        merchantName: "BARBERSAAS",
+        merchantCity: "SAO PAULO",
+        amount: validated.amount,
+        txid: "***",
+      });
 
-      // SVG Base64 de alta resolução para QR Code
-      const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#000"><rect width="100" height="100" fill="#fff"/><rect x="10" y="10" width="25" height="25" fill="#000"/><rect x="15" y="15" width="15" height="15" fill="#fff"/><rect x="18" y="18" width="9" height="9" fill="#000"/><rect x="65" y="10" width="25" height="25" fill="#000"/><rect x="70" y="15" width="15" height="15" fill="#fff"/><rect x="73" y="18" width="9" height="9" fill="#000"/><rect x="10" y="65" width="25" height="25" fill="#000"/><rect x="15" y="70" width="15" height="15" fill="#fff"/><rect x="18" y="73" width="9" height="9" fill="#000"/><rect x="42" y="42" width="16" height="16" fill="#009ee3"/><path d="M40 10h10v10H40zM55 25h10v10H55zM25 45h10v10H25zM45 60h10v10H45zM60 45h10v10H60zM75 60h10v10H75zM65 75h10v10H65z" fill="#000"/></svg>`;
-      const qrCodeBase64 = `data:image/svg+xml;base64,${typeof btoa !== "undefined" ? btoa(svgContent) : Buffer.from(svgContent).toString("base64")}`;
+      // QR Code real gerado a partir do BR Code
+      const qrCodeBase64 = await generatePixQrCodeDataUrl(pixCopiaECola);
 
       const result: PixPaymentResult = {
         id: paymentId,

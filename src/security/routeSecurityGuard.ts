@@ -200,7 +200,7 @@ export function evaluateRouteAccessSecurity({
   }
 
   if (targetScreen === 'barbershop') {
-    if (![USER_ROLES.ADMIN, USER_ROLES.EMPLOYEE, USER_ROLES.SUPERADMIN].includes(currentRole as any)) {
+    if (![USER_ROLES.ADMIN, USER_ROLES.EMPLOYEE, USER_ROLES.SUPERADMIN, 'owner', 'tenant'].includes(currentRole as any)) {
       return {
         allowed: false,
         tamperingDetected: false,

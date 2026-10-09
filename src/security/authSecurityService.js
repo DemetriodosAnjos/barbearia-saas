@@ -137,9 +137,25 @@ export async function secureLogin({
       ip: clientIp,
     });
 
+    const rawUserRole = data.user?.user_metadata?.role;
+    const normalizedRole =
+      !rawUserRole || rawUserRole === "owner" || rawUserRole === "tenant"
+        ? "admin"
+        : rawUserRole;
+
+    const normalizedUser = data.user
+      ? {
+          ...data.user,
+          user_metadata: {
+            ...(data.user.user_metadata || {}),
+            role: normalizedRole,
+          },
+        }
+      : data.user;
+
     return {
       success: true,
-      user: data.user,
+      user: normalizedUser,
       session: data.session,
       statusCode: 200,
     };
@@ -194,11 +210,15 @@ export async function secureSignUp({
 
   // 2. Delegação ao Supabase Auth
   try {
-    // Normalização defensiva: 'owner' mapeia para 'admin' para satisfazer constraints do Postgres
-    const safeRole = metadata?.role === "owner" || !metadata?.role ? "admin" : metadata.role;
+    // Normalização defensiva: 'owner' ou 'tenant' mapeia para 'admin' para satisfazer constraints do Postgres
+    const safeRole =
+      metadata?.role === "owner" || metadata?.role === "tenant" || !metadata?.role
+        ? "admin"
+        : metadata.role;
     const safeMetadata = {
       ...metadata,
       role: safeRole,
+      owner_email: metadata?.owner_email || normalizedEmail,
       barbershop_id: metadata?.barbershop_id || "a0000000-0000-0000-0000-000000000001",
     };
 
@@ -219,9 +239,14 @@ export async function secureSignUp({
             password: password,
             options: {
               data: {
-                name: metadata?.name || "",
+                name: metadata?.name || metadata?.owner_name || "",
+                owner_name: metadata?.owner_name || metadata?.name || "",
+                owner_email: normalizedEmail,
+                barbershop_name: metadata?.barbershop_name || "",
+                slug: metadata?.slug || "",
+                phone: metadata?.phone || "",
                 role: "admin",
-                barbershop_id: "a0000000-0000-0000-0000-000000000001",
+                barbershop_id: metadata?.barbershop_id || "a0000000-0000-0000-0000-000000000001",
               },
             },
           });

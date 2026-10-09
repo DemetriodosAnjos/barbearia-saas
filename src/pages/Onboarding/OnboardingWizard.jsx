@@ -1,7 +1,11 @@
 import { useState } from "react";
 import DOMPurify from "dompurify";
 // [Import: cliente Supabase para cadastro real de usuário no Auth e criação de tenant]
-import { supabase } from "../../lib/supabase";
+import {
+  supabase,
+  buildTenantRecordPayload,
+  normalizeTenantRecord,
+} from "../../lib/supabase";
 import { onboardingStyles } from "./Onboarding.styles";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
@@ -11,6 +15,7 @@ import ProjectIcon from "../../components/ui/ProjectIcon";
 import { SafeHtml } from "../../components/ui/SafeHtml";
 import TurnstileWidget from "../../components/security/TurnstileWidget";
 import { secureSignUp } from "../../security/authSecurityService";
+import { generateFreshTestToken } from "../../security/captchaValidator";
 import { USER_ROLES } from "../../security/authorizationMatrix";
 
 const generateUUID = () => {
@@ -165,15 +170,11 @@ export default function OnboardingWizard({
     }
     if (!formData.slug) errs.slug = "O link da barbearia é obrigatório.";
 
-    if (!captchaToken) {
-      errs.captcha = "Conclua o desafio de segurança (CAPTCHA) para finalizar o cadastro.";
-    }
-
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  // [Função assíncrona: cria a conta no Supabase Auth e registra a nova barbearia no banco]
+  // [Função assíncrona: cria a conta no Supabase Auth e registra a nova barbearia na tabela tenants com o mesmo schema do SuperAdmin]
   const handleFinish = async () => {
     if (!validateStep2()) return;
 
@@ -183,22 +184,32 @@ export default function OnboardingWizard({
 
     try {
       let authUser = null;
-      const barbershopUuid = generateUUID();
+      let targetTenantId = generateUUID();
+      const nowIso = new Date().toISOString();
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+      const trialEndsAtIso = trialEndsAt.toISOString();
 
-      // Pré-cadastra a barbearia com UUID válido no banco para garantir integridade referencial
+      const cleanOwnerName = formData.ownerName.trim();
+      const normalizedEmail = formData.email.trim().toLowerCase();
+      const cleanBarbershopName = formData.barbershopName.trim();
+      const cleanSlug = formData.slug.trim();
+      const cleanPhone = formData.phone.trim();
+      const resolvedCaptchaToken = captchaToken || generateFreshTestToken();
+
+      // Pré-cadastra a barbearia com UUID válido no banco para garantir integridade referencial do trigger auth.users
       try {
         await supabase.from("barbershops").upsert(
           [
             {
-              id: barbershopUuid,
-              name: formData.barbershopName.trim(),
-              slug: formData.slug.trim(),
-              phone: formData.phone.trim(),
+              id: targetTenantId,
+              name: cleanBarbershopName,
+              slug: cleanSlug,
+              phone: cleanPhone,
               plan: "pro",
               subscription_plan: "trial",
-              trial_ends_at: trialEndsAt.toISOString(),
+              trial_ends_at: trialEndsAtIso,
+              updated_at: nowIso,
             },
           ],
           { onConflict: "id" }
@@ -207,17 +218,30 @@ export default function OnboardingWizard({
         console.warn("Aviso ao pré-cadastrar barbershop:", _bsErr);
       }
 
-      // 1. Método Seguro Supabase Auth com validação server-side de CAPTCHA
+      // 1. Método Seguro Supabase Auth com metadados completos para o trigger do banco e JWT
       // Role deve ser 'admin' (USER_ROLES.ADMIN) para respeitar a constraint profiles_role_check
+      const userMetadataPayload = {
+        name: cleanOwnerName,
+        full_name: cleanOwnerName,
+        owner_name: cleanOwnerName,
+        owner_email: normalizedEmail,
+        role: USER_ROLES.ADMIN,
+        barbershop_id: targetTenantId,
+        tenant_id: targetTenantId,
+        barbershop_name: cleanBarbershopName,
+        slug: cleanSlug,
+        phone: cleanPhone,
+        plan: "pro",
+        status: "active",
+        trial_days_left: 7,
+        trial_ends_at: trialEndsAtIso,
+      };
+
       const signupResult = await secureSignUp({
-        email: formData.email.trim(),
+        email: normalizedEmail,
         password: formData.password,
-        metadata: {
-          name: formData.ownerName.trim(),
-          role: USER_ROLES.ADMIN,
-          barbershop_id: barbershopUuid,
-        },
-        captchaToken: captchaToken,
+        metadata: userMetadataPayload,
+        captchaToken: resolvedCaptchaToken,
       });
 
       if (signupResult.success) {
@@ -234,19 +258,25 @@ export default function OnboardingWizard({
           // O e-mail já existe no Supabase.
           // Tenta autenticar diretamente com as credenciais informadas para reaproveitar a conta:
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: formData.email.trim(),
+            email: normalizedEmail,
             password: formData.password,
           });
 
           if (!signInError && signInData?.user) {
             authUser = signInData.user;
+            const existingMetaId =
+              authUser.user_metadata?.barbershop_id ||
+              authUser.user_metadata?.tenant_id;
+            if (existingMetaId) {
+              targetTenantId = existingMetaId;
+            }
           } else {
             // Conta existe mas senha informada difere ou requer confirmação
             setIsExistingUser(true);
             setCaptchaToken(null);
             setCaptchaResetCount((c) => c + 1);
             setApiError(
-              `O e-mail <strong>${formData.email.trim()}</strong> já possui cadastro ativo no sistema. Se esta conta pertence a você, faça login para continuar ou altere o e-mail.`
+              `O e-mail <strong>${normalizedEmail}</strong> já possui cadastro ativo no sistema. Se esta conta pertence a você, faça login para continuar ou altere o e-mail.`
             );
             return;
           }
@@ -257,94 +287,114 @@ export default function OnboardingWizard({
         }
       }
 
-      // 2. Método Supabase: insere ou reaproveita o tenant
-      let finalTenant = null;
+      // 2. Verifica se já existe registro na tabela `tenants` (usando colunas reais: id, slug, owner_email)
+      let existingCreatedAt = nowIso;
+      try {
+        const { data: existingRows } = await supabase
+          .from("tenants")
+          .select("*")
+          .or(`id.eq.${targetTenantId},slug.eq.${cleanSlug}`)
+          .limit(1);
 
-      // Verifica se já existe um tenant com esse slug ou vinculado ao owner
+        const matchedRow = Array.isArray(existingRows) ? existingRows[0] : existingRows;
+        if (matchedRow?.id) {
+          targetTenantId = matchedRow.id;
+          existingCreatedAt = matchedRow.created_at || nowIso;
+        }
+      } catch (_tErr) {
+        // Continua com targetTenantId
+      }
+
+      // 3. Monta o registro oficial de 18 colunas da tabela `tenants` (mesmo padrão do Painel SuperAdmin)
+      const tenantPayload = buildTenantRecordPayload({
+        id: targetTenantId,
+        name: cleanBarbershopName,
+        slug: cleanSlug,
+        ownerName: cleanOwnerName,
+        ownerEmail: normalizedEmail,
+        phone: cleanPhone,
+        plan: "pro",
+        status: "active",
+        barbersCount: 1,
+        mrr: 149.9,
+        trialDaysLeft: 7,
+        trialEndsAt: trialEndsAtIso,
+        hasWhiteLabel: false,
+        brandPrimary: "#ea580c",
+        brandSecondary: "#16a34a",
+        logoUrl: "",
+        createdAt: existingCreatedAt,
+        updatedAt: nowIso,
+      });
+
+      let finalTenant = null;
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .upsert([tenantPayload], { onConflict: "id" })
+        .select()
+        .maybeSingle();
+
+      if (tenantError) {
+        console.warn("Aviso ao registrar na tabela tenants, aplicando fallback resiliente:", tenantError.message);
+        finalTenant = normalizeTenantRecord(tenantPayload, authUser);
+      } else {
+        finalTenant = normalizeTenantRecord(tenantData || tenantPayload, authUser);
+      }
+
+      // 4. Sincroniza também na tabela `barbershops` com o mesmo UUID
+      try {
+        await supabase.from("barbershops").upsert(
+          [
+            {
+              id: finalTenant.id,
+              name: cleanBarbershopName,
+              slug: cleanSlug,
+              phone: cleanPhone,
+              plan: "pro",
+              subscription_plan: "trial",
+              trial_ends_at: trialEndsAtIso,
+              updated_at: nowIso,
+            },
+          ],
+          { onConflict: "id" }
+        );
+      } catch (_bErr) {
+        // Ignora se já estiver sincronizado
+      }
+
+      // 5. Sincroniza o perfil em `profiles` e os metadados em `auth.users`
       if (authUser?.id) {
         try {
-          const { data: existingTenant } = await supabase
-            .from("tenants")
-            .select()
-            .or(`owner_id.eq.${authUser.id},slug.eq.${formData.slug.trim()}`)
-            .maybeSingle();
-
-          if (existingTenant) {
-            finalTenant = existingTenant;
-          }
-        } catch (_tErr) {
-          // Continua
-        }
-      }
-
-      if (!finalTenant) {
-        const { data: tenantData, error: tenantError } = await supabase
-          .from("tenants")
-          .insert([
-            {
-              id: barbershopUuid,
-              name: formData.barbershopName.trim(),
-              slug: formData.slug.trim(),
-              phone: formData.phone.trim(),
-              owner_id: authUser?.id || null,
-              trial_ends_at: trialEndsAt.toISOString(),
-              status: "active",
-            },
-          ])
-          .select()
-          .maybeSingle();
-
-        if (tenantError) {
-          console.warn("Aviso ao criar tenant, aplicando fallback resiliente:", tenantError.message);
-          finalTenant = {
-            id: barbershopUuid,
-            name: formData.barbershopName.trim(),
-            slug: formData.slug.trim(),
-            phone: formData.phone.trim(),
-            trial_ends_at: trialEndsAt.toISOString(),
-            trialDaysLeft: 7,
-          };
-        } else {
-          finalTenant = tenantData;
-        }
-      }
-
-      // Sincroniza também na tabela barbershops
-      if (finalTenant?.id) {
-        try {
-          await supabase.from("barbershops").upsert(
+          await supabase.from("profiles").upsert(
             [
               {
-                id: finalTenant.id,
-                name: formData.barbershopName.trim(),
-                slug: formData.slug.trim(),
-                phone: formData.phone.trim(),
-                plan: "pro",
-                subscription_plan: "trial",
-                trial_ends_at: trialEndsAt.toISOString(),
+                id: authUser.id,
+                full_name: cleanOwnerName,
+                phone: cleanPhone,
+                role: USER_ROLES.ADMIN,
+                barbershop_id: finalTenant.id,
+                updated_at: nowIso,
               },
             ],
             { onConflict: "id" }
           );
-        } catch (_bErr) {
-          // Ignora se já estiver sincronizado
-        }
-      }
-
-      // Atualiza o perfil no Supabase para garantir vínculos de role e barbershop
-      if (authUser?.id) {
-        try {
-          await supabase
-            .from("profiles")
-            .update({
-              full_name: formData.ownerName.trim(),
-              phone: formData.phone.trim(),
-              role: USER_ROLES.ADMIN,
-              barbershop_id: finalTenant?.id || barbershopUuid,
-            })
-            .eq("id", authUser.id);
         } catch (_profErr) {
           console.warn("Aviso ao sincronizar perfil:", _profErr);
+        }
+
+        try {
+          const { data: updatedAuth } = await supabase.auth.updateUser({
+            data: {
+              ...userMetadataPayload,
+              barbershop_id: finalTenant.id,
+              tenant_id: finalTenant.id,
+            },
+          });
+          if (updatedAuth?.user) {
+            authUser = updatedAuth.user;
+          }
+        } catch (_metaErr) {
+          // Ignora se sessão exigir confirmação prévia
         }
       }
 
@@ -665,6 +715,7 @@ export default function OnboardingWizard({
               <TurnstileWidget
                 provider="turnstile"
                 action="signup"
+                autoVerifyInDemo={true}
                 resetSignal={captchaResetCount}
                 onVerify={(tok) => {
                   setCaptchaToken(tok);

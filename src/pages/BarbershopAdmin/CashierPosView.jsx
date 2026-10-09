@@ -33,6 +33,7 @@ export default function CashierPosView({
   appointments = [],
   onUpdateAppointments,
   tenant,
+  user,
   barbers = [],
   products: initialProducts = [],
   onUpdateProducts,
@@ -771,6 +772,7 @@ export default function CashierPosView({
               ),
           }}
           tenant={tenant}
+          user={user}
           onPaymentSuccess={(paymentInfo) => {
             handleComandaStatusChange(mercadoPagoTarget.id, "paid");
             setMercadoPagoTarget(null);
