@@ -3,7 +3,10 @@ import DOMPurify from "dompurify";
 // [Import: cliente Supabase para persistência de agendamentos e alterações de status]
 import { supabase } from "../../lib/supabase";
 import { scheduleStyles } from "./ScheduleView.styles";
-import CalendarView from "../../components/calendar/CalendarView";
+import CalendarView, {
+  formatDateToYMD,
+  getAppointmentDateYMD,
+} from "../../components/calendar/CalendarView";
 import NewAppointmentModal from "../../components/calendar/NewAppointmentModal";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
@@ -36,6 +39,7 @@ export default function ScheduleView({
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [prefilledBarberId, setPrefilledBarberId] = useState("");
   const [prefilledTime, setPrefilledTime] = useState("");
+  const [prefilledDate, setPrefilledDate] = useState("");
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
@@ -318,14 +322,16 @@ export default function ScheduleView({
       return;
     }
 
-    // Conflito com outro agendamento
+    // Conflito com outro agendamento na mesma data
+    const draggedDateYMD = getAppointmentDateYMD(draggedAppt);
     const hasConflict = currentAppointments.some((a) => {
       if (a.id === draggedAppt.id) return false;
-      if (a.barberId !== targetBarberId) return false;
+      if ((a.barberId || a.barber_id) !== targetBarberId) return false;
       if (a.status === "cancelled") return false;
+      if (getAppointmentDateYMD(a) !== draggedDateYMD) return false;
 
-      const aStart = timeToMins(a.startTime);
-      const aEnd = timeToMins(a.endTime);
+      const aStart = timeToMins(a.startTime || a.start_time || "00:00");
+      const aEnd = timeToMins(a.endTime || a.end_time || "00:00");
       return newStartMins < aEnd && newEndMins > aStart;
     });
 
@@ -368,9 +374,10 @@ export default function ScheduleView({
     return `${String(nextH).padStart(2, "0")}:${String(nextM).padStart(2, "0")}`;
   };
 
-  const handleSlotClick = (barberId, time) => {
+  const handleSlotClick = (barberId, time, dateObj) => {
     setPrefilledBarberId(barberId);
     setPrefilledTime(time);
+    setPrefilledDate(dateObj ? formatDateToYMD(dateObj) : "");
     setIsNewModalOpen(true);
   };
 
@@ -453,12 +460,13 @@ export default function ScheduleView({
         barbers={activeBarbers}
         appointments={currentAppointments}
         startHour={8}
-        endHour={19}
+        endHour={21}
         minuteHeight={1.8}
         onSlotClick={handleSlotClick}
-        onNewAppointmentClick={() => {
+        onNewAppointmentClick={(dateObj) => {
           setPrefilledBarberId(activeBarbers[0]?.id || "");
           setPrefilledTime(getNextAvailableTimeSlot());
+          setPrefilledDate(dateObj ? formatDateToYMD(dateObj) : "");
           setIsNewModalOpen(true);
         }}
         onAppointmentClick={(appt) => handleOpenDetails(appt)}
@@ -467,6 +475,10 @@ export default function ScheduleView({
           else alert(`Abrindo Comanda #${id} no Caixa!`);
         }}
         onStatusChange={handleStatusChange}
+        onCancelAppointment={(id) => {
+          const target = currentAppointments.find((a) => a.id === id);
+          if (target) setAppointmentToCancel(target);
+        }}
         onDropAppointment={handleDropAppointment}
       />
 
@@ -899,6 +911,7 @@ export default function ScheduleView({
         services={services}
         prefilledBarberId={prefilledBarberId}
         prefilledTime={prefilledTime}
+        prefilledDate={prefilledDate}
       />
 
       {/* MODAL MERCADO PAGO CHECKOUT (PIX / CARTÃO CRÉDITO & DÉBITO) */}

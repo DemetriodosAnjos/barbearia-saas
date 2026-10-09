@@ -35,7 +35,12 @@ A **Agenda de Atendimentos** é o núcleo (Core Engine) da barbearia. É nela qu
    - **Prevenção de Apinhamento (Anti-Colisão):** Colunas com largura mínima expandida (`min-w-[290px]`), distribuição proporcional lado a lado com respiro de 6px entre cards adjacentes e foco visual ao passar o cursor (`hover:z-40 hover:scale-[1.02] hover:shadow-2xl`).
    - **Integração Mercado Pago:** Opção direta no menu e no modal de detalhes para liquidar o atendimento via API do Mercado Pago (Pix ou Cartão).
 
-4. **`UnavailableSlotModal.jsx` (`src/components/calendar/UnavailableSlotModal.jsx`):**
+4. **`CalendarView.jsx` & `BarberTimelineColumn.jsx` (`src/components/calendar/`):**
+   - **Isolamento Estrito de Slots por Data (`activeDateYMD`):** Na visão diária (`viewMode === "day"`), cada coluna de barbeiro filtra os cards da timeline estritamente pela data selecionada (`getAppointmentDateYMD(appt) === activeDateYMD`). Agendamentos de dias futuros (ex: `09/10` ou `10/10`) nunca são misturados nos slots do dia `08/10`.
+   - **Tag Indicadora `{N} cortes` Clicável (`BarberTimelineColumn`):** O indicador de total de cortes no cabeçalho do barbeiro (ex: `Henrique Silva • 3 cortes`) funciona como botão interativo que abre o **Modal de Agendamentos do Profissional**.
+   - **Modal / Subtela de Agendamentos do Barbeiro:** Exibe os cards de todos os atendimentos do profissional com filtros rápidos (`Todos`, `Dia Atual`, `Outros Dias`), **Nome do Cliente**, telefone, serviço, valor, status e **botão clicável de Dia e Hora** (`dd/mm/aaaa • HH:mm às HH:mm`). Ao clicar no card ou no Dia/Hora, o modal fecha, a agenda navega automaticamente para a data daquele agendamento na visão diária, faz scroll suave até o horário e aplica destaque luminoso (`ring-amber-400 animate-pulse`) no slot.
+
+5. **`UnavailableSlotModal.jsx` (`src/components/calendar/UnavailableSlotModal.jsx`):**
    - Modal com overlay exibido ao clicar em slots da agenda que pertençam a dias ou horários anteriores ao atual.
    - **Ícone:** Alert (`AlertTriangle`).
    - **Título:** `"OPS! Horário indisponível para agendamento"`.

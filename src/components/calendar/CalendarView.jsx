@@ -1,23 +1,72 @@
-import { useState, useEffect } from "react";
-import { AlertTriangle, Plus, Calendar, FileText } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  AlertTriangle,
+  Plus,
+  Calendar,
+  Clock,
+  Scissors,
+  User,
+  Phone,
+  ArrowRight,
+  ExternalLink,
+} from "lucide-react";
 import { calendarViewStyles } from "./CalendarView.styles";
 import BarberTimelineColumn from "./BarberTimelineColumn";
 import UnavailableSlotModal from "./UnavailableSlotModal";
+import Modal from "../ui/Modal";
+import Badge from "../ui/Badge";
 import IconButton from "../ui/IconButton";
 import Button from "../ui/Button";
+
+// Helper: formata Date em YYYY-MM-DD no fuso horário local (evita desvio UTC)
+export const formatDateToYMD = (dateObj) => {
+  if (!dateObj) return "";
+  const d = dateObj instanceof Date ? dateObj : new Date(dateObj);
+  if (Number.isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// Helper: extrai YYYY-MM-DD real de um agendamento
+export const getAppointmentDateYMD = (appt) => {
+  if (!appt) return formatDateToYMD(new Date());
+  const rawDate = appt.date || appt.bookingDate || "";
+  if (typeof rawDate === "string" && rawDate.trim().length >= 10) {
+    return rawDate.trim().slice(0, 10);
+  }
+  const rawCreated = appt.created_at || appt.createdAt || "";
+  if (typeof rawCreated === "string" && rawCreated.trim().length >= 10) {
+    return rawCreated.trim().slice(0, 10);
+  }
+  return formatDateToYMD(new Date());
+};
+
+// Helper: converte string YYYY-MM-DD em objeto Date local às 00:00:00
+export const parseYMDToLocalDate = (ymdStr) => {
+  if (!ymdStr || typeof ymdStr !== "string") return new Date();
+  const parts = ymdStr.slice(0, 10).split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
+    return new Date();
+  }
+  return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+};
 
 export default function CalendarView({
   barbers = [],
   appointments = [],
   startHour = 8,
-  endHour = 19,
+  endHour = 21,
   minuteHeight = 1.8,
   onSlotClick,
   onNewAppointmentClick,
   onAppointmentClick,
   onOpenComanda,
   onStatusChange,
+  onCancelAppointment,
   onDropAppointment,
+  onDateChange,
 }) {
   const [viewMode, setViewMode] = useState("day"); // 'day' | 'week' | 'month'
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -32,10 +81,86 @@ export default function CalendarView({
     date: null,
   });
 
+  // Estado do Modal / Subtela de Agendamentos do Barbeiro (ao clicar na tag "X cortes")
+  const [selectedBarberForModal, setSelectedBarberForModal] = useState(null);
+  const [barberModalFilter, setBarberModalFilter] = useState("all"); // 'all' | 'current_day' | 'other_days'
+  const [highlightedAppointmentId, setHighlightedAppointmentId] = useState(null);
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (onDateChange) {
+      onDateChange(currentDate);
+    }
+  }, [currentDate, onDateChange]);
+
+  const activeDateYMD = formatDateToYMD(currentDate);
+
+  // Abre o modal de agendamentos do barbeiro ao clicar na tag "X cortes"
+  const handleOpenBarberAppointments = (barberObj) => {
+    setSelectedBarberForModal(barberObj);
+    setBarberModalFilter("all");
+  };
+
+  // Navega para o dia do agendamento ao clicar no card ou no indicador de Dia/Hora dentro do modal
+  const handleJumpToAppointmentDate = (appt) => {
+    const apptDateYMD = getAppointmentDateYMD(appt);
+    const targetDate = parseYMDToLocalDate(apptDateYMD);
+
+    setSelectedBarberForModal(null);
+    setCurrentDate(targetDate);
+    setViewMode("day");
+    setHighlightedAppointmentId(appt.id);
+
+    // Faz scroll suave até o slot do agendamento na timeline após renderizar o dia
+    setTimeout(() => {
+      if (typeof document !== "undefined") {
+        const slotEl = document.getElementById(`appt-slot-${appt.id}`);
+        if (slotEl && typeof slotEl.scrollIntoView === "function") {
+          slotEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }, 120);
+
+    setTimeout(() => {
+      setHighlightedAppointmentId((prev) => (prev === appt.id ? null : prev));
+    }, 3600);
+  };
+
+  // Lista reativa de agendamentos do barbeiro selecionado no modal, ordenada por data e hora
+  const barberModalAppointments = useMemo(() => {
+    if (!selectedBarberForModal) return [];
+    const list = appointments.filter(
+      (a) =>
+        (a.barberId || a.barber_id) === selectedBarberForModal.id &&
+        a.status !== "cancelled"
+    );
+    return [...list].sort((a, b) => {
+      const dateA = getAppointmentDateYMD(a);
+      const dateB = getAppointmentDateYMD(b);
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      const timeA = a.startTime || a.start_time || "00:00";
+      const timeB = b.startTime || b.start_time || "00:00";
+      return timeA.localeCompare(timeB);
+    });
+  }, [selectedBarberForModal, appointments]);
+
+  const filteredBarberModalAppointments = useMemo(() => {
+    if (barberModalFilter === "current_day") {
+      return barberModalAppointments.filter(
+        (a) => getAppointmentDateYMD(a) === activeDateYMD
+      );
+    }
+    if (barberModalFilter === "other_days") {
+      return barberModalAppointments.filter(
+        (a) => getAppointmentDateYMD(a) !== activeDateYMD
+      );
+    }
+    return barberModalAppointments;
+  }, [barberModalAppointments, barberModalFilter, activeDateYMD]);
 
   const totalHours = endHour - startHour;
   const hoursList = Array.from({ length: totalHours }, (_, i) => startHour + i);
@@ -191,16 +316,12 @@ export default function CalendarView({
   // Recebe um objeto Date e calcula agendamentos e faturamento real daquele dia
   // =========================================================================
   const getDayMetrics = (targetDate) => {
-    // Variável: data formatada em YYYY-MM-DD para bater com a coluna 'date' do banco
-    const year = targetDate.getFullYear();
-    const month = String(targetDate.getMonth() + 1).padStart(2, "0");
-    const day = String(targetDate.getDate()).padStart(2, "0");
-    const targetDateStr = `${year}-${month}-${day}`;
+    const targetDateStr = formatDateToYMD(targetDate);
 
     // Filtro: filtra o array 'appointments' pela data informada e pelo barbeiro ativo
     const dayAppts = appointments.filter((appt) => {
-      const apptDate =
-        appt.date || (appt.created_at ? appt.created_at.split("T")[0] : "");
+      if (appt.status === "cancelled") return false;
+      const apptDate = getAppointmentDateYMD(appt);
       const matchesDate = apptDate === targetDateStr;
 
       const apptBarberId = appt.barberId || appt.barber_id;
@@ -296,7 +417,9 @@ export default function CalendarView({
 
           <Button
             variant="primary"
-            onClick={onNewAppointmentClick}
+            onClick={() =>
+              onNewAppointmentClick && onNewAppointmentClick(currentDate)
+            }
             disabled={isCurrentViewPast}
             className="text-xs py-2 px-3.5 flex items-center gap-1.5"
           >
@@ -356,10 +479,18 @@ export default function CalendarView({
               </div>
             )}
 
-            {/* Renderização das colunas dos barbeiros com dados 100% reais do Supabase */}
+            {/* Renderização das colunas dos barbeiros com isolamento estrito pela data selecionada (activeDateYMD) */}
             {filteredBarbers.map((barber) => {
-              const barberAppts = appointments.filter(
-                (a) => (a.barberId || a.barber_id) === barber.id,
+              // Todos os agendamentos ativos deste barbeiro (para o contador "X cortes" e modal de agendamentos)
+              const barberAllAppts = appointments.filter(
+                (a) =>
+                  (a.barberId || a.barber_id) === barber.id &&
+                  a.status !== "cancelled",
+              );
+
+              // APENAS os agendamentos cuja data corresponde ao dia aberto na grade (ex: 08/10 não exibe 09/10 ou 10/10)
+              const barberDayAppts = barberAllAppts.filter(
+                (a) => getAppointmentDateYMD(a) === activeDateYMD,
               );
 
               return (
@@ -372,11 +503,15 @@ export default function CalendarView({
                   isPastDate={isCurrentViewPast}
                   isSlotPast={(time) => isSlotInPast(currentDate, time)}
                   breaks={Array.isArray(barber.breaks) ? barber.breaks : Array.isArray(barber.breaks?.intervals) ? barber.breaks.intervals : []}
-                  appointments={barberAppts}
+                  appointments={barberDayAppts}
+                  allBarberAppointments={barberAllAppts}
+                  highlightedAppointmentId={highlightedAppointmentId}
+                  onOpenBarberAppointments={handleOpenBarberAppointments}
                   onSlotClick={handleTimelineSlotClick}
                   onAppointmentClick={handleCardClick}
                   onOpenComanda={onOpenComanda}
                   onStatusChange={onStatusChange}
+                  onCancel={onCancelAppointment}
                   onDropAppointment={onDropAppointment}
                 />
               );
@@ -554,6 +689,270 @@ export default function CalendarView({
         selectedTime={unavailableSlotData.time}
         selectedDate={unavailableSlotData.date}
       />
+
+      {/* MODAL / SUBTELA DE AGENDAMENTOS DO BARBEIRO (AO CLICAR NA TAG "X CORTES") */}
+      <Modal
+        isOpen={!!selectedBarberForModal}
+        onClose={() => setSelectedBarberForModal(null)}
+        title={
+          selectedBarberForModal ? (
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 font-bold text-xs flex items-center justify-center shrink-0">
+                {selectedBarberForModal.avatar ||
+                  selectedBarberForModal.name?.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="text-left">
+                <span className="block text-sm font-extrabold text-white leading-tight">
+                  {selectedBarberForModal.name} • {barberModalAppointments.length}{" "}
+                  {barberModalAppointments.length === 1 ? "corte" : "cortes"}
+                </span>
+                <span className="block text-[11px] font-medium text-neutral-400">
+                  {selectedBarberForModal.role || "Barbeiro"} — Clique no card ou no dia/hora para abrir a agenda na data do agendamento
+                </span>
+              </div>
+            </div>
+          ) : (
+            "Agendamentos do Profissional"
+          )
+        }
+        footer={
+          <div className="w-full flex items-center justify-between gap-2">
+            <span className="text-[11px] text-neutral-400 font-mono">
+              Total previsto:{" "}
+              <strong className="text-emerald-400">
+                R${" "}
+                {barberModalAppointments
+                  .reduce((acc, a) => acc + Number(a.price || 0), 0)
+                  .toFixed(2)
+                  .replace(".", ",")}
+              </strong>
+            </span>
+            <Button
+              variant="secondary"
+              onClick={() => setSelectedBarberForModal(null)}
+              className="text-xs"
+            >
+              Fechar
+            </Button>
+          </div>
+        }
+      >
+        {selectedBarberForModal && (
+          <div className="space-y-3 text-left">
+            {/* Barra de Filtros Rápidos: Todos | Neste Dia | Outros Dias */}
+            {(() => {
+              const sameDayCount = barberModalAppointments.filter(
+                (a) => getAppointmentDateYMD(a) === activeDateYMD
+              ).length;
+              const otherDaysCount =
+                barberModalAppointments.length - sameDayCount;
+              const currentDayLabel = currentDate.toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+              });
+
+              return (
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-neutral-950 p-1.5 rounded-xl border border-neutral-800">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setBarberModalFilter("all")}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                        barberModalFilter === "all"
+                          ? "bg-amber-500 text-neutral-950"
+                          : "text-neutral-400 hover:text-white"
+                      }`}
+                    >
+                      Todos ({barberModalAppointments.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBarberModalFilter("current_day")}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                        barberModalFilter === "current_day"
+                          ? "bg-amber-500 text-neutral-950"
+                          : "text-neutral-400 hover:text-white"
+                      }`}
+                    >
+                      Dia {currentDayLabel} ({sameDayCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBarberModalFilter("other_days")}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                        barberModalFilter === "other_days"
+                          ? "bg-amber-500 text-neutral-950"
+                          : "text-neutral-400 hover:text-white"
+                      }`}
+                    >
+                      Outros Dias ({otherDaysCount})
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Lista de Cards dos Agendamentos */}
+            {filteredBarberModalAppointments.length === 0 ? (
+              <div className="p-6 bg-neutral-950/80 border border-neutral-800 rounded-2xl text-center space-y-2">
+                <Scissors className="w-7 h-7 text-neutral-600 mx-auto" />
+                <p className="text-xs font-bold text-neutral-300">
+                  Nenhum agendamento encontrado neste filtro.
+                </p>
+                <p className="text-[11px] text-neutral-500">
+                  Selecione &ldquo;Todos&rdquo; acima ou cadastre um novo horário na grade.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+                {filteredBarberModalAppointments.map((appt) => {
+                  const clientName =
+                    appt.clientName || appt.client_name || "Cliente";
+                  const clientPhone =
+                    appt.clientPhone || appt.client_phone || "";
+                  const serviceName =
+                    appt.serviceName || appt.service_name || "Corte Tradicional";
+                  const startTime =
+                    appt.startTime || appt.start_time || "09:00";
+                  const endTime = appt.endTime || appt.end_time || "09:30";
+                  const duration =
+                    appt.durationMinutes || appt.duration_minutes || 30;
+                  const price = Number(appt.price || 0);
+                  const status = appt.status || "confirmed";
+                  const isPaid = Boolean(appt.isPaid ?? appt.is_paid);
+
+                  const apptDateYMD = getAppointmentDateYMD(appt);
+                  const apptDateObj = parseYMDToLocalDate(apptDateYMD);
+                  const isSameAsCurrentView = apptDateYMD === activeDateYMD;
+                  const formattedBRDate = apptDateObj.toLocaleDateString(
+                    "pt-BR",
+                    {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    }
+                  );
+                  const shortBRDate = apptDateObj.toLocaleDateString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                  });
+                  const weekdayShort = apptDateObj.toLocaleDateString("pt-BR", {
+                    weekday: "short",
+                  });
+
+                  return (
+                    <div
+                      key={appt.id}
+                      onClick={() => handleJumpToAppointmentDate(appt)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleJumpToAppointmentDate(appt);
+                        }
+                      }}
+                      className={`group p-3.5 rounded-2xl border transition-all duration-150 cursor-pointer text-left ${
+                        isSameAsCurrentView
+                          ? "bg-neutral-900/90 border-amber-500/40 hover:border-amber-400"
+                          : "bg-neutral-950/90 border-neutral-800 hover:border-amber-500/70 hover:bg-neutral-900/80"
+                      }`}
+                    >
+                      {/* Linha 1: Nome do Cliente + Status */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <h4 className="text-sm font-bold text-white truncate group-hover:text-amber-300 transition-colors">
+                              {clientName}
+                            </h4>
+                          </div>
+                          {clientPhone && (
+                            <p className="text-[11px] text-neutral-400 font-mono flex items-center gap-1 mt-0.5">
+                              <Phone className="w-3 h-3 text-neutral-500 shrink-0" />
+                              <span>{clientPhone}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge status={status} size="sm" showIcon={false} />
+                        </div>
+                      </div>
+
+                      {/* Linha 2: Serviço e Valor */}
+                      <div className="mt-2 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-xs">
+                        <span className="text-neutral-300 font-medium flex items-center gap-1.5 truncate">
+                          <Scissors className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span className="truncate">{serviceName}</span>
+                          <span className="text-neutral-500 font-mono">
+                            ({duration} min)
+                          </span>
+                        </span>
+                        <span className="font-mono font-bold text-emerald-400 shrink-0">
+                          R$ {price.toFixed(2).replace(".", ",")}{" "}
+                          <span className="text-[10px] text-neutral-400 font-normal">
+                            ({isPaid ? "Pago" : "Pendente"})
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* Linha 3: Botão/Indicador Clicável de Dia e Hora (Abre a agenda no dia do agendamento) */}
+                      <div className="mt-2.5 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleJumpToAppointmentDate(appt);
+                          }}
+                          className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-amber-500/10 group-hover:bg-amber-500/20 border border-amber-500/30 group-hover:border-amber-400 text-amber-300 text-xs font-bold transition-all cursor-pointer"
+                          title={`Abrir agenda no dia ${formattedBRDate} às ${startTime}`}
+                        >
+                          <span className="flex items-center gap-1.5 font-mono">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="uppercase">{weekdayShort}</span>
+                            <span>{formattedBRDate}</span>
+                            <span className="text-neutral-500">•</span>
+                            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span>
+                              {startTime} às {endTime}
+                            </span>
+                          </span>
+
+                          <span className="flex items-center gap-1 text-[10px] font-extrabold text-amber-400 group-hover:translate-x-0.5 transition-transform shrink-0">
+                            <span>
+                              {isSameAsCurrentView
+                                ? "Focar no slot"
+                                : `Abrir dia ${shortBRDate}`}
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </span>
+                        </button>
+
+                        {onAppointmentClick && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedBarberForModal(null);
+                              onAppointmentClick(appt);
+                            }}
+                            className="px-2.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-300 hover:text-white text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                            title="Abrir ficha de detalhes / pagamento deste atendimento"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Ficha</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

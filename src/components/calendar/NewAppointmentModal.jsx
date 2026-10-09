@@ -16,6 +16,7 @@ export default function NewAppointmentModal({
   services = [],
   prefilledBarberId = "",
   prefilledTime = "",
+  prefilledDate = "",
 }) {
   const getTodayDateString = () => {
     const now = new Date();
@@ -81,6 +82,18 @@ export default function NewAppointmentModal({
 
     return options;
   }, [bookingDate]);
+
+  // Sincroniza a data pré-selecionada na agenda ao abrir o modal
+  useEffect(() => {
+    if (isOpen) {
+      const todayStr = getTodayDateString();
+      if (prefilledDate && prefilledDate >= todayStr) {
+        setBookingDate(prefilledDate);
+      } else {
+        setBookingDate(todayStr);
+      }
+    }
+  }, [isOpen, prefilledDate]);
 
   // Sincroniza os dados pré-preenchidos e ajusta o horário inicial válido
   useEffect(() => {

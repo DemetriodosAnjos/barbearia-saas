@@ -1,17 +1,20 @@
 import { useState, useMemo } from "react";
-import { Coffee } from "lucide-react";
+import { Coffee, Calendar } from "lucide-react";
 import { timelineColumnStyles } from "./BarberTimelineColumn.styles";
 import AppointmentCard from "./AppointmentCard";
 
 export default function BarberTimelineColumn({
   barber,
   startHour = 8,
-  endHour = 18,
+  endHour = 21,
   minuteHeight = 1.8,
   isPastDate = false,
   isSlotPast,
   breaks,
   appointments = [],
+  allBarberAppointments,
+  highlightedAppointmentId = null,
+  onOpenBarberAppointments,
   onSlotClick,
   onAppointmentClick,
   onStatusChange,
@@ -212,6 +215,11 @@ export default function BarberTimelineColumn({
 
   if (!barber) return null;
 
+  const fullAppointmentsList = Array.isArray(allBarberAppointments)
+    ? allBarberAppointments
+    : appointments;
+  const totalBarberCuts = fullAppointmentsList.length;
+
   return (
     <div className={timelineColumnStyles.column}>
       {/* 1. Cabeçalho do Barbeiro */}
@@ -225,9 +233,19 @@ export default function BarberTimelineColumn({
             <p className={timelineColumnStyles.role}>{barber.role}</p>
           </div>
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-          {appointments.length} cortes
-        </span>
+        <button
+          type="button"
+          onClick={() =>
+            onOpenBarberAppointments &&
+            onOpenBarberAppointments(barber, fullAppointmentsList)
+          }
+          title={`Ver os ${totalBarberCuts} agendamento(s) de ${barber.name} e ir para a data`}
+          aria-label={`Ver ${totalBarberCuts} cortes agendados de ${barber.name}`}
+          className="group text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 hover:text-amber-300 border border-amber-500/25 hover:border-amber-400/70 transition-all duration-150 cursor-pointer flex items-center gap-1 shrink-0 active:scale-95 shadow-xs"
+        >
+          <Calendar className="w-3 h-3 text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
+          <span>{totalBarberCuts} cortes</span>
+        </button>
       </div>
 
       {/* 2. Grade de Horários com Suporte a Drag & Drop */}
@@ -345,10 +363,12 @@ export default function BarberTimelineColumn({
             return (
               <div
                 key={appt.id}
+                id={`appt-slot-${appt.id}`}
                 style={cardPositionStyle}
                 className={`
                   ${timelineColumnStyles.cardWrapper}
                   ${isMenuOpenThisCard ? "!z-[100] !overflow-visible ring-2 ring-amber-500/80 shadow-2xl" : ""}
+                  ${highlightedAppointmentId === appt.id ? "!z-[90] ring-2 ring-amber-400 shadow-2xl shadow-amber-500/40 rounded-xl animate-pulse" : ""}
                 `}
               >
                 <AppointmentCard
@@ -361,7 +381,9 @@ export default function BarberTimelineColumn({
                     setOpenMenuApptId(open ? appt.id : null)
                   }
                   onClick={() => onAppointmentClick && onAppointmentClick(appt)}
-                  onStatusChange={onStatusChange}
+                  onStatusChange={(newStatus) =>
+                    onStatusChange && onStatusChange(appt.id, newStatus)
+                  }
                   onOpenComanda={onOpenComanda}
                   onCancel={onCancel}
                 />

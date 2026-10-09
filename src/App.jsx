@@ -377,6 +377,14 @@ export default function App() {
     }
   }, [currentScreen]);
 
+  const getTodayLocalYMD = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
   // Atendimento especificado: #apt-179138762174 concluído de R$ 20,00 com status Pendente
   const DEFAULT_APPOINTMENT_179138762174 = {
     id: "apt-179138762174",
@@ -385,6 +393,7 @@ export default function App() {
     clientName: "Marcos Oliveira",
     clientPhone: "(11) 98765-4321",
     serviceName: "Acabamento / Pezinho",
+    date: getTodayLocalYMD(),
     startTime: "10:00",
     endTime: "10:20",
     durationMinutes: 20,
@@ -615,8 +624,8 @@ export default function App() {
       ];
       const fallbackAppointments = [
         DEFAULT_APPOINTMENT_179138762174,
-        { id: "apt-1", barberId: "barber-carlos", barberName: "Carlos Silva", clientName: "João Pedro", clientPhone: "(11) 98765-4321", serviceName: "Corte Tradicional", startTime: "09:00", endTime: "09:40", durationMinutes: 40, price: 45, status: "confirmed", isPaid: true, isVip: false },
-        { id: "apt-2", barberId: "barber-lucas", barberName: "Lucas Rocha", clientName: "Mateus Costa", clientPhone: "(11) 91234-5678", serviceName: "Barba Completa", startTime: "10:00", endTime: "10:30", durationMinutes: 30, price: 35, status: "confirmed", isPaid: false, isVip: true },
+        { id: "apt-1", barberId: "barber-carlos", barberName: "Carlos Silva", clientName: "João Pedro", clientPhone: "(11) 98765-4321", serviceName: "Corte Tradicional", date: getTodayLocalYMD(), startTime: "09:00", endTime: "09:40", durationMinutes: 40, price: 45, status: "confirmed", isPaid: true, isVip: false },
+        { id: "apt-2", barberId: "barber-lucas", barberName: "Lucas Rocha", clientName: "Mateus Costa", clientPhone: "(11) 91234-5678", serviceName: "Barba Completa", date: getTodayLocalYMD(), startTime: "10:00", endTime: "10:30", durationMinutes: 30, price: 35, status: "confirmed", isPaid: false, isVip: true },
       ];
 
       setServices(fallbackServices);
@@ -643,6 +652,7 @@ export default function App() {
       clientName: bookingData.clientName,
       clientPhone: bookingData.clientPhone,
       serviceName: bookingData.services,
+      date: bookingData.date || getTodayLocalYMD(),
       startTime: bookingData.time,
       endTime: bookingData.endTime,
       durationMinutes: bookingData.totalDuration,
