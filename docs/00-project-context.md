@@ -1,4 +1,4 @@
-# Contexto do Projeto: SaaS de Agendamento e Gestão para Barbearias (SaaS V1.5.1.8)
+# Contexto do Projeto: SaaS de Agendamento e Gestão para Barbearias (SaaS V1.5.1.9)
 
 ## 1. Visão Geral do Sistema
 Plataforma SaaS Multi-tenant completa para gestão de barbearias, atendendo três públicos principais:

@@ -17,9 +17,10 @@
 - [x] **Chaves Privadas de Pagamento:**
   - `MERCADO_PAGO_ACCESS_TOKEN` e `STRIPE_SECRET_KEY` (`sk_live_...`) são mantidos exclusivamente em segredos de servidor/Edge Functions.
   - O front-end utiliza apenas as chaves públicas (`pk_live_...` e `APP_USR-...` pública para SDKs de checkout).
-- [x] **Template Sanitizado `.env.example`:**
+- [x] **Template Sanitizado `.env.example` & Zero-Hardcode em Stores:**
   - Arquivo `.env.example` versionado no Git contém apenas dados fictícios, documentando a divisão entre variáveis client-side e server-side.
   - O arquivo real `.env` está categoricamente listado no `.gitignore`.
+  - Os stores centrais de configuração (`apiKeysConfigStore.ts` e `mercadoPagoConfigStore.ts`) possuem **Zero Chaves Hardcoded** (verdadeiras ou falsas): todas as variáveis são resolvidas dinamicamente em tempo de execução via `import.meta.env` / `process.env` ou iniciam vazias.
 
 ---
 

@@ -23,10 +23,11 @@ A barra lateral de navegação (`src/components/ui/Sidebar.jsx` e `Sidebar.style
   - Ao ser clicado, abre diretamente o modal oficial de contratação: `"Escolha o plano ideal para a sua barbearia"`.
   - Possui a mesma funcionalidade e destino do botão `"Fazer Upgrade / Assinar"` presente na barra superior de contagem regressiva (`TrialBanner.jsx`).
 
-### 2.3 Versão Dinâmica do Sistema (`metadata.json`)
-- **Carregamento Automático:**
-  - O rodapé da Sidebar carrega diretamente o campo `"name"` do arquivo `metadata.json` (ex: `"SaaS V1.5.1.6"`).
-  - Sempre que a versão do projeto é atualizada em `metadata.json`, a exibição na Sidebar atualiza de forma reativa e automática sem necessidade de hardcode.
+### 2.3 Versão Centralizada do Sistema (`metadata.json`)
+- **Carregamento Automático e Centralizado:**
+  - O rodapé da Sidebar carrega diretamente o campo `"name"` do arquivo `metadata.json` (`"SaaS V1.5.1.9"`).
+  - A versão é renderizada em bloco dedicado, centralizado horizontalmente (`text-center` e `justify-center`), com divisor sutil e tipografia monoespaçada em destaque Âmbar (`text-amber-400 font-mono font-bold tracking-wider`).
+  - Quando a barra lateral é recolhida, a versão compactada (`V1.5.1.9`) permanece centralizada e com tooltip acessível.
 - **Substituição de Informações Técnicas e Remoção do Avatar:**
   - O termo técnico de autenticação `"Authenticated"` e o avatar circular com iniciais foram removidos do rodapé da Sidebar.
-  - A visualização foi substituída pelo nome do usuário ativo e a versão oficial em destaque monoespaçado Âmbar (`text-amber-400 font-mono font-bold`).
+  - A visualização foi substituída pelo nome do usuário ativo e a versão oficial `SaaS V1.5.1.9` centralizada.
