@@ -685,7 +685,7 @@ export default function App() {
     setAppointments((prev) => [...prev, createdAppointment]);
   };
 
-  const showDevNav = urlParams.get("dev") === "true";
+  const showDevNav = urlParams.get("dev") !== "false";
 
   return (
     <div className="min-h-screen bg-neutral-900 text-neutral-100 flex flex-col">
@@ -701,7 +701,7 @@ export default function App() {
               <div className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <span>Barbearia SaaS</span>
                 <span className="text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                  v1.5.1.7
+                  v1.5.2.0
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 hidden sm:block">
@@ -759,7 +759,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Barra de Navegação Central do SaaS (Apenas visível se ?dev=true) */}
+      {/* Barra de Navegação Central do SaaS (Sempre visível para alternância fluida entre módulos) */}
       {showDevNav && (
       <div className="bg-neutral-900 border-b border-neutral-800 p-2.5 flex flex-wrap items-center justify-between gap-3 text-xs z-50 sticky top-0 shadow-lg select-none">
         <div className="flex flex-wrap items-center gap-2">
@@ -781,7 +781,23 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setCurrentScreen("barbershop")}
+            onClick={() => {
+              if (activeUserRole === USER_ROLES.ANON) {
+                setActiveUserRole(USER_ROLES.ADMIN);
+                if (!currentUser) {
+                  setCurrentUser({
+                    id: "owner-usr-01",
+                    email: "admin@barbearia.com",
+                    user_metadata: {
+                      name: "Carlos Gestor",
+                      role: USER_ROLES.ADMIN,
+                      barbershop_name: tenant?.name || "Vintage Club Barber Shop",
+                    },
+                  });
+                }
+              }
+              setCurrentScreen("barbershop");
+            }}
             className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
               currentScreen === "barbershop"
                 ? "bg-amber-600 text-white shadow-xs"

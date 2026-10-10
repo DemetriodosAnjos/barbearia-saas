@@ -29,6 +29,9 @@ import {
   loginController,
   refreshTokenController,
   logoutController,
+  googleOAuthUrlController,
+  googleOAuthTokenExchangeController,
+  googleSsoController,
   REFRESH_COOKIE_NAME,
   getRefreshTokenCookieOptions,
 } from "./authController";
@@ -45,6 +48,9 @@ export interface EndpointHandlerConfig {
 
 export const ENDPOINT_CATALOG: EndpointHandlerConfig[] = [
   { method: "POST", pathPattern: /^\/api\/auth\/login$/, schema: API_SCHEMAS.auth.login },
+  { method: "GET", pathPattern: /^\/api\/auth\/google\/url$/ },
+  { method: "POST", pathPattern: /^\/api\/auth\/google\/token$/ },
+  { method: "POST", pathPattern: /^\/api\/auth\/google$/ },
   { method: "POST", pathPattern: /^\/api\/auth\/refresh$/ },
   { method: "POST", pathPattern: /^\/api\/auth\/logout$/ },
   { method: "POST", pathPattern: /^\/api\/auth\/register$/, schema: API_SCHEMAS.auth.register },
@@ -403,6 +409,95 @@ export async function dispatchApiRequest(
       if (pathname === "/api/auth/logout" && method === "POST") {
         res.setHeader("Set-Cookie", `${REFRESH_COOKIE_NAME}=; Path=/api/auth; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly`);
         return sendJson(200, { success: true, message: "Sessão encerrada com sucesso." });
+      }
+
+      // 10b. Roteamento de Autenticação Google SSO (OAuth 2.0 / OpenID Connect)
+      if (pathname === "/api/auth/google/url" && method === "GET") {
+        let responseSent = false;
+        const fakeReq = {
+          query,
+          headers: req.headers,
+        } as any;
+        const fakeRes = {
+          status(statusCode: number) {
+            this.statusCode = statusCode;
+            return this;
+          },
+          json(data: any) {
+            responseSent = true;
+            sendJson(this.statusCode || 200, data);
+            return this;
+          },
+        } as any;
+        await googleOAuthUrlController(fakeReq, fakeRes);
+        if (!responseSent && !res.headersSent) {
+          sendJson(200, { success: true });
+        }
+        return;
+      }
+
+      if (pathname === "/api/auth/google/token" && method === "POST") {
+        let responseSent = false;
+        const fakeReq = {
+          body: parsedBody,
+          headers: req.headers,
+        } as any;
+        const fakeRes = {
+          status(statusCode: number) {
+            this.statusCode = statusCode;
+            return this;
+          },
+          json(data: any) {
+            responseSent = true;
+            sendJson(this.statusCode || 200, data);
+            return this;
+          },
+        } as any;
+        await googleOAuthTokenExchangeController(fakeReq, fakeRes);
+        if (!responseSent && !res.headersSent) {
+          sendJson(200, { success: true });
+        }
+        return;
+      }
+
+      if (pathname === "/api/auth/google" && method === "POST") {
+        let responseSent = false;
+        const fakeReq = {
+          body: parsedBody,
+          cookies: {},
+          headers: req.headers,
+        } as any;
+
+        const fakeRes = {
+          status(statusCode: number) {
+            this.statusCode = statusCode;
+            return this;
+          },
+          cookie(name: string, val: string, options: any) {
+            const isProd = process.env.NODE_ENV === "production";
+            const cookieParts = [
+              `${name}=${encodeURIComponent(val)}`,
+              `Path=${options.path || "/api/auth"}`,
+              `Max-Age=${Math.floor((options.maxAge || 604800000) / 1000)}`,
+              options.httpOnly ? "HttpOnly" : "",
+              options.secure || isProd ? "Secure" : "",
+              `SameSite=${options.sameSite || "Lax"}`,
+            ].filter(Boolean);
+            res.setHeader("Set-Cookie", cookieParts.join("; "));
+            return this;
+          },
+          json(data: any) {
+            responseSent = true;
+            sendJson(this.statusCode || 200, data);
+            return this;
+          },
+        } as any;
+
+        await googleSsoController(fakeReq, fakeRes);
+        if (!responseSent && !res.headersSent) {
+          sendJson(200, { success: true });
+        }
+        return;
       }
 
       // 11. Roteamento de Pagamentos Mercado Pago API

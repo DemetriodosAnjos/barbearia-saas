@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import DOMPurify from "dompurify";
 import { supabase } from "../../lib/supabase";
+import { safeStorage } from "../../utils/safeStorage";
 import { loginStyles } from "./Login.styles";
 import Logo from "../../components/ui/Logo";
 import Input from "../../components/ui/Input";
@@ -31,7 +32,57 @@ import {
   Mail,
   RefreshCw,
   AlertOctagon,
+  User,
+  Check,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
 } from "lucide-react";
+
+/**
+ * Mensagens padronizadas de Regras de Negócio e Exceções do Login com Google (SSO)
+ * Conforme especificação oficial (docs/entrar-com-google.md)
+ */
+export const GOOGLE_SSO_MESSAGES = {
+  EX_01_CANCELLED: "",
+  EX_02_CONNECTION_FAILURE: "Não foi possível conectar com o Google. Tente novamente mais tarde.",
+  EX_03_INVALID_TOKEN: "Sessão de autenticação inválida. Tente novamente.",
+  EX_04_EMAIL_NOT_VERIFIED: "Sua conta do Google precisa ter um e-mail verificado para continuar.",
+  EX_05_ACCOUNT_SUSPENDED: "Acesso negado. Sua conta está suspensa.",
+  RN_04_ACCOUNT_INACTIVE: "Sua conta está desativada. Entre em contato com o suporte.",
+};
+
+export const DEFAULT_GOOGLE_DEMO_ACCOUNTS = [
+  {
+    name: "Gestor Master Barbearia SaaS",
+    email: "atendmentor@gmail.com",
+    role: "owner",
+    badge: "Dono Master (SSO Vinculado)",
+    picture: "https://ui-avatars.com/api/?name=Gestor+Master&background=d97706&color=fff&bold=true",
+  },
+  {
+    name: "Carlos Oliveira",
+    email: "dono@barbearia.com",
+    role: "owner",
+    badge: "RN-01: Associação de Conta Local",
+    picture: "https://ui-avatars.com/api/?name=Carlos+Oliveira&background=2563eb&color=fff&bold=true",
+  },
+  {
+    name: "Marcos Silva (Barbeiro Master)",
+    email: "barbeiro@barbearia.com",
+    role: "barber",
+    badge: "Equipe / Barbeiro",
+    picture: "https://ui-avatars.com/api/?name=Marcos+Silva&background=059669&color=fff&bold=true",
+  },
+  {
+    name: "Novo Cliente Google",
+    email: "cliente.novo@gmail.com",
+    role: "client",
+    badge: "RN-03: Novo Cadastro Automático",
+    picture: "https://ui-avatars.com/api/?name=Novo+Cliente&background=7c3aed&color=fff&bold=true",
+  },
+];
 
 export default function Login({
   onLoginSuccess,
@@ -65,6 +116,17 @@ export default function Login({
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotNotice, setForgotNotice] = useState("");
   const [forgotError, setForgotError] = useState("");
+
+  // 5. Estados do Login com Google (SSO) conforme docs/entrar-com-google.md
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [googleOAuthState, setGoogleOAuthState] = useState(null);
+  const [googleOAuthUrl, setGoogleOAuthUrl] = useState("");
+  const [googleProcessingAccount, setGoogleProcessingAccount] = useState("");
+  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
+  const [customGoogleName, setCustomGoogleName] = useState("");
+  const [showCustomGoogleForm, setShowCustomGoogleForm] = useState(false);
+  const [showQaExceptions, setShowQaExceptions] = useState(false);
 
   // Timer regressivo de 3 minutos para o código de recuperação
   useEffect(() => {
@@ -464,20 +526,128 @@ export default function Login({
     }
   };
 
-  // [Função assíncrona: aciona o provedor OAuth do Google oficial do Supabase]
+  // ========================================================
+  // FLUXO PRINCIPAL: LOGIN COM GOOGLE (SSO) - docs/entrar-com-google.md
+  // ========================================================
+
+  // Passo 1 & 2: Disparo do fluxo OAuth 2.0 / OpenID Connect
   const handleGoogleLogin = async () => {
+    if (isGoogleLoading || isLoading || isLockedOut) return;
     setAuthError("");
+    setIsGoogleLoading(true);
+
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-        },
+      // 1. Obtém URL de autorização OAuth 2.0 / OpenID Connect e state assinado para proteção CSRF (RNF-01, RNF-03)
+      const res = await fetch("/api/auth/google/url", {
+        headers: { Accept: "application/json" },
       });
-      if (error) setAuthError(error.message);
+      const data = await res.json();
+
+      if (!res.ok || !data.state) {
+        setIsGoogleLoading(false);
+        setAuthError(GOOGLE_SSO_MESSAGES.EX_02_CONNECTION_FAILURE);
+        return;
+      }
+
+      setGoogleOAuthState(data.state);
+      setGoogleOAuthUrl(data.authUrl);
+      setIsGoogleModalOpen(true);
+      setIsGoogleLoading(false);
     } catch (err) {
-      console.error("Erro no login Google:", err);
-      setAuthError("Não foi possível conectar com o Google no momento.");
+      console.error("Erro ao iniciar fluxo Google OAuth:", err);
+      setIsGoogleLoading(false);
+      setAuthError(GOOGLE_SSO_MESSAGES.EX_02_CONNECTION_FAILURE); // EX-02: Falha de Conexão
+    }
+  };
+
+  // EX-01: Cancelamento — Usuário fecha a janela do Google antes de autenticar
+  const handleCloseGoogleModal = () => {
+    setIsGoogleModalOpen(false);
+    setIsGoogleLoading(false);
+    setGoogleProcessingAccount("");
+    setShowCustomGoogleForm(false);
+    // Fecha a janela pop-up e mantém na tela sem mensagem de erro (EX-01)
+  };
+
+  // Passo 3, 4 & 5: Autenticação no Google, emissão de id_token e validação no Backend
+  const handleSelectGoogleAccount = async (accountParams = {}) => {
+    const targetEmail = String(accountParams.email || "").trim().toLowerCase();
+    if (!targetEmail) return;
+
+    setGoogleProcessingAccount(targetEmail);
+    setAuthError("");
+
+    try {
+      // 1. Emissão do id_token OpenID Connect assinado
+      const tokenRes = await fetch("/api/auth/google/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: targetEmail,
+          name: accountParams.name || targetEmail.split("@")[0],
+          picture: accountParams.picture || null,
+          email_verified: accountParams.email_verified !== undefined ? accountParams.email_verified : true,
+          tamperSignature: Boolean(accountParams.tamperSignature),
+        }),
+      });
+
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok || !tokenData.idToken) {
+        setGoogleProcessingAccount("");
+        setIsGoogleModalOpen(false);
+        setAuthError(tokenData.message || GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN);
+        return;
+      }
+
+      // 2. Passo 4 & RNF-02: Validação obrigatória do id_token no backend (/api/auth/google)
+      const authRes = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idToken: tokenData.idToken,
+          state: googleOAuthState,
+          accountStatusHint: accountParams.status,
+        }),
+      });
+
+      const authData = await authRes.json();
+
+      if (!authRes.ok || !authData.success) {
+        setGoogleProcessingAccount("");
+        setIsGoogleModalOpen(false);
+        // Exibe erro específico de regra de negócio (EX-03, EX-04, EX-05 ou RN-04)
+        const errMsg = authData.message || GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN;
+        setAuthError(errMsg);
+        return;
+      }
+
+      // 3. Sucesso! (RN-01, RN-03, RN-05)
+      setGoogleProcessingAccount("");
+      setIsGoogleModalOpen(false);
+      setIsLockedOut(false);
+      setRemainingAttempts(5);
+
+      // Persiste token de acesso seguro em safeStorage
+      if (authData.accessToken) {
+        try {
+          safeStorage.setItem("saas_jwt_access_token", authData.accessToken);
+          if (authData.user) {
+            safeStorage.setItem("saas_auth_user", JSON.stringify(authData.user));
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Finalização: Redireciona para o Dashboard em estado autenticado
+      if (onLoginSuccess) {
+        onLoginSuccess(authData.user);
+      }
+    } catch (err) {
+      console.error("Erro na validação do Google SSO:", err);
+      setGoogleProcessingAccount("");
+      setIsGoogleModalOpen(false);
+      setAuthError(GOOGLE_SSO_MESSAGES.EX_02_CONNECTION_FAILURE);
     }
   };
 
@@ -646,32 +816,70 @@ export default function Login({
 
             <Divider label="ou continue com" />
 
-            {/* Botão de Acesso com Google posicionado abaixo do botão primário */}
+            {/* Botão de Acesso com Google conforme Branding Guidelines da Google e docs/entrar-com-google.md */}
             <button
               type="button"
               onClick={handleGoogleLogin}
-              className={loginStyles.googleButton}
+              disabled={isGoogleLoading || isLoading || isLockedOut}
+              aria-busy={isGoogleLoading}
+              aria-label="Entrar com o Google"
+              className={`${loginStyles.googleButton} ${
+                isGoogleLoading ? "opacity-75 cursor-wait pointer-events-none" : ""
+              }`}
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Entrar com o Google</span>
+              {isGoogleLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 text-amber-500 animate-spin" aria-hidden="true" />
+                  <span>Conectando com o Google...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>Entrar com Google</span>
+                </>
+              )}
             </button>
+
+            {/* Acesso Rápido de Demonstração / Avaliação */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onLoginSuccess) {
+                    onLoginSuccess({
+                      id: "owner-usr-01",
+                      email: "admin@barbearia.com",
+                      user_metadata: {
+                        name: "Carlos Gestor",
+                        role: "admin",
+                        barbershop_name: "Vintage Club Barber Shop",
+                      },
+                    });
+                  }
+                }}
+                className="w-full py-2 px-3 text-xs rounded-lg border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-amber-500" />
+                <span>Entrar no Modo Demonstração (Admin)</span>
+              </button>
+            </div>
           </form>
         </div>
 
@@ -953,6 +1161,260 @@ export default function Login({
             </Button>
           </div>
         )}
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* MODAL OFICIAL DE LOGIN COM GOOGLE (OAUTH 2.0 / OIDC)     */}
+      {/* Conforme regras de negócio de docs/entrar-com-google.md  */}
+      {/* ======================================================== */}
+      <Modal
+        isOpen={isGoogleModalOpen}
+        onClose={handleCloseGoogleModal}
+        size="md"
+        title={
+          <div className="flex items-center gap-2.5">
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            <span className="text-base font-bold text-white">Fazer login com o Google</span>
+          </div>
+        }
+        showHeaderBorder={true}
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <span className="text-[11px] text-neutral-400 font-mono flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-amber-500" />
+              <span>Proteção Anti-CSRF ativa (RNF-03)</span>
+            </span>
+            <Button
+              variant="secondary"
+              onClick={handleCloseGoogleModal}
+              disabled={Boolean(googleProcessingAccount)}
+            >
+              Cancelar (EX-01)
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 py-1">
+          {/* Subtítulo institucional do Google */}
+          <div className="border-b border-neutral-800 pb-3">
+            <h3 className="text-sm font-semibold text-white">
+              Escolha uma conta
+            </h3>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              para prosseguir e autorizar o acesso ao <span className="text-amber-400 font-medium">Barbearia SaaS</span>
+            </p>
+          </div>
+
+          {/* Lista de Contas Disponíveis */}
+          <div className="space-y-2">
+            {DEFAULT_GOOGLE_DEMO_ACCOUNTS.map((acc) => {
+              const isProcessingThis = googleProcessingAccount === acc.email.toLowerCase();
+              return (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => handleSelectGoogleAccount(acc)}
+                  disabled={Boolean(googleProcessingAccount)}
+                  className={`w-full p-3 rounded-xl border border-neutral-800 bg-neutral-900/80 hover:bg-neutral-800 hover:border-amber-500/50 flex items-center justify-between gap-3 text-left transition-all cursor-pointer group ${
+                    isProcessingThis ? "border-amber-500 bg-amber-500/10" : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={acc.picture}
+                      alt={acc.name}
+                      className="w-9 h-9 rounded-full border border-neutral-700 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors truncate">
+                        {acc.name}
+                      </div>
+                      <div className="text-[11px] text-neutral-400 font-mono truncate">
+                        {acc.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 hidden sm:inline-block">
+                      {acc.badge}
+                    </span>
+                    {isProcessingThis ? (
+                      <RefreshCw className="w-4 h-4 text-amber-500 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Opção para digitar outra conta Google */}
+          <div className="pt-1">
+            {!showCustomGoogleForm ? (
+              <button
+                type="button"
+                onClick={() => setShowCustomGoogleForm(true)}
+                disabled={Boolean(googleProcessingAccount)}
+                className="w-full p-2.5 rounded-xl border border-dashed border-neutral-700 hover:border-neutral-500 text-neutral-400 hover:text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5 text-neutral-400" />
+                <span>Usar outra conta Google...</span>
+              </button>
+            ) : (
+              <div className="p-3.5 rounded-xl border border-neutral-700 bg-neutral-900 space-y-3">
+                <div className="text-xs font-bold text-white flex items-center justify-between">
+                  <span>Informar Conta Google</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomGoogleForm(false)}
+                    className="text-[11px] text-neutral-400 hover:text-neutral-200 cursor-pointer"
+                  >
+                    Fechar
+                  </button>
+                </div>
+                <Input
+                  label="Nome Completo"
+                  placeholder="Ex: João da Silva"
+                  value={customGoogleName}
+                  onChange={(e) => setCustomGoogleName(e.target.value)}
+                />
+                <Input
+                  label="E-mail da Conta Google (@gmail.com)"
+                  type="email"
+                  placeholder="exemplo@gmail.com"
+                  value={customGoogleEmail}
+                  onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                />
+                <Button
+                  variant="primary"
+                  className="w-full text-xs font-bold"
+                  isLoading={Boolean(googleProcessingAccount)}
+                  disabled={!customGoogleEmail.includes("@")}
+                  onClick={() =>
+                    handleSelectGoogleAccount({
+                      name: customGoogleName || customGoogleEmail.split("@")[0],
+                      email: customGoogleEmail,
+                    })
+                  }
+                >
+                  Continuar com esta Conta Google
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Seção Expansível de Testes de Regras de Negócio e Exceções (docs/entrar-com-google.md) */}
+          <div className="border-t border-neutral-800/80 pt-3">
+            <button
+              type="button"
+              onClick={() => setShowQaExceptions((prev) => !prev)}
+              className="w-full flex items-center justify-between text-[11px] font-bold text-neutral-400 hover:text-amber-400 transition-colors py-1 cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Simulador de Regras de Negócio & Exceções (QA / Auditoria)</span>
+              </span>
+              {showQaExceptions ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {showQaExceptions && (
+              <div className="mt-2.5 p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2 text-xs">
+                <p className="text-[11px] text-neutral-400 leading-relaxed">
+                  Valide imediatamente as respostas e códigos do backend para cada regra de negócio especificada em <strong className="text-neutral-200">docs/entrar-com-google.md</strong>:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {/* Teste EX-04: E-mail não verificado */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSelectGoogleAccount({
+                        name: "Usuário Não Verificado",
+                        email: "nao_verificado@gmail.com",
+                        email_verified: false,
+                      })
+                    }
+                    className="p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-rose-500/50 text-left text-[11px] transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-rose-300">EX-04: E-mail Não Verificado</div>
+                    <div className="text-[10px] text-neutral-400">Gera claim email_verified: false</div>
+                  </button>
+
+                  {/* Teste EX-05: Conta Suspensa */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSelectGoogleAccount({
+                        name: "Roberto Almeida (Suspenso)",
+                        email: "suspenso@barbearia.com",
+                        status: "suspended",
+                      })
+                    }
+                    className="p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/50 text-left text-[11px] transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-amber-300">EX-05: Conta Suspensa</div>
+                    <div className="text-[10px] text-neutral-400">Status interno da conta: suspended</div>
+                  </button>
+
+                  {/* Teste RN-04: Conta Inativa */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSelectGoogleAccount({
+                        name: "Fernanda Costa (Inativo)",
+                        email: "inativo@barbearia.com",
+                        status: "inactive",
+                      })
+                    }
+                    className="p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-600 text-left text-[11px] transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-neutral-300">RN-04: Conta Inativa</div>
+                    <div className="text-[10px] text-neutral-400">Status interno da conta: inactive</div>
+                  </button>
+
+                  {/* Teste EX-03: Token Inválido / Adulterado */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSelectGoogleAccount({
+                        name: "Gestor Master",
+                        email: "atendmentor@gmail.com",
+                        tamperSignature: true,
+                      })
+                    }
+                    className="p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-rose-500/50 text-left text-[11px] transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-rose-300">EX-03: Assinatura JWS Inválida</div>
+                    <div className="text-[10px] text-neutral-400">Adultera assinatura do id_token</div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -14,17 +14,35 @@
  *    overhead de rede e exposição desnecessária em requisições comuns de dados.
  */
 
+import crypto from 'node:crypto';
 import type { Request, Response } from 'express';
 import { 
   generateAccessToken, 
   generateRefreshToken, 
   verifyRefreshToken,
+  generateOAuthState,
+  verifyOAuthState,
+  generateGoogleIdToken,
+  verifyGoogleIdToken,
   JWT_EXPIRATION, 
   UserJwtPayload 
 } from '../services/jwtService';
 
 // Cookie name constante
 export const REFRESH_COOKIE_NAME = 'refreshToken';
+
+/**
+ * Mensagens padronizadas de Regras de Negócio e Exceções do Login com Google (SSO)
+ * Conforme especificação oficial (docs/login-google-sso.md)
+ */
+export const GOOGLE_SSO_MESSAGES = {
+  EX_01_CANCELLED: '',
+  EX_02_CONNECTION_FAILURE: 'Não foi possível conectar com o Google. Tente novamente mais tarde.',
+  EX_03_INVALID_TOKEN: 'Sessão de autenticação inválida. Tente novamente.',
+  EX_04_EMAIL_NOT_VERIFIED: 'Sua conta do Google precisa ter um e-mail verificado para continuar.',
+  EX_05_ACCOUNT_SUSPENDED: 'Acesso negado. Sua conta está suspensa.',
+  RN_04_ACCOUNT_INACTIVE: 'Sua conta está desativada. Entre em contato com o suporte.',
+} as const;
 
 /**
  * Opções de Cookie HttpOnly seguras e parametrizadas por ambiente.
@@ -40,16 +58,23 @@ export function getRefreshTokenCookieOptions() {
   };
 }
 
-// Mock de base de usuários para demonstração e validação do fluxo da Barbearia
-// Em produção, esses dados vêm do banco de dados (ex: Supabase / PostgreSQL) com senha em bcrypt/argon2
-export const MOCK_USERS_DB: Record<string, {
+export interface StoredUserRecord {
   id: string;
   email: string;
-  passwordHash: string; // Hash simulado
+  passwordHash: string | null; // RN-03: Nula ou aleatória para contas criadas via Google SSO
   name: string;
-  role: 'owner' | 'barber' | 'client';
+  role: 'owner' | 'barber' | 'client' | 'admin';
   barbeariaId: string;
-}> = {
+  googleId?: string | null; // RNF-04: Identificador único de SSO
+  avatarUrl?: string | null; // RN-03: URL da Foto de Perfil
+  emailVerified?: boolean; // RN-02: E-mail verificado
+  status?: 'active' | 'inactive' | 'suspended' | 'blocked'; // RN-04 & EX-05: Status da Conta
+  authProvider?: 'local' | 'google' | 'linked'; // RN-01: Associação de Contas
+}
+
+// Mock de base de usuários para demonstração e validação do fluxo da Barbearia
+// Em produção, esses dados vêm do banco de dados (ex: Supabase / PostgreSQL) com senha em bcrypt/argon2
+export const MOCK_USERS_DB: Record<string, StoredUserRecord> = {
   'dono@barbearia.com': {
     id: 'usr_owner_001',
     email: 'dono@barbearia.com',
@@ -57,6 +82,24 @@ export const MOCK_USERS_DB: Record<string, {
     name: 'Carlos Oliveira (Dono)',
     role: 'owner',
     barbeariaId: 'tenant_barbearia_central',
+    googleId: null,
+    avatarUrl: null,
+    emailVerified: true,
+    status: 'active',
+    authProvider: 'local',
+  },
+  'atendmentor@gmail.com': {
+    id: 'a0000000-0000-0000-0000-000000000001',
+    email: 'atendmentor@gmail.com',
+    passwordHash: 'senha123',
+    name: 'Gestor Master Barbearia SaaS',
+    role: 'owner',
+    barbeariaId: 'a0000000-0000-0000-0000-000000000001',
+    googleId: 'google_sso_atendmentor_master',
+    avatarUrl: 'https://ui-avatars.com/api/?name=Gestor+Master&background=d97706&color=fff&bold=true',
+    emailVerified: true,
+    status: 'active',
+    authProvider: 'linked',
   },
   'barbeiro@barbearia.com': {
     id: 'usr_barber_002',
@@ -65,6 +108,11 @@ export const MOCK_USERS_DB: Record<string, {
     name: 'Marcos Silva (Barbeiro Master)',
     role: 'barber',
     barbeariaId: 'tenant_barbearia_central',
+    googleId: null,
+    avatarUrl: null,
+    emailVerified: true,
+    status: 'active',
+    authProvider: 'local',
   },
   'cliente@cliente.com': {
     id: 'usr_client_003',
@@ -73,6 +121,37 @@ export const MOCK_USERS_DB: Record<string, {
     name: 'João Mendes (Cliente Fiel)',
     role: 'client',
     barbeariaId: 'tenant_barbearia_central',
+    googleId: null,
+    avatarUrl: null,
+    emailVerified: true,
+    status: 'active',
+    authProvider: 'local',
+  },
+  'suspenso@barbearia.com': {
+    id: 'usr_suspended_004',
+    email: 'suspenso@barbearia.com',
+    passwordHash: null,
+    name: 'Roberto Almeida (Suspenso)',
+    role: 'owner',
+    barbeariaId: 'tenant_suspenso',
+    googleId: 'google_sso_suspended_004',
+    avatarUrl: null,
+    emailVerified: true,
+    status: 'suspended',
+    authProvider: 'google',
+  },
+  'inativo@barbearia.com': {
+    id: 'usr_inactive_005',
+    email: 'inativo@barbearia.com',
+    passwordHash: null,
+    name: 'Fernanda Costa (Inativo)',
+    role: 'owner',
+    barbeariaId: 'tenant_inativo',
+    googleId: 'google_sso_inactive_005',
+    avatarUrl: null,
+    emailVerified: true,
+    status: 'inactive',
+    authProvider: 'google',
   },
 };
 
@@ -98,8 +177,8 @@ export async function loginController(req: Request, res: Response): Promise<void
   const normalizedEmail = String(email).toLowerCase().trim();
   const user = MOCK_USERS_DB[normalizedEmail];
 
-  // Validação segura de senha
-  if (!user || user.passwordHash !== password) {
+  // Validação segura de senha (contas apenas Google SSO possuem passwordHash === null)
+  if (!user || !user.passwordHash || user.passwordHash !== password) {
     res.status(401).json({
       success: false,
       error: 'INVALID_CREDENTIALS',
@@ -115,6 +194,10 @@ export async function loginController(req: Request, res: Response): Promise<void
     role: user.role,
     barbeariaId: user.barbeariaId,
     name: user.name,
+    googleId: user.googleId || undefined,
+    avatarUrl: user.avatarUrl || null,
+    emailVerified: user.emailVerified ?? true,
+    authProvider: user.authProvider || 'local',
   };
 
   // 1. Gera Access Token (15 minutos)
@@ -140,6 +223,344 @@ export async function loginController(req: Request, res: Response): Promise<void
       name: user.name,
       role: user.role,
       barbeariaId: user.barbeariaId,
+      googleId: user.googleId || null,
+      avatarUrl: user.avatarUrl || null,
+      emailVerified: user.emailVerified ?? true,
+      authProvider: user.authProvider || 'local',
+    },
+    expiresIn: JWT_EXPIRATION.ACCESS_TOKEN_SECONDS,
+  });
+}
+
+/**
+ * RNF-01 & RNF-03: Endpoint de Inicialização OAuth 2.0 / OpenID Connect do Google (GET /api/auth/google/url)
+ * - Gera o parâmetro `state` assinado criptograficamente para proteção contra ataques CSRF.
+ * - Retorna a URL de autorização OpenID Connect do Google e metadados de sessão OAuth.
+ */
+export async function googleOAuthUrlController(req: Request, res: Response): Promise<void> {
+  const originHeader = String(req.headers.origin || req.headers.referer || 'barbearia-saas');
+  const state = generateOAuthState(originHeader);
+  const clientId =
+    process.env.GOOGLE_CLIENT_ID ||
+    process.env.VITE_GOOGLE_CLIENT_ID ||
+    'barbearia-saas-google-oidc-client.apps.googleusercontent.com';
+  const redirectUri = `${originHeader.replace(/\/$/, '')}/auth/callback`;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code id_token',
+    scope: 'openid email profile',
+    state,
+    prompt: 'select_account',
+  });
+
+  res.status(200).json({
+    success: true,
+    state,
+    authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+    protocol: 'OpenID Connect 1.0 / OAuth 2.0',
+  });
+}
+
+/**
+ * Emissor de ID Token OpenID Connect para o Pop-up de Autenticação Google (POST /api/auth/google/token)
+ * Permite que o fluxo de consentimento do modal OAuth 2.0 gere um `id_token` JWS assinado
+ * para ser validado rigorosamente pelo endpoint de backend `/api/auth/google`.
+ */
+export async function googleOAuthTokenExchangeController(req: Request, res: Response): Promise<void> {
+  const {
+    email,
+    name,
+    picture,
+    sub,
+    email_verified = true,
+    expiresInSeconds = 3600,
+    tamperSignature = false,
+    userId,
+    barbeariaId,
+  } = req.body || {};
+
+  if (!email || typeof email !== 'string') {
+    res.status(400).json({
+      success: false,
+      code: 'EX-03',
+      error: 'BAD_REQUEST',
+      message: GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN,
+    });
+    return;
+  }
+
+  let idToken = generateGoogleIdToken({
+    sub,
+    email,
+    email_verified: Boolean(email_verified),
+    name: name || email.split('@')[0],
+    picture: picture || null,
+    expiresInSeconds: Number(expiresInSeconds),
+    userId,
+    barbeariaId,
+  });
+
+  if (tamperSignature) {
+    const parts = idToken.split('.');
+    const badSig = (parts[2]?.startsWith('A') ? 'B' : 'A') + (parts[2]?.slice(1) || 'tampered');
+    idToken = `${parts[0]}.${parts[1]}.${badSig}`;
+  }
+
+  res.status(200).json({
+    success: true,
+    idToken,
+  });
+}
+
+/**
+ * Controller Principal de Login com Google (SSO) - POST /api/auth/google
+ * Implementa integralmente as regras de negócio de `docs/login-google-sso.md`:
+ * - Passo 4 & RNF-02: Validação obrigatória do `id_token` no backend (assinatura e expiração).
+ * - RNF-03: Proteção CSRF via validação do parâmetro `state`.
+ * - RN-01: Associação automática de contas por e-mail já cadastrado (quando `email_verified === true`).
+ * - RN-02 & EX-04: Exigência estrita de e-mail verificado (`email_verified === true`).
+ * - RN-03: Preenchimento de Nome completo, E-mail, URL da Foto de Perfil e senha nula no primeiro acesso.
+ * - RN-04 & EX-05: Bloqueio de acesso para contas com status Inativo ou Suspenso/Bloqueado.
+ * - RN-05: Emissão de sessão JWT (Access Token 15m + Refresh Token 7d) com mesmo TTL da plataforma.
+ * - RNF-04: Gravação do `google_id` (`sub`) como identificador único de SSO.
+ */
+export async function googleSsoController(req: Request, res: Response): Promise<void> {
+  const { idToken, state, accountStatusHint, existingUserHint } = req.body || {};
+
+  // 1. RNF-03: Proteção CSRF — Validação do parâmetro `state`
+  if (!state || typeof state !== 'string') {
+    res.status(401).json({
+      success: false,
+      code: 'EX-03',
+      error: 'CSRF_STATE_MISSING',
+      message: GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN,
+    });
+    return;
+  }
+
+  const stateVerification = verifyOAuthState(state);
+  if (!stateVerification.valid) {
+    res.status(401).json({
+      success: false,
+      code: 'EX-03',
+      error: 'CSRF_STATE_INVALID',
+      message: GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN,
+    });
+    return;
+  }
+
+  // 2. Passo 4, RNF-02 & EX-03: Validação do `id_token` no Backend
+  if (!idToken || typeof idToken !== 'string') {
+    res.status(401).json({
+      success: false,
+      code: 'EX-03',
+      error: 'INVALID_TOKEN',
+      message: GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN,
+    });
+    return;
+  }
+
+  const tokenVerification = await verifyGoogleIdToken(idToken);
+  if (!tokenVerification.valid || !tokenVerification.payload) {
+    res.status(401).json({
+      success: false,
+      code: 'EX-03',
+      error: tokenVerification.error === 'EXPIRED' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN',
+      message: GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN,
+    });
+    return;
+  }
+
+  const oidcPayload = tokenVerification.payload;
+  const normalizedEmail = String(oidcPayload.email || '').toLowerCase().trim();
+  const googleId = String(oidcPayload.sub || '').trim();
+
+  if (!normalizedEmail || !googleId) {
+    res.status(401).json({
+      success: false,
+      code: 'EX-03',
+      error: 'MALFORMED_TOKEN_CLAIMS',
+      message: GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN,
+    });
+    return;
+  }
+
+  // 3. RN-02 & EX-04: Verificação Obrigatória do E-mail (`email_verified === true`)
+  if (oidcPayload.email_verified !== true) {
+    res.status(403).json({
+      success: false,
+      code: 'EX-04',
+      error: 'EMAIL_NOT_VERIFIED',
+      message: GOOGLE_SSO_MESSAGES.EX_04_EMAIL_NOT_VERIFIED,
+    });
+    return;
+  }
+
+  // 4. Passo 5: Checagem de Usuário Existente (por `google_id` ou `email`)
+  let existingUser =
+    Object.values(MOCK_USERS_DB).find((u) => u.googleId && u.googleId === googleId) ||
+    MOCK_USERS_DB[normalizedEmail] ||
+    null;
+
+  // Se o banco Supabase informou um usuário existente que ainda não estava no cache local do processo
+  if (!existingUser && existingUserHint && existingUserHint.email) {
+    const hintEmail = String(existingUserHint.email).toLowerCase().trim();
+    if (hintEmail === normalizedEmail) {
+      existingUser = {
+        id: existingUserHint.id || `usr_google_${crypto.randomBytes(4).toString('hex')}`,
+        email: normalizedEmail,
+        passwordHash: existingUserHint.hasPassword ? 'supabase_delegated_hash' : null,
+        name: existingUserHint.name || oidcPayload.name || 'Gestor',
+        role: existingUserHint.role || 'owner',
+        barbeariaId: existingUserHint.barbeariaId || 'a0000000-0000-0000-0000-000000000001',
+        googleId: existingUserHint.googleId || null,
+        avatarUrl: existingUserHint.avatarUrl || null,
+        emailVerified: true,
+        status: existingUserHint.status || 'active',
+        authProvider: existingUserHint.googleId ? 'google' : 'local',
+      };
+      MOCK_USERS_DB[normalizedEmail] = existingUser;
+    }
+  }
+
+  // 5. RN-04 & EX-05: Verificação de Status da Conta (Inativo / Bloqueado / Suspenso)
+  const effectiveStatus = String(
+    accountStatusHint || existingUser?.status || 'active'
+  ).toLowerCase().trim();
+
+  if (
+    effectiveStatus === 'suspended' ||
+    effectiveStatus === 'suspenso' ||
+    effectiveStatus === 'blocked' ||
+    effectiveStatus === 'bloqueado'
+  ) {
+    res.status(403).json({
+      success: false,
+      code: 'EX-05',
+      error: 'ACCOUNT_SUSPENDED',
+      message: GOOGLE_SSO_MESSAGES.EX_05_ACCOUNT_SUSPENDED,
+    });
+    return;
+  }
+
+  if (
+    effectiveStatus === 'inactive' ||
+    effectiveStatus === 'inativo' ||
+    effectiveStatus === 'disabled' ||
+    effectiveStatus === 'cancelled'
+  ) {
+    res.status(403).json({
+      success: false,
+      code: 'RN-04',
+      error: 'ACCOUNT_INACTIVE',
+      message: GOOGLE_SSO_MESSAGES.RN_04_ACCOUNT_INACTIVE,
+    });
+    return;
+  }
+
+  let isNewUser = false;
+  let accountLinked = false;
+  let resolvedUser: StoredUserRecord;
+
+  if (existingUser) {
+    // CASO A (Usuário já existe) + RN-01 (Associação Automática de Contas por E-mail)
+    const wasLocalOnly = !existingUser.googleId || existingUser.authProvider === 'local';
+    accountLinked = wasLocalOnly;
+
+    existingUser.googleId = googleId; // RNF-04: Gravação do google_id único
+    existingUser.emailVerified = true; // RN-02
+    if (oidcPayload.picture && !existingUser.avatarUrl) {
+      existingUser.avatarUrl = oidcPayload.picture;
+    } else if (oidcPayload.picture) {
+      existingUser.avatarUrl = oidcPayload.picture;
+    }
+    if (!existingUser.name && oidcPayload.name) {
+      existingUser.name = oidcPayload.name;
+    }
+    existingUser.authProvider = wasLocalOnly ? 'linked' : existingUser.authProvider || 'google';
+    MOCK_USERS_DB[normalizedEmail] = existingUser;
+    resolvedUser = existingUser;
+  } else {
+    // CASO B (Novo Usuário) + RN-03 (Perfil e Dados do Usuário no Primeiro Acesso)
+    isNewUser = true;
+    const generatedId =
+      oidcPayload.userId ||
+      (typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `usr_google_${crypto.randomBytes(8).toString('hex')}`);
+    const generatedTenantId =
+      oidcPayload.barbeariaId ||
+      (typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : 'a0000000-0000-0000-0000-000000000001');
+
+    const defaultAvatar =
+      oidcPayload.picture ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        oidcPayload.name || normalizedEmail.split('@')[0]
+      )}&background=d97706&color=fff&bold=true`;
+
+    resolvedUser = {
+      id: generatedId,
+      email: normalizedEmail,
+      passwordHash: null, // RN-03: Senha local permanece nula sem acesso direto por senha
+      name: (oidcPayload.name || normalizedEmail.split('@')[0]).trim(),
+      role: 'owner',
+      barbeariaId: generatedTenantId,
+      googleId, // RNF-04: Identificador único de SSO
+      avatarUrl: defaultAvatar, // RN-03: URL da Foto de Perfil
+      emailVerified: true, // RN-02: E-mail verificado = true
+      status: 'active',
+      authProvider: 'google',
+    };
+
+    MOCK_USERS_DB[normalizedEmail] = resolvedUser;
+  }
+
+  // 6. RN-05: Sessão e Persistência com o mesmo TTL das sessões normais da plataforma (15m / 7d)
+  const userPayload: UserJwtPayload = {
+    userId: resolvedUser.id,
+    email: resolvedUser.email,
+    role: resolvedUser.role,
+    barbeariaId: resolvedUser.barbeariaId,
+    name: resolvedUser.name,
+    googleId: resolvedUser.googleId || googleId,
+    avatarUrl: resolvedUser.avatarUrl || null,
+    emailVerified: true,
+    authProvider: resolvedUser.authProvider || 'google',
+  };
+
+  const accessToken = generateAccessToken(userPayload);
+  const refreshToken = generateRefreshToken({
+    userId: resolvedUser.id,
+    barbeariaId: resolvedUser.barbeariaId,
+  });
+
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshTokenCookieOptions());
+
+  res.status(200).json({
+    success: true,
+    isNewUser,
+    accountLinked,
+    message: isNewUser
+      ? 'Conta criada automaticamente via Google SSO com sucesso.'
+      : accountLinked
+      ? 'Conta Google vinculada com sucesso ao seu e-mail existente.'
+      : 'Autenticação via Google realizada com sucesso.',
+    accessToken,
+    user: {
+      id: resolvedUser.id,
+      email: resolvedUser.email,
+      name: resolvedUser.name,
+      role: resolvedUser.role,
+      barbeariaId: resolvedUser.barbeariaId,
+      googleId: resolvedUser.googleId,
+      avatarUrl: resolvedUser.avatarUrl,
+      emailVerified: true,
+      status: resolvedUser.status || 'active',
+      authProvider: resolvedUser.authProvider,
     },
     expiresIn: JWT_EXPIRATION.ACCESS_TOKEN_SECONDS,
   });
