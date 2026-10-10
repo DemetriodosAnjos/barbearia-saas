@@ -266,9 +266,8 @@ export default function Login({
         barberMatch?.name ||
         "Profissional";
 
-      // Gera código de 6 dígitos seguro
+      // Gera código de 6 dígitos seguro para envio
       const code6Digits = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedCode(code6Digits);
       setVerificationCode("");
       setCountdownSeconds(180); // Inicia timer regressivo de 3 minutos
 
@@ -351,12 +350,19 @@ export default function Login({
         console.warn("Aviso ao solicitar reset no Supabase Auth:", authErr);
       }
 
+      if (emailSentViaBackend) {
+        setGeneratedCode(code6Digits);
+      } else {
+        // Quando disparado via Supabase Auth, o código de 6 dígitos é o {{ .Token }} oficial emitido pelo Supabase
+        setGeneratedCode("");
+      }
+
       if (isStaticHost && !emailSentViaBackend && !supabaseAuthSent && supabaseErrorMsg) {
         setForgotNotice(
-          `Código de verificação de 6 dígitos gerado para ${targetEmail}. Nota: Caso não receba o e-mail em instantes, ative o SMTP Personalizado (atendmentor@gmail.com) no painel do Supabase.`
+          `Código de verificação de 6 dígitos enviado para ${targetEmail}. Nota: Caso não receba o e-mail em instantes, configure o SMTP e o template {{ .Token }} no painel do Supabase.`
         );
       } else {
-        setForgotNotice(`Código de 6 dígitos gerado e enviado para ${targetEmail}.`);
+        setForgotNotice(`Código de verificação de 6 dígitos enviado para ${targetEmail}.`);
       }
 
       setForgotStep("code");
@@ -374,20 +380,15 @@ export default function Login({
 
     if (countdownSeconds <= 0) {
       setForgotError(
-        "O código de verificação expirou (limite de 3 minutos). Clique em 'Reenviar Código' para solicitar um novo código."
+        "O código de verificação expirou (limite de 3 minutos). Clique em \x27Reenviar Código\x27 para solicitar um novo código."
       );
       return;
     }
 
-    if (!verificationCode || verificationCode.length < 6) {
+    if (!verificationCode || verificationCode.trim().length < 6) {
       setForgotError(
         "Informe o código de verificação de 6 dígitos recebido por e-mail."
       );
-      return;
-    }
-
-    if (generatedCode && verificationCode.trim() !== generatedCode.trim()) {
-      setForgotError("Código de verificação incorreto. Digite ou copie o código de 6 dígitos enviado.");
       return;
     }
 
@@ -404,18 +405,49 @@ export default function Login({
     setForgotLoading(true);
 
     try {
-      // Método 1: Tenta atualizar via Supabase Auth se sessão OTP estiver ativa
-      try {
-        await supabase.auth.verifyOtp({
-          email: forgotEmail.trim(),
-          token: verificationCode.trim(),
-          type: "recovery",
-        });
-        await supabase.auth.updateUser({
-          password: newPassword,
-        });
-      } catch (authErr) {
-        console.warn("Aviso ao atualizar via Supabase Auth:", authErr);
+      let otpVerified = false;
+      let otpErrorMessage = "";
+
+      // 1. Validação do código de 6 dígitos diretamente via Supabase Auth (OTP recovery)
+      const { data: otpData, error: otpErr } = await supabase.auth.verifyOtp({
+        email: forgotEmail.trim(),
+        token: verificationCode.trim(),
+        type: "recovery",
+      });
+
+      if (!otpErr && (otpData?.session || otpData?.user)) {
+        otpVerified = true;
+      } else if (otpErr) {
+        otpErrorMessage = otpErr.message || "";
+        console.warn("Aviso na validação do OTP no Supabase Auth:", otpErr);
+      }
+
+      // 2. Se falhou no Supabase Auth mas tínhamos código gerado por e-mail backend local
+      if (!otpVerified && generatedCode && verificationCode.trim() === generatedCode.trim()) {
+        otpVerified = true;
+      }
+
+      if (!otpVerified) {
+        setForgotError(
+          otpErrorMessage
+            ? `Código inválido ou expirado: ${otpErrorMessage}`
+            : "Código de verificação incorreto ou expirado. Verifique os 6 dígitos recebidos por e-mail."
+        );
+        setForgotLoading(false);
+        return;
+      }
+
+      // 3. Atualização da nova senha no Supabase Auth com a sessão estabelecida
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateErr) {
+        setForgotError(
+          updateErr.message || "Erro ao redefinir a nova senha no Supabase Auth. Tente novamente."
+        );
+        setForgotLoading(false);
+        return;
       }
 
       // Conclusão com sucesso
@@ -426,7 +458,7 @@ export default function Login({
       setConfirmNewPassword("");
     } catch (err) {
       console.error("Erro ao redefinir senha:", err);
-      setForgotError("Erro inesperado ao salvar a nova senha.");
+      setForgotError(err?.message || "Erro inesperado ao salvar a nova senha.");
     } finally {
       setForgotLoading(false);
     }

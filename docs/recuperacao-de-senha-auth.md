@@ -143,3 +143,67 @@ Lembre-se de que no aplicativo Barbearia SaaS você **não precisa obrigatoriame
 2. Na tela do próprio modal, digite o código de 6 dígitos recebido.
 3. Defina sua **Nova Senha** e clique em **Redefinir Senha**.
 4. Sua senha será atualizada diretamente no Supabase sem depender do link externo!
+
+---
+
+## 📩 6. Como Configurar o Supabase para Enviar o Código de 6 Dígitos (Em vez do Link em Inglês)
+
+### ❓ Por que o e-mail padrão chega com o link em inglês?
+Por padrão, o Supabase Auth vem com o modelo de e-mail de recuperação configurado para enviar um **Magic Link** em inglês:
+```text
+We received a request to reset your password. Follow the link below to choose a new one.
+Reset password
+```
+Esse template padrão usa a variável interna `{{ .ConfirmationURL }}`.
+
+---
+
+### ✅ Como configurar o Template para enviar o Código de 6 Dígitos (`{{ .Token }}`):
+O Supabase Auth disponibiliza nativamente a variável **`{{ .Token }}`**, que contém o **código OTP numérico de 6 dígitos** gerado para a redefinição de senha!
+
+Para que o usuário receba o código de 6 dígitos em português e sem links externos com erro 403:
+
+1. Acesse o **[Supabase Dashboard](https://supabase.com/dashboard/project/njgeevywotbflikilway)**.
+2. No menu lateral esquerdo, vá em **Authentication** e clique em **Email Templates**.
+3. Selecione o template **Reset Password** (ou **Reset password / Recovery**).
+4. No campo **Subject (Assunto)**, preencha:
+   ```text
+   Código de Recuperação de Senha - Barbearia SaaS
+   ```
+5. No campo **Message Body (Corpo da Mensagem)**, substitua todo o conteúdo pelo HTML oficial abaixo:
+
+```html
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #171717; color: #f5f5f5; border-radius: 12px; overflow: hidden; border: 1px solid #333;">
+  <div style="background: linear-gradient(135deg, #d97706, #b45309); padding: 24px; text-align: center;">
+    <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: bold;">Recuperação de Acesso 🔐</h1>
+    <p style="margin: 6px 0 0; color: #fef3c7; font-size: 13px;">Barbearia SaaS - Suporte de Segurança</p>
+  </div>
+  <div style="padding: 24px; text-align: center;">
+    <p style="font-size: 15px; color: #e5e5e5; margin-top: 0; text-align: left;">Olá,</p>
+    <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso na <strong>Barbearia SaaS</strong>. Use o código de 6 dígitos abaixo para confirmar sua identidade no aplicativo:</p>
+    
+    <div style="margin: 24px 0; background-color: #262626; border: 2px dashed #f59e0b; border-radius: 8px; padding: 18px; display: inline-block;">
+      <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fbbf24; font-family: monospace;">{{ .Token }}</span>
+    </div>
+    
+    <p style="font-size: 13px; color: #ef4444; margin-bottom: 20px;">⏱️ Este código expira em <strong>3 minutos</strong>. Se você não solicitou a alteração, ignore este e-mail.</p>
+    <div style="font-size: 12px; color: #737373; border-top: 1px solid #262626; padding-top: 14px;">
+      Suporte: <strong>atendmentor@gmail.com</strong>
+    </div>
+  </div>
+</div>
+```
+
+6. Clique no botão **Save** (ou **Save Changes**) no rodapé.
+
+---
+
+### 🔄 Como o Fluxo Funciona após essa Configuração:
+1. O usuário clica em **"Esqueceu a senha?"** e informa seu e-mail.
+2. O sistema aciona o Supabase Auth (`resetPasswordForEmail`).
+3. O Supabase dispara o e-mail via SMTP com o **código de 6 dígitos** (`{{ .Token }}`).
+4. O usuário abre o e-mail, copia o código de 6 dígitos e digita no modal do sistema.
+5. O sistema executa:
+   - `supabase.auth.verifyOtp({ email, token, type: "recovery" })` (valida o código e abre a sessão do usuário).
+   - `supabase.auth.updateUser({ password })` (grava a nova senha na conta do usuário no Supabase).
+6. A senha é redefinida com 100% de sucesso, sem links externos e sem qualquer risco de erro 403!
