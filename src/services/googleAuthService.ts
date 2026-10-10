@@ -92,7 +92,7 @@ export function getGoogleClientId(): string {
   const storedClientId = (safeStorage.getItem("google_client_id") || "").trim();
   if (storedClientId) return storedClientId;
 
-  return "";
+  return "737774141986-jqmalq9e63isp91q27jd9ghvebc0i22i.apps.googleusercontent.com";
 }
 
 /**

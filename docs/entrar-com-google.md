@@ -100,10 +100,33 @@ Se o usuário estiver com o status `inactive` (Inativo) ou `suspended` / `blocke
 
 ## 6. Configuração e Variáveis de Ambiente
 
-- **`VITE_GOOGLE_CLIENT_ID`**: Client ID OAuth 2.0 Web criado no Google Cloud Console com as origens JavaScript autorizadas.
-  - Pode ser configurado via `.env` (`VITE_GOOGLE_CLIENT_ID=...`) ou informado no modal de configuração de chave se ausente.
+### 6.1 Credenciais Oficiais do Google Cloud Console
+- **Projeto Google Cloud**: `barber-saas-511219`
+- **Client ID OAuth 2.0 Web**: `737774141986-jqmalq9e63isp91q27jd9ghvebc0i22i.apps.googleusercontent.com`
+- **Variável de Ambiente Front-End**: `VITE_GOOGLE_CLIENT_ID`
+- **Variáveis de Ambiente Back-End (Opcional)**: `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` (para troca server-side de tokens OpenID Connect se ativado)
+
+### 6.2 Origens JavaScript Autorizadas (Authorized JavaScript Origins)
+Configuradas no console do Google Cloud para este Client ID:
+1. `http://localhost:3000` (Ambiente local de desenvolvimento)
+2. `https://demetriodosanjos.github.io` (Ambiente de produção / GitHub Pages)
+3. *Ambientes AI Studio Preview / Cloud Run* (Adicionar no console conforme necessário):
+   - `https://ais-dev-ycppka6c2abbopa2jhhqpo-872847100246.us-east1.run.app`
+   - `https://ais-pre-ycppka6c2abbopa2jhhqpo-872847100246.us-east1.run.app`
+
+### 6.3 Políticas de Segurança do Navegador (CSP e Headers)
 - **Content-Security-Policy (CSP)**:
   - `script-src`: inclui `https://accounts.google.com https://apis.google.com`
   - `connect-src`: inclui `https://accounts.google.com https://oauth2.googleapis.com https://*.googleapis.com`
   - `frame-src`: inclui `https://accounts.google.com`
-  - `Cross-Origin-Opener-Policy`: configurado para `same-origin-allow-popups` para permitir comunicação com o modal/popup do Google.
+- **Cross-Origin-Opener-Policy**: configurado para `same-origin-allow-popups` para permitir comunicação bidirecional com o modal/popup do Google Identity Services.
+
+---
+
+## 7. Diagnóstico e Resolução de Problemas (Troubleshooting)
+
+| Erro | Causa Mais Frequente | Como Solucionar |
+| :--- | :--- | :--- |
+| `origin_mismatch` / `redirect_uri_mismatch` | A URL acessada no navegador não está na lista de "Origens JavaScript autorizadas" do Google Cloud Console. | Acesse o [Google Cloud Console](https://console.cloud.google.com/apis/credentials), edite o Client ID `737774141986-...` e adicione a URL exata (com `https://` e sem barra no final). |
+| `popup_closed_by_user` | O usuário fechou o popup do Google antes de concluir a autenticação. | Comportamento normal (código `EX-01`). O sistema encerra o loading silenciosamente sem travar a tela. |
+| `access_denied` | O usuário recusou permissão de leitura de perfil/e-mail no consentimento. | O sistema notifica o usuário solicitando autorização do e-mail para prosseguir com o login. |

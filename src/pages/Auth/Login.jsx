@@ -82,7 +82,7 @@ export default function Login({
   // 5. Estados do Login com Google (SSO) oficial via Google API
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGoogleConfigModalOpen, setIsGoogleConfigModalOpen] = useState(false);
-  const [googleClientIdInput, setGoogleClientIdInput] = useState("");
+  const [googleClientIdInput, setGoogleClientIdInput] = useState(() => getGoogleClientId() || "");
 
   // Timer regressivo de 3 minutos para o código de recuperação
   useEffect(() => {

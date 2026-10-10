@@ -243,7 +243,7 @@ export async function googleOAuthUrlController(req: Request, res: Response): Pro
   const clientId =
     process.env.GOOGLE_CLIENT_ID ||
     process.env.VITE_GOOGLE_CLIENT_ID ||
-    'barbearia-saas-google-oidc-client.apps.googleusercontent.com';
+    '737774141986-jqmalq9e63isp91q27jd9ghvebc0i22i.apps.googleusercontent.com';
   const redirectUri = `${originHeader.replace(/\/$/, '')}/auth/callback`;
 
   const params = new URLSearchParams({

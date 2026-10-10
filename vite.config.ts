@@ -384,6 +384,16 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY': JSON.stringify(
         dotEnvValues.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-5ac54098-969a-4315-aa30-04d5faa9d008'
       ),
+      'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(
+        dotEnvValues.VITE_GOOGLE_CLIENT_ID ||
+          process.env.VITE_GOOGLE_CLIENT_ID ||
+          '737774141986-jqmalq9e63isp91q27jd9ghvebc0i22i.apps.googleusercontent.com'
+      ),
+      'import.meta.env.VITE_APP_URL': JSON.stringify(
+        dotEnvValues.VITE_APP_URL ||
+          process.env.VITE_APP_URL ||
+          ''
+      ),
     },
     plugins: [react(), tailwindcss(), mercadoPagoProxyPlugin()],
     resolve: {
