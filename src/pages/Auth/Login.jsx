@@ -272,47 +272,89 @@ export default function Login({
       setVerificationCode("");
       setCountdownSeconds(180); // Inicia timer regressivo de 3 minutos
 
-      // Dispara envio de e-mail via API backend / SMTP oficial
+      // 1. Disparo de e-mail via API backend / SMTP oficial (quando há backend Node.js ativo)
+      const isStaticHost =
+        typeof window !== "undefined" &&
+        (window.location.hostname.endsWith("github.io") ||
+          window.location.hostname.includes("github.io"));
+
+      const backendUrl = (
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_APP_URL ||
+        ""
+      ).trim();
+
+      // Em ambiente estático puro (GitHub Pages) sem servidor Node, evita POST para a mesma origem que geraria 405
+      const emailEndpoint = !isStaticHost
+        ? "/api/email/send"
+        : backendUrl && !backendUrl.includes("github.io")
+        ? `${backendUrl.replace(/\/$/, "")}/api/email/send`
+        : null;
+
+      let emailSentViaBackend = false;
+      if (emailEndpoint) {
+        try {
+          const emailRes = await fetch(emailEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: targetEmail,
+              subject: "Código de Recuperação de Senha - Barbearia SaaS",
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #171717; color: #f5f5f5; border-radius: 12px; overflow: hidden; border: 1px solid #333;">
+                  <div style="background: linear-gradient(135deg, #d97706, #b45309); padding: 24px; text-align: center;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: bold;">Recuperação de Acesso 🔐</h1>
+                    <p style="margin: 6px 0 0; color: #fef3c7; font-size: 13px;">Barbearia SaaS - Suporte de Segurança</p>
+                  </div>
+                  <div style="padding: 24px; text-align: center;">
+                    <p style="font-size: 15px; color: #e5e5e5; margin-top: 0; text-align: left;">Olá, <strong>${recipientName}</strong>,</p>
+                    <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso. Use o código de 6 dígitos abaixo para confirmar sua identidade:</p>
+                    <div style="margin: 24px 0; background-color: #262626; border: 2px dashed #f59e0b; border-radius: 8px; padding: 16px; display: inline-block;">
+                      <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fbbf24; font-family: monospace;">${code6Digits}</span>
+                    </div>
+                    <p style="font-size: 13px; color: #ef4444; margin-bottom: 20px;">⏱️ Este código expira em <strong>3 minutos</strong>. Se você não solicitou a alteração, ignore este e-mail.</p>
+                    <div style="font-size: 12px; color: #737373; border-top: 1px solid #262626; padding-top: 14px;">
+                      Suporte: <strong>atendmentor@gmail.com</strong>
+                    </div>
+                  </div>
+                </div>
+              `,
+            }),
+          });
+          if (emailRes.ok) {
+            emailSentViaBackend = true;
+          }
+        } catch (sendErr) {
+          console.warn("Aviso ao disparar e-mail via endpoint:", sendErr);
+        }
+      }
+
+      // 2. Disparo de recuperação nativo via Supabase Auth
+      let supabaseAuthSent = false;
+      let supabaseErrorMsg = "";
       try {
-        await fetch("/api/email/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: targetEmail,
-            subject: "Código de Recuperação de Senha - Barbearia SaaS",
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #171717; color: #f5f5f5; border-radius: 12px; overflow: hidden; border: 1px solid #333;">
-                <div style="background: linear-gradient(135deg, #d97706, #b45309); padding: 24px; text-align: center;">
-                  <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: bold;">Recuperação de Acesso 🔐</h1>
-                  <p style="margin: 6px 0 0; color: #fef3c7; font-size: 13px;">Barbearia SaaS - Suporte de Segurança</p>
-                </div>
-                <div style="padding: 24px; text-align: center;">
-                  <p style="font-size: 15px; color: #e5e5e5; margin-top: 0; text-align: left;">Olá, <strong>${recipientName}</strong>,</p>
-                  <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso. Use o código de 6 dígitos abaixo para confirmar sua identidade:</p>
-                  <div style="margin: 24px 0; background-color: #262626; border: 2px dashed #f59e0b; border-radius: 8px; padding: 16px; display: inline-block;">
-                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fbbf24; font-family: monospace;">${code6Digits}</span>
-                  </div>
-                  <p style="font-size: 13px; color: #ef4444; margin-bottom: 20px;">⏱️ Este código expira em <strong>3 minutos</strong>. Se você não solicitou a alteração, ignore este e-mail.</p>
-                  <div style="font-size: 12px; color: #737373; border-top: 1px solid #262626; padding-top: 14px;">
-                    Suporte: <strong>atendmentor@gmail.com</strong>
-                  </div>
-                </div>
-              </div>
-            `,
-          }),
+        const { error: resetErr } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+          redirectTo: typeof window !== "undefined" ? window.location.href : undefined,
         });
-      } catch (sendErr) {
-        console.warn("Aviso ao disparar e-mail:", sendErr);
+        if (resetErr) {
+          supabaseErrorMsg = resetErr.message || "";
+          console.warn("Aviso ao solicitar recuperação no Supabase Auth:", resetErr);
+        } else {
+          supabaseAuthSent = true;
+        }
+      } catch (authErr) {
+        supabaseErrorMsg = authErr?.message || "";
+        console.warn("Aviso ao solicitar reset no Supabase Auth:", authErr);
       }
 
-      // Sincroniza Supabase Auth OTP em paralelo caso exista
-      try {
-        await supabase.auth.resetPasswordForEmail(targetEmail);
-      } catch {
-        // safe fallback
+      if (isStaticHost && !emailSentViaBackend && !supabaseAuthSent && supabaseErrorMsg) {
+        setForgotNotice(
+          `Código de verificação de 6 dígitos gerado para ${targetEmail}. Nota: Caso não receba o e-mail em instantes, ative o SMTP Personalizado (atendmentor@gmail.com) no painel do Supabase.`
+        );
+      } else {
+        setForgotNotice(`Código de 6 dígitos gerado e enviado para ${targetEmail}.`);
       }
 
-      setForgotNotice(`Código de 6 dígitos gerado e enviado para ${targetEmail}.`);
       setForgotStep("code");
     } catch (err) {
       console.error("Erro na verificação de recuperação:", err);

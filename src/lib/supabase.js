@@ -145,6 +145,11 @@ async function supabaseResilientFetch(input, init = {}) {
   }
 
   const isBrowser = !isTestEnv && typeof window !== "undefined";
+  const isStaticHost =
+    isBrowser &&
+    (window.location.hostname.endsWith("github.io") ||
+      window.location.hostname.includes("github.io"));
+
   let targetPath = "";
   if (isBrowser && (rawUrl.includes("/rest/v1/") || rawUrl.includes("/auth/v1/"))) {
     try {
@@ -155,9 +160,10 @@ async function supabaseResilientFetch(input, init = {}) {
     }
   }
 
-  // 1. As tabelas administrativas (`tenants`, `plans`, `saas_config`) utilizam sempre o proxy server-side para contornar RLS restrito ao service_role
+  // 1. As tabelas administrativas (`tenants`, `plans`, `saas_config`) utilizam o proxy server-side para contornar RLS apenas em ambiente full-stack com backend ativo
   if (
     isBrowser &&
+    !isStaticHost &&
     (targetPath.startsWith("/rest/v1/tenants") ||
       targetPath.startsWith("/rest/v1/plans") ||
       targetPath.startsWith("/rest/v1/saas_config"))
@@ -172,10 +178,10 @@ async function supabaseResilientFetch(input, init = {}) {
     }
   }
 
-  // 2. Para as demais rotas (/rest/v1/* e /auth/v1/*), tenta fetch direto e usa o proxy same-origin como contingência contra RLS (401/403) e "TypeError: Failed to fetch"
+  // 2. Para as demais rotas (/rest/v1/* e /auth/v1/*), tenta fetch direto e usa o proxy same-origin como contingência contra RLS (401/403) apenas se houver servidor proxy
   try {
     const directRes = await fetch(input, init);
-    if ((directRes.status === 401 || directRes.status === 403) && isBrowser && targetPath) {
+    if ((directRes.status === 401 || directRes.status === 403) && isBrowser && !isStaticHost && targetPath) {
       try {
         const proxyFallback = await fetchViaServerProxy(targetPath, init);
         if (proxyFallback.ok) {
@@ -187,7 +193,7 @@ async function supabaseResilientFetch(input, init = {}) {
     }
     return directRes;
   } catch (networkErr) {
-    if (isBrowser && targetPath) {
+    if (isBrowser && !isStaticHost && targetPath) {
       return await fetchViaServerProxy(targetPath, init);
     }
     throw networkErr;

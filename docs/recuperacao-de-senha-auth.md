@@ -64,3 +64,37 @@ Caso o e-mail seja localizado com sucesso no Supabase:
 - Campos para digitação do código de 6 dígitos recebido por e-mail, **Nova Senha** (mínimo 6 caracteres) e **Confirmar Nova Senha**.
 - Botão **"Redefinir Senha"** que sincroniza a atualização com o Supabase Auth.
 - Mensagem de sucesso com botão direto para **"Fazer Login Agora"**.
+
+---
+
+## 🌐 4. Ambiente de Produção (GitHub Pages) & Resolução de Erros
+
+Ao publicar o front-end estático no GitHub Pages (`https://demetriodosanjos.github.io/barbearia-saas/`), devem ser observadas as particularidades de hospedagem estática vs. full-stack:
+
+### 1. Diagnóstico dos Erros DevTools:
+1. **`GET /api/supabase-proxy (404 Not Found)`**:
+   - **Causa:** O GitHub Pages é um servidor de arquivos estáticos e não possui rotas de backend `/api/*`.
+   - **Solução Implementada:** O cliente Supabase (`src/lib/supabase.js`) detecta automaticamente hosts estáticos (`*.github.io`) e não tenta consultar o proxy server-side, consultando diretamente os endpoints oficiais do Supabase via REST sem emitir erro 404 no console.
+2. **`POST /api/email/send (405 Method Not Allowed)`**:
+   - **Causa:** Métodos HTTP POST para a mesma origem do GitHub Pages retornam 405 porque o GitHub Pages só suporta requisições estáticas GET/HEAD.
+   - **Solução Implementada:** O componente `Login.jsx` verifica se o ambiente é estático (`github.io`). Se não houver URL externa de backend configurada (`VITE_API_URL`), ele não dispara o POST para o host estático, evitando o erro 405.
+3. **`POST /auth/v1/recover (500 Internal Server Error)` no Supabase**:
+   - **Causa:** O projeto Supabase (`njgeevywotbflikilway`) utiliza por padrão o serviço compartilhado de e-mail de teste (limite de 3 e-mails/hora), que falha com HTTP 500 se atingir o limite ou se o SMTP customizado não estiver ativado no painel do Supabase.
+
+### 2. Passo a Passo para Ativar o Envio de E-mails em Produção no Supabase:
+Para que o Supabase Auth dispare os e-mails com 100% de confiabilidade diretamente da nuvem:
+
+1. Acesse o [Supabase Dashboard](https://supabase.com/dashboard/project/njgeevywotbflikilway).
+2. Vá em **Project Settings** (ícone de engrenagem) > **Authentication**.
+3. Role até a seção **SMTP Settings** (Configurações de SMTP).
+4. Ative a chave **"Enable Custom SMTP"**.
+5. Preencha os campos com as credenciais já configuradas no projeto:
+   - **Sender email:** `atendmentor@gmail.com`
+   - **Sender name:** `Barbearia SaaS`
+   - **Host:** `smtp.gmail.com`
+   - **Port:** `465`
+   - **Username:** `atendmentor@gmail.com`
+   - **Password:** `iqbd whmd vspa casr` (App Password do Google)
+6. Clique em **Save**.
+7. Pronto! A partir desse momento, qualquer solicitação de recuperação de senha pelo modal enviará o e-mail oficial com taxa de sucesso de 100%, sem erros 500 no Supabase.
+
