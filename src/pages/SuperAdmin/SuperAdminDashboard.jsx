@@ -23,6 +23,7 @@ import { safeSessionStorage } from "../../utils/safeStorage";
 export default function SuperAdminDashboard({
   onImpersonateTenant,
   onLogout,
+  onNavigateBarbershop,
 }) {
   const [activeTab, setActiveTabState] = useState(() => {
     return safeSessionStorage.getItem("superadmin_active_tab") || "tenants";
@@ -727,10 +728,19 @@ export default function SuperAdminDashboard({
           </div>
 
           <div className="flex items-center gap-2">
+            {onNavigateBarbershop && (
+              <Button
+                variant="primary"
+                onClick={onNavigateBarbershop}
+                className="text-xs py-1 px-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold cursor-pointer shadow-sm"
+              >
+                Voltar para a Barbearia
+              </Button>
+            )}
             <Button
               variant="secondary"
               onClick={onLogout}
-              className="text-xs py-1 px-2.5"
+              className="text-xs py-1 px-2.5 cursor-pointer"
             >
               Sair
             </Button>

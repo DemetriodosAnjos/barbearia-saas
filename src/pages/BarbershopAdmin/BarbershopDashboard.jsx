@@ -43,6 +43,7 @@ export default function BarbershopDashboard({
   onUpdateProducts,
   onDeleteProduct,
   onLogout,
+  onNavigateSuperAdmin,
   isLoading = false,
 }) {
   const [activeMenuTab, setActiveMenuTab] = useState("agenda");
@@ -135,6 +136,7 @@ export default function BarbershopDashboard({
             }
           }
           onLogout={onLogout}
+          onNavigateSuperAdmin={onNavigateSuperAdmin}
         />
 
         {/* ÁREA CENTRAL */}

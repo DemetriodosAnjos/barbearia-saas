@@ -16,7 +16,28 @@ export default function Sidebar({
   onOpenPlansModal,
   user = { name: "Pedro Silva" },
   onLogout,
+  onNavigateSuperAdmin,
 }) {
+  const userEmail = (
+    user?.email ||
+    user?.user_metadata?.email ||
+    (typeof window !== "undefined" && window.localStorage?.getItem("saas_auth_user")
+      ? (() => {
+          try {
+            return JSON.parse(window.localStorage.getItem("saas_auth_user") || "{}")?.email;
+          } catch {
+            return "";
+          }
+        })()
+      : "") ||
+    ""
+  ).toLowerCase().trim();
+
+  const isSuperAdminAuthorized =
+    userEmail === "atendmentor@gmail.com" ||
+    (Boolean(import.meta.env?.VITE_SUPERADMIN_EMAIL) &&
+      userEmail === String(import.meta.env.VITE_SUPERADMIN_EMAIL).toLowerCase().trim());
+
   // Estado para controlar quais submenus estão abertos (Acordeão)
   const [expandedMenus, setExpandedMenus] = useState({});
 
@@ -364,20 +385,60 @@ export default function Sidebar({
               </button>
             </div>
 
+            {/* Link Especial Super Admin para o e-mail oficial (atendmentor@gmail.com) */}
+            {isSuperAdminAuthorized && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateSuperAdmin) {
+                    onNavigateSuperAdmin();
+                  } else if (onSelect) {
+                    onSelect("superadmin");
+                  }
+                  if (onClose) onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer shadow-sm group mb-1"
+                title="Acessar Painel Super Admin"
+                aria-label="Acessar Painel Super Admin"
+              >
+                <span className="w-5 h-5 flex items-center justify-center text-amber-400 shrink-0">
+                  <ProjectIcon name="Crown" size={16} />
+                </span>
+                <span className="truncate">Painel Super Admin</span>
+              </button>
+            )}
+
             {/* Versão Centralizada */}
             <div className="w-full flex items-center justify-center pt-2 border-t border-neutral-800/60 text-center">
               <span className="text-[11px] font-mono font-bold text-amber-400 tracking-wider">
-                {appMetadata?.name || "SaaS V1.5.1.9"}
+                {appMetadata?.name || "SaaS V1.5.2.0"}
               </span>
             </div>
           </div>
         ) : (
           <div className={sidebarStyles.footerCollapsed}>
+            {isSuperAdminAuthorized && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateSuperAdmin) {
+                    onNavigateSuperAdmin();
+                  } else if (onSelect) {
+                    onSelect("superadmin");
+                  }
+                }}
+                className="w-8 h-8 mx-auto flex items-center justify-center rounded-lg text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer shadow-sm mb-1.5"
+                title="Painel Super Admin"
+                aria-label="Painel Super Admin"
+              >
+                <ProjectIcon name="Crown" size={16} />
+              </button>
+            )}
             <span
               className="text-[10px] font-mono font-bold text-amber-400 text-center"
-              title={appMetadata?.name || "SaaS V1.5.1.9"}
+              title={appMetadata?.name || "SaaS V1.5.2.0"}
             >
-              V1.5.1.9
+              V1.5.2.0
             </span>
             <button
               type="button"

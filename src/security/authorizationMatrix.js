@@ -282,6 +282,13 @@ export const UI_SCREEN_MATRIX = [
     allowedRoles: [USER_ROLES.ANON, USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN],
   },
   {
+    screenId: "onboarding-quiz",
+    name: "Quiz de Onboarding (Definição de Perfil)",
+    classification: ROUTE_CLASSIFICATIONS.PUBLIC,
+    isPublic: true,
+    allowedRoles: [USER_ROLES.ANON, USER_ROLES.CLIENT, USER_ROLES.EMPLOYEE, USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN],
+  },
+  {
     screenId: "design-system",
     name: "UI Kit & Design System",
     classification: ROUTE_CLASSIFICATIONS.PUBLIC,

@@ -55,4 +55,9 @@ Plataforma SaaS Multi-tenant completa para gestão de barbearias, atendendo trê
      - **Entreprise:** Cadeiras ilimitadas, multi-filiais, pacote white-label e suporte prioritário VIP.
    - Botões dos cards conectados dinamicamente à API do Mercado Pago (`/api/mercadopago/preference`) gerando links de Checkout Pro em tempo real.
    - Botão de confirmação no rodapé: *"Continuar para pagamento seguro"*.
+10. **Quiz de Onboarding & Direcionamento de Persona (`OnboardingQuiz` - `docs/onboarding-quiz-e-perfis.md`):**
+   - Apresentado no primeiro acesso de novos usuários pós-Google Login com duas opções em Radio Button:
+     - *Cenário 1:* Dono do negócio com equipe.
+     - *Cenário 2:* Profissional autônomo solo.
+   - Memorização automática da escolha e ativação de link restrito para o Super Admin (`atendmentor@gmail.com`) no rodapé da Sidebar acima da versão do app.
 

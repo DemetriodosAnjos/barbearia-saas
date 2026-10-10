@@ -30,4 +30,15 @@ A barra lateral de navegação (`src/components/ui/Sidebar.jsx` e `Sidebar.style
   - Quando a barra lateral é recolhida, a versão compactada (`V1.5.1.9`) permanece centralizada e com tooltip acessível.
 - **Substituição de Informações Técnicas e Remoção do Avatar:**
   - O termo técnico de autenticação `"Authenticated"` e o avatar circular com iniciais foram removidos do rodapé da Sidebar.
-  - A visualização foi substituída pelo nome do usuário ativo e a versão oficial `SaaS V1.5.1.9` centralizada.
+  - A visualização foi substituída pelo nome do usuário ativo e a versão oficial `SaaS V1.5.2.0` centralizada.
+
+### 2.4 Link Contextual Super Admin (`atendmentor@gmail.com`)
+- **Exibição Condicional Estrita:**
+  - O link/botão para o **Painel Super Admin** é renderizado dinamicamente apenas quando o e-mail do usuário autenticado for `atendmentor@gmail.com` (ou corresponder à chave `VITE_SUPERADMIN_EMAIL`).
+- **Posicionamento no Rodapé:**
+  - Posicionado no rodapé da Sidebar, imediatamente acima do bloco que exibe a versão centralizada do sistema.
+  - No modo expandido: exibe o ícone de Coroa (`Crown`), texto *"Painel Super Admin"* e efeito hover âmbar.
+  - No modo recolhido: exibe o botão compacto com ícone de Coroa e tooltip acessível.
+- **Segurança de Acesso:**
+  - Usuários convencionais, clientes e barbeiros não visualizam o atalho, mantendo a interface limpa e restrita.
+

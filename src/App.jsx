@@ -13,6 +13,8 @@ import Login from "./pages/Auth/Login";
 import SuperAdminDashboard from "./pages/SuperAdmin/SuperAdminDashboard";
 import BarbershopDashboard from "./pages/BarbershopAdmin/BarbershopDashboard";
 import ClientBookingView from "./pages/ClientBooking/ClientBookingView";
+import OnboardingQuiz from "./components/onboarding/OnboardingQuiz";
+import { safeStorage } from "./utils/safeStorage";
 import ProtectedRoute from "./components/security/ProtectedRoute";
 import { USER_ROLES } from "./security/authorizationMatrix";
 import {
@@ -62,6 +64,8 @@ export default function App() {
       setActiveNavButton("superadmin");
     } else if (currentScreen === "login") {
       setActiveNavButton("login");
+    } else if (currentScreen === "onboarding-quiz") {
+      setActiveNavButton("quiz");
     }
   }, [currentScreen]);
 
@@ -710,8 +714,31 @@ export default function App() {
             </div>
           </div>
 
-          {/* Botões de Navegação Solicitados (Login & SuperAdmin) */}
-          <nav className="flex items-center gap-2.5 sm:gap-3">
+          {/* Botões de Navegação Solicitados (Quiz Onboarding, Login & SuperAdmin) */}
+          <nav className="flex items-center gap-2 sm:gap-3">
+            {/* BOTÃO: Quiz Onboarding (Fluxo de Definição de Personas) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveNavButton("quiz");
+                setCurrentScreen("onboarding-quiz");
+              }}
+              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-200 cursor-pointer ${
+                activeNavButton === "quiz"
+                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/25"
+                  : "bg-transparent hover:bg-amber-500/10 text-amber-500 border-[1.5px] border-amber-500"
+              }`}
+            >
+              <ProjectIcon
+                name="ClipboardList"
+                size={16}
+                colorVariant={activeNavButton === "quiz" ? "inherit" : "amber"}
+              />
+              <span className={activeNavButton === "quiz" ? "text-white" : "text-amber-500"}>
+                Quiz Onboarding
+              </span>
+            </button>
+
             {/* BOTÃO: Login (carrega a tela de Login) */}
             <button
               type="button"
@@ -817,6 +844,21 @@ export default function App() {
             }`}
           >
             <span className="flex items-center gap-1.5"><ProjectIcon name="Crown" size={14} colorVariant="inherit" /><span>SuperAdmin</span></span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCurrentScreen("onboarding-quiz")}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
+              currentScreen === "onboarding-quiz"
+                ? "bg-amber-600 text-white shadow-xs"
+                : "text-neutral-400 hover:text-white bg-neutral-800/60"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <ProjectIcon name="ClipboardList" size={14} colorVariant="inherit" />
+              <span>Quiz Onboarding</span>
+            </span>
           </button>
 
           <button
@@ -952,6 +994,7 @@ export default function App() {
               onDeleteProduct={handleDeleteProduct}
               barbers={barbers}
               onUpdateBarbers={setBarbers}
+              onNavigateSuperAdmin={() => setCurrentScreen("superadmin")}
               onLogout={() => {
                 setCurrentUser(null);
                 setActiveUserRole(USER_ROLES.ANON);
@@ -967,6 +1010,7 @@ export default function App() {
         {currentScreen === "superadmin" && (
           <ErrorBoundary componentName="Painel SuperAdmin">
             <SuperAdminDashboard
+              onNavigateBarbershop={() => setCurrentScreen("barbershop")}
               onImpersonateTenant={(selectedTenant) => {
                 if (selectedTenant) {
                   setTenant(normalizeTenantRecord(selectedTenant, currentUser));
@@ -998,12 +1042,89 @@ export default function App() {
           </ErrorBoundary>
         )}
 
+        {/* 4b. ONBOARDING QUIZ: Quiz simplificado de definição de cenário (Dono com equipe vs. Autônomo solo) */}
+        {currentScreen === "onboarding-quiz" && (
+          <ErrorBoundary componentName="Onboarding Quiz">
+            <OnboardingQuiz
+              user={currentUser}
+              onCancel={() => setCurrentScreen("login")}
+              onSelectScenario={async (scenario) => {
+                safeStorage.setItem("barber_saas_persona", scenario);
+                const isSolo = scenario === "solo_barber";
+                const role = USER_ROLES.ADMIN;
+
+                const updatedUser = {
+                  ...(currentUser || {}),
+                  persona: scenario,
+                  isSolo,
+                  user_metadata: {
+                    ...(currentUser?.user_metadata || {}),
+                    role,
+                    persona: scenario,
+                    is_solo: isSolo,
+                  },
+                };
+
+                setCurrentUser(updatedUser);
+                setActiveUserRole(role);
+
+                try {
+                  const resolved = await resolveAndSyncUserTenant(updatedUser);
+                  if (resolved) {
+                    setTenant(resolved);
+                  }
+                } catch (syncErr) {
+                  console.warn("Aviso na sincronização do tenant no quiz:", syncErr);
+                }
+
+                setCurrentScreen("barbershop");
+              }}
+            />
+          </ErrorBoundary>
+        )}
+
         {/* 5. LOGIN: Autenticação de usuários */}
         {currentScreen === "login" && (
           <ErrorBoundary componentName="Tela de Login">
             <Login
               onGoToSignup={() => setCurrentScreen("onboarding")}
               onLoginSuccess={async (loggedUser) => {
+                const userEmail = (
+                  loggedUser?.email ||
+                  loggedUser?.user_metadata?.email ||
+                  ""
+                ).toLowerCase().trim();
+
+                const isSuperAdminEmail =
+                  userEmail === "atendmentor@gmail.com" ||
+                  (Boolean(import.meta.env?.VITE_SUPERADMIN_EMAIL) &&
+                    userEmail === String(import.meta.env.VITE_SUPERADMIN_EMAIL).toLowerCase().trim());
+
+                if (isSuperAdminEmail) {
+                  const superAdminUser = {
+                    ...loggedUser,
+                    user_metadata: {
+                      ...(loggedUser?.user_metadata || {}),
+                      role: USER_ROLES.SUPERADMIN,
+                    },
+                  };
+                  setCurrentUser(superAdminUser);
+                  setActiveUserRole(USER_ROLES.SUPERADMIN);
+                  await resolveAndSyncUserTenant(superAdminUser);
+                  setCurrentScreen("barbershop");
+                  return;
+                }
+
+                // Verifica se é primeiro acesso via Google ou se o usuário ainda não respondeu ao Quiz de Personas
+                const existingPersona = safeStorage.getItem("barber_saas_persona");
+                const isFirstTimeGoogle = Boolean(loggedUser?.isNewUser) || (!existingPersona && loggedUser?.authProvider === "google");
+
+                if (isFirstTimeGoogle) {
+                  setCurrentUser(loggedUser);
+                  setCurrentScreen("onboarding-quiz");
+                  return;
+                }
+
                 const rawRole = loggedUser?.user_metadata?.role;
                 const role =
                   !rawRole || rawRole === "owner" || rawRole === "tenant"

@@ -517,7 +517,7 @@ export default function Login({
       setIsLockedOut(false);
       setRemainingAttempts(5);
       if (onLoginSuccess) {
-        onLoginSuccess(authResult.user);
+        onLoginSuccess({ ...authResult.user, isNewUser: Boolean(authResult.isNewUser) });
       }
     } catch (err) {
       if (err?.message === "CANCELLED") {
@@ -554,7 +554,7 @@ export default function Login({
       setIsLockedOut(false);
       setRemainingAttempts(5);
       if (onLoginSuccess) {
-        onLoginSuccess(authResult.user);
+        onLoginSuccess({ ...authResult.user, isNewUser: Boolean(authResult.isNewUser) });
       }
     } catch (err) {
       if (err?.message !== "CANCELLED") {

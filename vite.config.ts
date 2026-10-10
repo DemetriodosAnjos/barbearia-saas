@@ -394,6 +394,11 @@ export default defineConfig(({ mode }) => {
           process.env.VITE_APP_URL ||
           ''
       ),
+      'import.meta.env.VITE_SUPERADMIN_EMAIL': JSON.stringify(
+        dotEnvValues.VITE_SUPERADMIN_EMAIL ||
+          process.env.VITE_SUPERADMIN_EMAIL ||
+          'atendmentor@gmail.com'
+      ),
     },
     plugins: [react(), tailwindcss(), mercadoPagoProxyPlugin()],
     resolve: {

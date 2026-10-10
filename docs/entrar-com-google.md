@@ -51,9 +51,10 @@
 3. **Autenticação Real**: O usuário seleciona sua conta Google real logada no navegador ou insere suas credenciais Google.
 4. **Obtenção de Perfil**: A aplicação consulta o endpoint oficial da Google `https://www.googleapis.com/oauth2/v3/userinfo` com o token de acesso autorizado.
 5. **Associação e Criação de Sessão**:
-   - **Caso A (Usuário já existe no banco Supabase)**: Se o e-mail existir na tabela `tenants` (campo `owner_email`) ou `barbers` (campo `email`), a conta é associada (`authProvider: 'linked'`) e a sessão é iniciada com a role correspondente (`owner`/`barber`).
-   - **Caso B (Novo Usuário)**: Cria a sessão do usuário com perfil fornecido pelo Google (Nome, E-mail, Avatar, `role: 'client'`).
-6. **Redirecionamento**: O usuário acessa o SaaS imediatamente em estado autenticado.
+   - **Caso A (Usuário já existe no banco Supabase)**: Se o e-mail existir na tabela `tenants` (campo `owner_email`) ou `barbers` (campo `email`), a conta é associada (`authProvider: 'linked'`) e a sessão é iniciada diretamente com o papel correspondente (`owner`/`barber`), enviando o usuário direto para o painel.
+   - **Caso B (Super Admin: atendmentor@gmail.com)**: Concede privilégios administrativos globais e ativa o link de acesso ao Painel Super Admin no rodapé da Sidebar.
+   - **Caso C (Novo Usuário)**: Se for o primeiro acesso, o usuário é direcionado para a tela do **Quiz de Onboarding** (`docs/onboarding-quiz-e-perfis.md`) para selecionar entre "Dono com equipe" ou "Profissional autônomo solo". A resposta é memorizada para que logins futuros entrem direto na aplicação.
+6. **Redirecionamento**: O usuário acessa a plataforma em estado autenticado com sua persona estabelecida.
 
 ---
 
