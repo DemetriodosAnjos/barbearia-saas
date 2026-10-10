@@ -51,17 +51,17 @@ Caso o e-mail seja localizado com sucesso no Supabase:
 - Envia o e-mail transacional via endpoint oficial `/api/email/send` utilizando SMTP configurado (`atendmentor@gmail.com`).
 - Template HTML com identidade visual escura/dourada da Barbearia SaaS, código em destaque monospace e orientações de segurança.
 
-### 2. Modal com Código & Botão de Copiar:
-- Exibe o código de 6 dígitos gerado em caixa com fundo contrastante e fonte monospace ampliada.
-- Fornece botão com ícone **"Copiar Código"** (Lucide `Copy`), que utiliza a API `navigator.clipboard.writeText`.
-- Feedback visual instantâneo: ícone Lucide `Check` verde com rótulo **"Copiado!"** por 2.5 segundos.
+### 2. Segurança no Modal (Código Oculto no UI):
+- O código de recuperação **NÃO é exposto na tela** da modal, reforçando a proteção contra visualizações indevidas no dispositivo.
+- É apresentado um informativo claro indicando que o código de 6 dígitos foi despachado para o endereço de e-mail do usuário.
+- O usuário deve consultar sua caixa de entrada e digitar o código recebido no campo de verificação.
 
 ### 3. Timer Regressivo de 3 Minutos (180 Segundos):
 - Exibição de cronômetro regressivo contínuo no formato `MM:SS` (ex: `03:00`, `02:59`, ... `00:00`).
 - Indicador pulsante com ícone `Clock` da biblioteca Lucide.
-- **Expiração:** Ao atingir `00:00`, o sistema notifica o usuário sobre a expiração do código e oferece a opção **"Reenviar Código"**, que reinicia o temporizador de 3 minutos e dispara um novo código de segurança.
+- **Expiração:** Ao atingir `00:00`, o sistema notifica o usuário sobre a expiração do código e oferece a opção **"Reenviar Código"**, que reinicia o temporizador de 3 minutos e dispara um novo código de segurança por e-mail.
 
 ### 4. Redefinição Segura da Senha:
-- Campos para digitação/colagem do código de 6 dígitos, **Nova Senha** (mínimo 6 caracteres) e **Confirmar Nova Senha**.
+- Campos para digitação do código de 6 dígitos recebido por e-mail, **Nova Senha** (mínimo 6 caracteres) e **Confirmar Nova Senha**.
 - Botão **"Redefinir Senha"** que sincroniza a atualização com o Supabase Auth.
 - Mensagem de sucesso com botão direto para **"Fazer Login Agora"**.

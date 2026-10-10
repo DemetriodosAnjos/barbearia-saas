@@ -27,8 +27,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   UserX,
-  Copy,
-  Check,
   Clock,
   Mail,
   RefreshCw,
@@ -63,7 +61,6 @@ export default function Login({
   const [forgotEmail, setForgotEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [generatedCode, setGeneratedCode] = useState("");
-  const [copiedCode, setCopiedCode] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState(180); // 3 minutos = 180s
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -98,7 +95,6 @@ export default function Login({
     setForgotNotice("");
     setVerificationCode("");
     setGeneratedCode("");
-    setCopiedCode(false);
     setNewPassword("");
     setConfirmNewPassword("");
     setCountdownSeconds(180);
@@ -276,7 +272,6 @@ export default function Login({
       const code6Digits = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedCode(code6Digits);
       setVerificationCode("");
-      setCopiedCode(false);
       setCountdownSeconds(180); // Inicia timer regressivo de 3 minutos
 
       // Dispara envio de e-mail via API backend / SMTP oficial
@@ -765,44 +760,13 @@ export default function Login({
             }}
             className="space-y-4 text-left"
           >
-            {/* Caixa do Código de 6 Dígitos com Botão de Copiar */}
-            <div className="p-3.5 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
-                  <Mail className="w-4 h-4 text-amber-500" />
-                  <span>Código de 6 Dígitos Enviado:</span>
-                </span>
-
-                {/* Botão de Copiar Código com feedback */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (generatedCode) {
-                      navigator.clipboard.writeText(generatedCode);
-                      setCopiedCode(true);
-                      setTimeout(() => setCopiedCode(false), 2500);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-200 hover:text-white transition-all cursor-pointer border border-neutral-700 active:scale-95"
-                  title="Copiar código de 6 dígitos para a área de transferência"
-                >
-                  {copiedCode ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
-                      <span className="text-emerald-400 font-bold">Copiado!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Copiar Código</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Destaque visual do Código de 6 Dígitos */}
-              <div className="flex items-center justify-center py-2.5 px-4 bg-neutral-950 rounded-lg border border-neutral-800 font-mono text-2xl font-bold tracking-[8px] text-amber-400 select-all shadow-inner">
-                {generatedCode || "------"}
+            {/* Aviso de envio de e-mail */}
+            <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl flex items-start gap-3">
+              <Mail className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-xs text-neutral-300 leading-relaxed">
+                <span>Enviamos um código de verificação para</span>{" "}
+                <strong className="text-amber-400 font-medium">{forgotEmail}</strong>.
+                <span className="text-neutral-400 block mt-0.5">Consulte sua caixa de entrada e insira o código abaixo.</span>
               </div>
             </div>
 
