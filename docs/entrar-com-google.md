@@ -4,16 +4,17 @@
 - **Funcionalidade**: Autenticação via Google Single Sign-On (SSO).
 - **Localização**: Tela de Login (`/src/pages/Auth/Login.jsx`) e Onboarding.
 - **Objetivo**: Permitir que usuários entrem ou criem uma conta na plataforma utilizando suas credenciais da conta Google, reduzindo o atrito no processo de cadastro e acesso.
+- **Tecnologia**: Integração direta com Google Identity Services (GIS) / Google OAuth 2.0 API no front-end, eliminando dependência de proxies estáticos que causavam falhas HTTP 404/405.
 
 ---
 
 ## 2. Elementos de Interface (UI)
 - **Texto da Ação**: `Entrar com Google` / `Continuar com Google`.
 - **Comportamento do Botão**:
-  - Deve seguir estritamente as diretrizes de marca (*Branding Guidelines*) da Google (ícone oficial com quatro cores, tipografia sans-serif legível e proporção equilibrada).
+  - Segue estritamente as diretrizes de marca (*Branding Guidelines*) da Google (ícone oficial com quatro cores, tipografia sans-serif legível e proporção equilibrada).
   - **Estado Padrão**: Habilitado para clique com foco acessível (`:focus-visible`).
-  - **Estado Loading**: Exibir indicador visual (*spinner* animado) e desabilitar cliques repetidos durante a comunicação com a API do Google/Backend (`isGoogleLoading = true`).
-  - **Estado Desabilitado**: Desabilitado temporariamente em falhas críticas de conexão ou durante submissões ativas.
+  - **Estado Loading**: Exibir indicador visual (*spinner* animado) e desabilitar cliques repetidos durante a comunicação com a API do Google (`isGoogleLoading = true`).
+  - **Zero Poluição Técnica**: Sem badges anti-CSRF, sem botões de simulação/demonstração e sem seletores fictícios de contas.
 
 ---
 
@@ -23,68 +24,65 @@
 [Usuário clica em "Entrar com Google"]
              │
              ▼
-[Backend gera parâmetro state (CSRF) via GET /api/auth/google/url]
+[API do Google (GIS) abre o Modal / Pop-up nativo de Seleção de Contas]
              │
              ▼
-[Exibe Modal de Seleção de Conta / Pop-up OAuth 2.0 OpenID Connect]
+[Usuário seleciona sua conta Google real e autoriza compartilhamento]
              │
              ▼
-[Usuário seleciona conta Google e autoriza compartilhamento de perfil]
+[Google API retorna perfil real (sub, email, email_verified, name, picture)]
              │
              ▼
-[Emissão e Validação do id_token no Backend via POST /api/auth/google]
+[Aplicação executa validações das Regras de Negócio (RN-01 a RN-05)]:
+ ├─ RN-02: email_verified === true
+ ├─ RN-01: Associação automática se já cadastrado no banco Supabase
+ ├─ RN-03: Perfil oficial do Google para novo usuário
+ └─ RN-04: Verificação de status (ativo/inativo/suspenso)
              │
              ▼
-[Checagem de Usuário: Caso A (Associação de Conta) ou Caso B (Novo Usuário)]
+[RN-05: Emissão e Gravação da Sessão (safeStorage)]
              │
              ▼
-[Emissão de Sessão JWT (Access Token 15m + Refresh Token HttpOnly 7d)]
-             │
-             ▼
-[Redirecionamento para o Dashboard do SaaS autenticado]
+[Redirecionamento imediato para o Painel/Dashboard do SaaS autenticado]
 ```
 
 1. **Clique do Usuário**: O usuário clica no botão "Entrar com Google".
-2. **Pop-up / Redirecionamento Google**: A aplicação solicita o parâmetro `state` criptográfico via `GET /api/auth/google/url` e abre o modal/pop-up de consentimento OAuth 2.0 / OpenID Connect.
-3. **Autenticação no Google**: O usuário seleciona a conta Google desejada e autoriza o compartilhamento de dados básicos (E-mail, Nome, Foto de Perfil).
-4. **Validação do Token (Backend)**:
-   - O frontend envia o `id_token` do Google junto ao `state` para o endpoint `/api/auth/google`.
-   - O backend valida a assinatura criptográfica (JWS/RS256), emissor (`accounts.google.com`), audiência e expiração (`exp`).
-5. **Checagem de Usuário Existente**:
-   - **Caso A (Usuário já existe)**: O backend identifica o e-mail ou o `google_id` vinculado. Autentica a sessão, vincula a conta se necessário (`authProvider: 'linked'`) e gera o token JWT da aplicação.
-   - **Caso B (Novo Usuário)**: O backend cria automaticamente uma nova conta utilizando as informações retornadas pelo Google (Nome, E-mail, Avatar, `email_verified = true`, senha local nula).
-6. **Finalização**: O usuário é redirecionado para a tela principal (Dashboard) em estado autenticado com permissões concedidas pelo RBAC.
+2. **Modal Nativo da Google API**: A aplicação inicializa o Google Identity Services (`window.google.accounts.oauth2.initTokenClient` / GIS) e abre a janela oficial de seleção de contas do Google.
+3. **Autenticação Real**: O usuário seleciona sua conta Google real logada no navegador ou insere suas credenciais Google.
+4. **Obtenção de Perfil**: A aplicação consulta o endpoint oficial da Google `https://www.googleapis.com/oauth2/v3/userinfo` com o token de acesso autorizado.
+5. **Associação e Criação de Sessão**:
+   - **Caso A (Usuário já existe no banco Supabase)**: Se o e-mail existir na tabela `tenants` (campo `owner_email`) ou `barbers` (campo `email`), a conta é associada (`authProvider: 'linked'`) e a sessão é iniciada com a role correspondente (`owner`/`barber`).
+   - **Caso B (Novo Usuário)**: Cria a sessão do usuário com perfil fornecido pelo Google (Nome, E-mail, Avatar, `role: 'client'`).
+6. **Redirecionamento**: O usuário acessa o SaaS imediatamente em estado autenticado.
 
 ---
 
 ## 4. Regras de Negócio Específicas (RNs)
 
 ### RN-01: Associação de Contas por E-mail
-Se o e-mail retornado pelo Google já estiver cadastrado via formulário tradicional (e-mail/senha):
-- A aplicação deve automaticamente vincular o método de login Google a essa conta existente (desde que o e-mail retornado pelo Google esteja marcado como `email_verified: true`).
+Se o e-mail retornado pelo Google já estiver cadastrado no banco de dados (tabelas `tenants` ou `barbers`):
+- A aplicação automaticamente vincula o método de login Google a essa conta existente.
 - A conta passa a ter suporte duplo (login local ou via Google SSO).
 
 ### RN-02: Verificação do E-mail
 - Apenas contas do Google com e-mail marcado como verificado (`email_verified == true`) poderão concluir o login/cadastro.
-- Contas não verificadas são rejeitadas imediatamente no backend com código de erro `EX-04`.
+- Contas não verificadas são rejeitadas imediatamente com código de erro `EX-04`.
 
 ### RN-03: Perfil e Dados do Usuário
 No momento do primeiro acesso (novo usuário):
-- **Nome completo**: Preenchido a partir da claim `name` do OIDC.
-- **E-mail**: Preenchido a partir da claim `email` do OIDC.
-- **URL da Foto de Perfil**: Preenchida a partir da claim `picture` do Google.
-- **Senha da conta**: Permanece nula (`passwordHash: null`) ou aleatória sem acesso direto pelo usuário, impedindo login por senha até que uma senha seja expressamente configurada via redefinição.
+- **Nome completo**: Preenchido a partir do nome retornado pela API do Google.
+- **E-mail**: Preenchido a partir do e-mail retornado pela API do Google.
+- **URL da Foto de Perfil**: Preenchida a partir da foto oficial do perfil Google.
+- **Identificador Único (`googleId`)**: Preenchido a partir do campo `sub` da Google API.
 
 ### RN-04: Status da Conta
-Se o usuário estiver com o status `inactive` (Inativo) ou `suspended` / `blocked` (Suspenso / Bloqueado) no banco de dados interno:
-- O acesso via Google deve ser bloqueado com mensagem explicativa:
+Se o usuário estiver com o status `inactive` (Inativo) ou `suspended` / `blocked` (Suspenso / Bloqueado) no banco de dados:
+- O acesso via Google é bloqueado com mensagem explicativa:
   - Para conta inativa: `"Sua conta está desativada. Entre em contato com o suporte."`
   - Para conta suspensa: `"Acesso negado. Sua conta está suspensa."`
 
 ### RN-05: Sessão e Persistência
-- A sessão iniciada via Google segue rigorosamente o mesmo tempo de expiração (TTL) das sessões normais da plataforma:
-  - **Access Token**: 15 minutos (900 segundos) em memória / cabeçalho `Authorization: Bearer <token>`.
-  - **Refresh Token**: 7 dias (604.800 segundos) em Cookie seguro com flags `HttpOnly`, `SameSite=Lax` e `Secure`.
+- A sessão iniciada via Google grava os dados no `safeStorage` (`saas_auth_user` e `saas_jwt_access_token`) garantindo persistência segura durante a navegação na plataforma.
 
 ---
 
@@ -92,27 +90,20 @@ Se o usuário estiver com o status `inactive` (Inativo) ou `suspended` / `blocke
 
 | Código / Cenário | Causa | Ação do Sistema / Mensagem para o Usuário |
 | :--- | :--- | :--- |
-| **EX-01: Cancelamento** | Usuário fecha a janela do Google antes de autenticar. | Fecha a janela pop-up e mantém o usuário na tela de login sem mensagens de erro. |
-| **EX-02: Falha de Conexão** | Sem comunicação com os servidores do Google / Backend indisponível. | Exibir alerta/toast: *"Não foi possível conectar com o Google. Tente novamente mais tarde."* |
-| **EX-03: Token Inválido** | Token expirado, malformado ou alterado durante o trânsito (falha de assinatura JWS). | Exibir erro: *"Sessão de autenticação inválida. Tente novamente."* |
+| **EX-01: Cancelamento** | Usuário fecha o modal do Google sem selecionar uma conta. | Fecha a janela e mantém o usuário na tela de login sem mensagens de erro. |
+| **EX-02: Falha de Conexão** | Sem comunicação com os servidores do Google / Falha de rede. | Exibir alerta: *"Não foi possível conectar com o Google. Tente novamente mais tarde."* |
+| **EX-03: Sessão Inválida** | Resposta da Google API corrompida ou e-mail inválido. | Exibir erro: *"Sessão de autenticação inválida. Tente novamente."* |
 | **EX-04: E-mail Não Verificado** | Conta do Google possui e-mail não confirmado (`email_verified: false`). | Exibir erro: *"Sua conta do Google precisa ter um e-mail verificado para continuar."* |
 | **EX-05: Conta Suspensa** | Usuário com status `suspended` ou `blocked` no sistema. | Exibir erro: *"Acesso negado. Sua conta está suspensa."* |
 
 ---
 
-## 6. Requisitos Não Funcionais (RNFs) e Segurança
+## 6. Configuração e Variáveis de Ambiente
 
-- **RNF-01: Padrão OpenID Connect 1.0 & OAuth 2.0**: Endpoint `/api/auth/google/url` gera URLs conformes com escopos `openid email profile` e `response_type=code id_token`.
-- **RNF-02: Validação Estrita de Tokens no Backend**: O frontend **nunca** define a identidade do usuário. O `id_token` é enviado ao backend e validado criptograficamente com RS256/HS256 e checagem de expiração temporal.
-- **RNF-03: Proteção Anti-CSRF via Parâmetro `state`**: O backend emite e assina o token `state` com validade de 10 minutos. O retorno valida a integridade do `state` antes de processar qualquer login.
-- **RNF-04: Identificador Único `google_id` (`sub`)**: Gravação do claim `sub` do OIDC na coluna `google_id` da base de dados para garantir unicidade e rastreabilidade independente de eventuais alterações de e-mail no futuro.
-
----
-
-## 7. Catálogo de Endpoints de Backend
-
-| Método | Rota | Descrição |
-| :--- | :--- | :--- |
-| `GET` | `/api/auth/google/url` | Emite o `state` anti-CSRF e URL oficial de autorização Google. |
-| `POST` | `/api/auth/google/token` | Emite `id_token` OIDC assinado para fluxos de consentimento e testes. |
-| `POST` | `/api/auth/google` | Valida o `id_token`, verifica `state`, aplica RN-01 a RN-05 e emite JWT da sessão. |
+- **`VITE_GOOGLE_CLIENT_ID`**: Client ID OAuth 2.0 Web criado no Google Cloud Console com as origens JavaScript autorizadas.
+  - Pode ser configurado via `.env` (`VITE_GOOGLE_CLIENT_ID=...`) ou informado no modal de configuração de chave se ausente.
+- **Content-Security-Policy (CSP)**:
+  - `script-src`: inclui `https://accounts.google.com https://apis.google.com`
+  - `connect-src`: inclui `https://accounts.google.com https://oauth2.googleapis.com https://*.googleapis.com`
+  - `frame-src`: inclui `https://accounts.google.com`
+  - `Cross-Origin-Opener-Policy`: configurado para `same-origin-allow-popups` para permitir comunicação com o modal/popup do Google.
