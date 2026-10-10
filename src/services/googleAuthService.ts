@@ -258,6 +258,21 @@ export async function authenticateGoogleUser(
       console.warn("Aviso ao buscar barbers para Google SSO:", err);
     }
 
+    // 3. Busca em 'profiles' (identidade)
+    let profileMatch: any = null;
+    try {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, role, barbershop_id")
+        .ilike("email", normalizedEmail);
+
+      if (profiles && profiles.length > 0) {
+        profileMatch = profiles[0];
+      }
+    } catch (pErr) {
+      console.warn("Aviso ao buscar profiles para Google SSO:", pErr);
+    }
+
     // RN-04 & EX-05: Checagem de Status da Conta
     const matchedRecord = tenantMatch || barberMatch;
     if (matchedRecord) {
@@ -281,12 +296,13 @@ export async function authenticateGoogleUser(
     // Monta o usuário autenticado da sessão
     const isOwner = Boolean(tenantMatch);
     const isBarber = !isOwner && Boolean(barberMatch);
-    const isNewUser = !tenantMatch && !barberMatch;
+    const isNewUser = !tenantMatch && !barberMatch && !profileMatch;
 
     const resolvedName =
       profile.name ||
       tenantMatch?.owner_name ||
       barberMatch?.name ||
+      profileMatch?.full_name ||
       normalizedEmail.split("@")[0];
 
     const resolvedAvatar =
@@ -299,13 +315,15 @@ export async function authenticateGoogleUser(
       ? tenantMatch.id
       : barberMatch
       ? barberMatch.id
+      : profileMatch
+      ? profileMatch.id
       : `usr_google_${profile.sub || Date.now()}`;
 
     const barbeariaId = tenantMatch
       ? tenantMatch.id
       : barberMatch
       ? barberMatch.tenant_id || barberMatch.barbershop_id || "a0000000-0000-0000-0000-000000000001"
-      : "a0000000-0000-0000-0000-000000000001";
+      : profileMatch?.barbershop_id || "a0000000-0000-0000-0000-000000000001";
 
     const authenticatedUser = {
       id: userId,

@@ -4,6 +4,7 @@ import { barbershopStyles } from "./BarbershopDashboard.styles";
 import Sidebar from "../../components/ui/Sidebar";
 import Navbar from "../../components/ui/Navbar";
 import TrialBanner from "../../components/dashboard/TrialBanner";
+import ProfileCompletionBanner from "../../components/dashboard/ProfileCompletionBanner";
 import ErrorBoundary from "../../components/ui/ErrorBoundary";
 import { SafeHtml } from "../../components/ui/SafeHtml";
 import ScheduleView from "./ScheduleView";
@@ -112,6 +113,13 @@ export default function BarbershopDashboard({
         tenant={tenant}
         user={user}
         onSubscribePlan={(plan) => console.log("Plano assinado:", plan)}
+      />
+
+      {/* Banner de alerta: orienta o profissional autônomo a completar o perfil e cadastrar PIX */}
+      <ProfileCompletionBanner
+        tenant={tenant}
+        user={user}
+        onCompleteProfile={() => setActiveMenuTab("perfil")}
       />
 
       <div className={barbershopStyles.layoutBody}>

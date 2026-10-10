@@ -57,3 +57,23 @@ VITE_SUPERADMIN_EMAIL="atendmentor@gmail.com"
   - **Localização Exata**: No rodapé da Sidebar, imediatamente acima da informação de versão da aplicação (`SaaS V1.5.2.0`).
   - **Estilo**: Ícone de Coroa (`Crown`), cor âmbar destacada e borda sutil.
   - Usuários comuns ou outros e-mails não visualizam este botão, garantindo discrição e segurança de interface.
+
+---
+
+## 5. Persistência no Supabase & Conclusão de Cadastro
+
+### RN-05: Gravação Tripla Síncrona no Supabase
+Ao selecionar *"sou profissional autônomo e trabalho sozinho"* no Quiz, o serviço `registerSoloBarberInSupabase` grava de forma síncrona com UUIDs canônicos do PostgreSQL:
+1. **`public.tenants`**: Registro da barbearia (`name`, `slug`, `owner_name`, `owner_email`, `is_solo: true`, 1 cadeira, plano `starter`, status `active`).
+2. **`public.barbers`**: Registro do barbeiro para a agenda de atendimento (`name`, `email`, `avatar_url`, `service_commission: 100%`, `status: 'active'`).
+3. **`public.profiles`**: Registro de identidade com role `admin` associado ao `barbershop_id`.
+
+**Efeito de Reconhecimento Perpétuo**: Em acessos futuros com a mesma conta Google, a API de autenticação (`googleAuthService.ts`) localiza o registro em `tenants` por `owner_email` ou em `barbers` por `email`. O status `isNewUser` é `false` e o usuário entra diretamente no dashboard carregado com seus dados.
+
+### RN-06: Banner de Alerta "Complete seu Perfil" (`ProfileCompletionBanner.jsx`)
+- Exibido no topo do painel da barbearia logo abaixo do `TrialBanner`.
+- Notifica o profissional autônomo que sua conta Google foi vinculada e orienta a completar o perfil.
+- O botão **"Completar meu perfil"** direciona imediatamente para a aba `perfil` (`UserProfileView`), onde o barbeiro pode preencher:
+  - Telefone / WhatsApp para contato de clientes.
+  - Chave PIX para recebimentos diretos.
+  - Slug personalizado e horários de funcionamento.
