@@ -199,7 +199,7 @@ export function buildRecoveryEmailTemplate({
 
       <div style="padding: 24px; text-align: center;">
         <p style="font-size: 15px; color: #e5e5e5; margin-top: 0; text-align: left;">Olá, <strong>${userName || "Usuário"}</strong>,</p>
-        <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso. Use o código de 6 dígitos abaixo para confirmar sua identidade:</p>
+        <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso. Use o código de verificação abaixo para confirmar sua identidade:</p>
 
         <div style="margin: 24px 0; background-color: #262626; border: 2px dashed #3b82f6; border-radius: 8px; padding: 16px; display: inline-block;">
           <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #60a5fa; font-family: monospace;">${verificationCode}</span>

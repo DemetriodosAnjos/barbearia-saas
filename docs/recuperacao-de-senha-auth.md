@@ -180,7 +180,7 @@ Para que o usuário receba o código de 6 dígitos em português e sem links ext
   </div>
   <div style="padding: 24px; text-align: center;">
     <p style="font-size: 15px; color: #e5e5e5; margin-top: 0; text-align: left;">Olá,</p>
-    <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso na <strong>Barbearia SaaS</strong>. Use o código de 6 dígitos abaixo para confirmar sua identidade no aplicativo:</p>
+    <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso na <strong>Barbearia SaaS</strong>. Use o código de verificação abaixo para confirmar sua identidade no aplicativo:</p>
     
     <div style="margin: 24px 0; background-color: #262626; border: 2px dashed #f59e0b; border-radius: 8px; padding: 18px; display: inline-block;">
       <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fbbf24; font-family: monospace;">{{ .Token }}</span>
@@ -202,8 +202,15 @@ Para que o usuário receba o código de 6 dígitos em português e sem links ext
 1. O usuário clica em **"Esqueceu a senha?"** e informa seu e-mail.
 2. O sistema aciona o Supabase Auth (`resetPasswordForEmail`).
 3. O Supabase dispara o e-mail via SMTP com o **código de 6 dígitos** (`{{ .Token }}`).
-4. O usuário abre o e-mail, copia o código de 6 dígitos e digita no modal do sistema.
+4. O usuário abre o e-mail, copia o código de verificação (6 a 8 dígitos) e digita no modal do sistema.
 5. O sistema executa:
    - `supabase.auth.verifyOtp({ email, token, type: "recovery" })` (valida o código e abre a sessão do usuário).
    - `supabase.auth.updateUser({ password })` (grava a nova senha na conta do usuário no Supabase).
 6. A senha é redefinida com 100% de sucesso, sem links externos e sem qualquer risco de erro 403!
+
+---
+
+### 🔢 Compatibilidade de Tamanho do Token (6 a 8 Dígitos)
+Por padrão no Supabase Auth, o token numérico OTP (`{{ .Token }}`) pode conter **6 ou 8 dígitos** dependendo da versão ou da política configurada no projeto.
+- O campo do modal no front-end aceita de **6 a 8 dígitos**, higienizando automaticamente caracteres não numéricos e espaços.
+- A validação assíncrona com `supabase.auth.verifyOtp({ email, token, type: "recovery" })` processa o código de forma nativa e segura independente de conter 6 ou 8 dígitos.

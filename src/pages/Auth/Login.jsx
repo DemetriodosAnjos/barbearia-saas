@@ -359,10 +359,10 @@ export default function Login({
 
       if (isStaticHost && !emailSentViaBackend && !supabaseAuthSent && supabaseErrorMsg) {
         setForgotNotice(
-          `Código de verificação de 6 dígitos enviado para ${targetEmail}. Nota: Caso não receba o e-mail em instantes, configure o SMTP e o template {{ .Token }} no painel do Supabase.`
+          `Código de verificação enviado para ${targetEmail}. Nota: Caso não receba o e-mail em instantes, configure o SMTP e o template {{ .Token }} no painel do Supabase.`
         );
       } else {
-        setForgotNotice(`Código de verificação de 6 dígitos enviado para ${targetEmail}.`);
+        setForgotNotice(`Código de verificação enviado para ${targetEmail}.`);
       }
 
       setForgotStep("code");
@@ -387,7 +387,7 @@ export default function Login({
 
     if (!verificationCode || verificationCode.trim().length < 6) {
       setForgotError(
-        "Informe o código de verificação de 6 dígitos recebido por e-mail."
+        "Informe o código de verificação recebido por e-mail."
       );
       return;
     }
@@ -431,7 +431,7 @@ export default function Login({
         setForgotError(
           otpErrorMessage
             ? `Código inválido ou expirado: ${otpErrorMessage}`
-            : "Código de verificação incorreto ou expirado. Verifique os 6 dígitos recebidos por e-mail."
+            : "Código de verificação incorreto ou expirado. Verifique o código recebido por e-mail."
         );
         setForgotLoading(false);
         return;
@@ -797,7 +797,7 @@ export default function Login({
           >
             <p className="text-xs text-neutral-400 leading-relaxed">
               Informe o e-mail cadastrado na sua barbearia. Enviaremos um{" "}
-              <strong className="text-neutral-200">código de 6 dígitos</strong>{" "}
+              <strong className="text-neutral-200">código de verificação</strong>{" "}
               para você redefinir sua senha com segurança.
             </p>
             <Input
@@ -876,14 +876,14 @@ export default function Login({
             )}
 
             <Input
-              label="Digite ou Cole o Código (6 dígitos)"
-              placeholder="000000"
-              maxLength={6}
+              label="Digite ou Cole o Código (6 a 8 dígitos)"
+              placeholder="Ex: 12345678"
+              maxLength={10}
               autoFocus
               className="font-mono text-center tracking-widest text-lg font-bold"
               value={verificationCode}
               onChange={(e) => {
-                setVerificationCode(e.target.value.replace(/\D/g, ""));
+                setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 8));
                 if (forgotError) setForgotError("");
               }}
             />
