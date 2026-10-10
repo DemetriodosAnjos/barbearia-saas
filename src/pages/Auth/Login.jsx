@@ -30,9 +30,7 @@ import {
   Clock,
   Mail,
   RefreshCw,
-  AlertCircle,
   AlertOctagon,
-  X,
 } from "lucide-react";
 
 export default function Login({
@@ -619,11 +617,12 @@ export default function Login({
         onClose={handleCloseForgotModal}
         title={
           forgotStep === "error_not_found"
-            ? "OPS! E-mail não cadastrado"
+            ? null
             : forgotStep === "success"
             ? "Senha Atualizada"
             : "Recuperação de Senha"
         }
+        showHeaderBorder={forgotStep !== "error_not_found"}
         footer={
           forgotStep === "email" ? (
             <>
@@ -686,37 +685,24 @@ export default function Login({
               <AlertOctagon className="w-9 h-9 text-rose-500 stroke-[2.2]" />
             </div>
 
-            {/* Título & Mensagem obrigatórios */}
+            {/* Título & Subtítulo (Exibição única sem redundância) */}
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono font-bold uppercase">
-                <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
-                <span>OPS! E-mail não cadastrado</span>
-              </div>
               <h3 className="text-xl font-bold text-white tracking-tight">
                 OPS! E-mail não cadastrado
               </h3>
               <p className="text-sm text-neutral-300 max-w-sm mx-auto leading-relaxed">
-                &ldquo;Desculpe! Esse e-mail não foi encontrado em nosso banco de dados&rdquo;
+                Desculpe! Esse e-mail não foi encontrado em nosso banco de dados
               </p>
             </div>
 
-            {/* Botões de Ação: OK, Entendi! / Fechar => (X) */}
-            <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+            {/* Botão Vermelho de Ação: OK, Entendi! */}
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={handleCloseForgotModal}
-                className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white font-bold text-sm transition-all shadow-lg shadow-rose-950/50 cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white font-bold text-sm transition-all shadow-lg shadow-rose-950/50 cursor-pointer flex items-center justify-center"
               >
                 <span>OK, Entendi!</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleCloseForgotModal}
-                className="py-3 px-5 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:scale-[0.99] text-neutral-300 hover:text-white font-semibold text-sm transition-all border border-neutral-700 cursor-pointer flex items-center justify-center gap-1.5"
-                title="Fechar e retornar à tela de login"
-              >
-                <X className="w-4 h-4 text-neutral-400" />
-                <span>Fechar</span>
               </button>
             </div>
           </div>

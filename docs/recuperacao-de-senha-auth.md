@@ -30,15 +30,14 @@ Ao clicar em **"Enviar Código de Verificação"**, o sistema realiza a checagem
 
 Caso o e-mail informado não seja localizado nem na tabela `tenants` nem na tabela `barbers`, o sistema aciona imediatamente a interface de alerta de erro:
 
-### Componente Modal:
-- **Tema & Cores:** Alerta de Erro Vermelho (`bg-rose-500/15`, `border-rose-500/40`, `text-rose-500`).
-- **Ícone:** Ícone padrão da biblioteca Lucide (`AlertOctagon` estilizado com halo de destaque e `AlertCircle`).
-- **Título:** `OPS! E-mail não cadastrado`
-- **Mensagem:** `"Desculpe! Esse e-mail não foi encontrado em nosso banco de dados"`
-- **Botões Disponíveis:**
-  - `OK, Entendi!` (Botão primário com destaque visual vermelho).
-  - `Fechar` / `(X)` (Botão secundário e botão nativo de fechar no cabeçalho do modal).
-- **Ação:** Qualquer um dos botões fecha a modal imediatamente e redefine todo o estado do formulário (`resetState`), retornando o usuário à tela de login limpa.
+### Componente Modal (Sem Redundâncias de UX/UI):
+- **Tema & Cores:** Alerta de Erro Vermelho com visual limpo e direto (`bg-rose-500/15`, `border-rose-500/40`, `text-rose-500`).
+- **Posicionamento do Ícone Fechar (X):** Posicionado à direita superior do modal, sem linha divisória separando o ícone das demais informações (cabeçalho sem `border-b`).
+- **Ícone Central:** Ícone da biblioteca Lucide `AlertOctagon` estilizado em container de destaque com halo vermelho.
+- **Título Único em Branco:** `OPS! E-mail não cadastrado` (exibido apenas 1 vez, sem repetições no cabeçalho ou tags extras).
+- **Subtítulo:** `Desculpe! Esse e-mail não foi encontrado em nosso banco de dados`.
+- **Botão de Ação:** Botão vermelho destacado `OK, Entendi!`.
+- **Ação:** O fechamento (seja pelo botão "OK, Entendi!" ou pelo "X" à direita) reseta completamente o estado do fluxo e retorna o usuário à tela de login limpa.
 
 ---
 

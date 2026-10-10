@@ -9,6 +9,7 @@ export default function Modal({
   footer,
   size = "md",
   className = "",
+  showHeaderBorder = true,
 }) {
   // Efeito para fechar com tecla ESC e travar o scroll da tela
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function Modal({
   if (!isOpen) return null;
 
   const sizeClass = modalStyles.sizes[size] || modalStyles.sizes.md;
+  const hasHeaderBorder = Boolean(title && showHeaderBorder !== false);
 
   return (
     <div
@@ -50,7 +52,13 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabeçalho */}
-        <div className={modalStyles.header}>
+        <div
+          className={`flex items-center ${
+            title ? "justify-between" : "justify-end"
+          } px-6 ${title ? "py-4" : "pt-5 pb-0"} ${
+            hasHeaderBorder ? "border-b border-neutral-800" : ""
+          } shrink-0`}
+        >
           {title && (
             <h3 id="modal-title-heading" className={modalStyles.title}>
               {title}
@@ -59,7 +67,7 @@ export default function Modal({
           <button
             type="button"
             onClick={onClose}
-            className={`${modalStyles.closeButton} focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none`}
+            className={`${modalStyles.closeButton} ml-auto focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none`}
             aria-label="Fechar janela modal"
           >
             <svg
