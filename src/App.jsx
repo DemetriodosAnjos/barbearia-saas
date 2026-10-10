@@ -214,11 +214,8 @@ export default function App() {
       const needsTenantUpsert =
         isUuidUser &&
         (!tenantRow ||
-          !tenantRow.phone ||
-          !tenantRow.owner_email ||
-          Number(tenantRow.mrr || 0) === 0 ||
-          tenantRow.name !== resolvedName ||
-          tenantRow.slug !== resolvedSlug);
+          (!tenantRow.owner_email && userEmail) ||
+          (!tenantRow.phone && resolvedPhone));
 
       let syncedTenantData = tenantRow;
       if (needsTenantUpsert) {
@@ -243,13 +240,20 @@ export default function App() {
         });
 
         try {
-          const { data: upserted } = await supabase
+          const { data: upserted, error: upsertErr } = await supabase
             .from("tenants")
             .upsert([upsertPayload], { onConflict: "id" })
             .select()
             .maybeSingle();
+          if (upsertErr) {
+            console.warn(
+              "Aviso na sincronização do tenant (verifique as políticas RLS na tabela tenants do Supabase):",
+              upsertErr.message
+            );
+          }
           syncedTenantData = upserted || upsertPayload;
-        } catch {
+        } catch (err) {
+          console.warn("Aviso ao sincronizar tenant:", err);
           syncedTenantData = upsertPayload;
         }
       }
