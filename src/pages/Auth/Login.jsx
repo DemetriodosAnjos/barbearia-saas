@@ -333,8 +333,12 @@ export default function Login({
       let supabaseAuthSent = false;
       let supabaseErrorMsg = "";
       try {
+        const redirectUrl =
+          typeof window !== "undefined"
+            ? window.location.origin + window.location.pathname
+            : undefined;
         const { error: resetErr } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-          redirectTo: typeof window !== "undefined" ? window.location.href : undefined,
+          redirectTo: redirectUrl,
         });
         if (resetErr) {
           supabaseErrorMsg = resetErr.message || "";

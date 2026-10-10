@@ -98,3 +98,48 @@ Para que o Supabase Auth dispare os e-mails com 100% de confiabilidade diretamen
 6. Clique em **Save**.
 7. Pronto! A partir desse momento, qualquer solicitação de recuperação de senha pelo modal enviará o e-mail oficial com taxa de sucesso de 100%, sem erros 500 no Supabase.
 
+
+---
+
+## 🔒 5. Diagnóstico e Resolução do Erro 403 ao Clicar em "Reset Password"
+
+Quando você recebe o e-mail oficial do Supabase:
+> **Reset your password**
+> We received a request to reset your password. Follow the link below to choose a new one.
+> **[Reset password] -> Erro 403 Forbidden**
+
+### Por que o Erro 403 Ocorre?
+No Supabase Auth, o link enviado por e-mail contém um token de recuperação que redireciona para a URL configurada no seu aplicativo. O erro HTTP 403 (ou mensagem de redirecionamento bloqueado) acontece por dois motivos principais:
+
+1. **A URL do GitHub Pages não está na lista de URLs permitidas (Redirect URLs) do Supabase:**
+   Por segurança, o Supabase bloqueia redirecionamentos para qualquer domínio que não esteja explicitamente autorizado nas configurações de autenticação.
+2. **O link expirou ou foi consumido por um scanner de antivírus/e-mail:**
+   Alguns clientes de e-mail (Outlook/Gmail) clicam previamente no link para checar segurança, o que pode invalidar o token de uso único.
+
+---
+
+### 🛠️ Como Resolver no Supabase Dashboard (Passo a Passo Rápido)
+
+1. Acesse o [Supabase Dashboard](https://supabase.com/dashboard/project/njgeevywotbflikilway).
+2. No menu lateral esquerdo, clique em **Authentication** e depois em **URL Configuration**.
+3. Configure os seguintes campos:
+   - **Site URL:**
+     ```text
+     https://demetriodosanjos.github.io/barbearia-saas/
+     ```
+   - **Redirect URLs (Adicione cada uma das seguintes URLs clicando em "Add URL"):**
+     - `https://demetriodosanjos.github.io/barbearia-saas/`
+     - `https://demetriodosanjos.github.io/barbearia-saas/*`
+     - `https://demetriodosanjos.github.io/*`
+     - `http://localhost:3000/*`
+     - `http://localhost:5173/*`
+4. Clique em **Save** no rodapé da página.
+
+---
+
+### 💡 Alternativa Direta: O Código de 6 Dígitos no Modal
+Lembre-se de que no aplicativo Barbearia SaaS você **não precisa obrigatoriamente do link externo**:
+1. Ao solicitar a recuperação no modal, o sistema envia o código para seu e-mail.
+2. Na tela do próprio modal, digite o código de 6 dígitos recebido.
+3. Defina sua **Nova Senha** e clique em **Redefinir Senha**.
+4. Sua senha será atualizada diretamente no Supabase sem depender do link externo!
