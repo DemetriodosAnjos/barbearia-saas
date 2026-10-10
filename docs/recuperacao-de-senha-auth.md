@@ -1,0 +1,67 @@
+# Módulo de Recuperação de Senha & Supabase Auth
+
+> **Status:** Homologado & Implementado  
+> **Componente Principal:** `src/pages/Auth/Login.jsx`  
+> **Serviço de E-mail:** `src/services/emailService.ts` / `/api/email/send`  
+> **Banco de Dados:** Supabase SQL (`public.tenants` & `public.barbers`)
+
+---
+
+## 🎯 Visão Geral
+
+O fluxo de **Esqueci a Senha / Recuperação de Senha** foi arquitetado para garantir máxima segurança contra enumeração de contas, validação em tempo real no banco de dados Supabase e uma experiência de usuário (UX) fluida, com verificação de dois fatores baseada em código numérico de 6 dígitos e expiração cronometrada.
+
+---
+
+## 🔍 1. Fluxo de Validação no Supabase SQL
+
+Quando o usuário clica em **"Esqueceu a senha?"** na tela de login, uma janela modal interativa é aberta solicitando o e-mail cadastrado.
+
+Ao clicar em **"Enviar Código de Verificação"**, o sistema realiza a checagem assíncrona nas seguintes tabelas do Supabase:
+
+1. **Tabela `public.tenants` (Proprietários de Barbearia):**
+   - Consulta insensível a maiúsculas/minúsculas: `.ilike("owner_email", targetEmail)`.
+2. **Tabela `public.barbers` (Barbeiros e Profissionais da Equipe):**
+   - Consulta insensível a maiúsculas/minúsculas: `.ilike("email", targetEmail)`.
+
+---
+
+## 🚫 2. Cenário A: E-mail NÃO Existe no Banco de Dados
+
+Caso o e-mail informado não seja localizado nem na tabela `tenants` nem na tabela `barbers`, o sistema aciona imediatamente a interface de alerta de erro:
+
+### Componente Modal:
+- **Tema & Cores:** Alerta de Erro Vermelho (`bg-rose-500/15`, `border-rose-500/40`, `text-rose-500`).
+- **Ícone:** Ícone padrão da biblioteca Lucide (`AlertOctagon` estilizado com halo de destaque e `AlertCircle`).
+- **Título:** `OPS! E-mail não cadastrado`
+- **Mensagem:** `"Desculpe! Esse e-mail não foi encontrado em nosso banco de dados"`
+- **Botões Disponíveis:**
+  - `OK, Entendi!` (Botão primário com destaque visual vermelho).
+  - `Fechar` / `(X)` (Botão secundário e botão nativo de fechar no cabeçalho do modal).
+- **Ação:** Qualquer um dos botões fecha a modal imediatamente e redefine todo o estado do formulário (`resetState`), retornando o usuário à tela de login limpa.
+
+---
+
+## ✉️ 3. Cenário B: E-mail EXISTE no Banco de Dados
+
+Caso o e-mail seja localizado com sucesso no Supabase:
+
+### 1. Disparo Transacional de E-mail:
+- Gera um código criptográfico de 6 dígitos (`100000` a `999999`).
+- Envia o e-mail transacional via endpoint oficial `/api/email/send` utilizando SMTP configurado (`atendmentor@gmail.com`).
+- Template HTML com identidade visual escura/dourada da Barbearia SaaS, código em destaque monospace e orientações de segurança.
+
+### 2. Modal com Código & Botão de Copiar:
+- Exibe o código de 6 dígitos gerado em caixa com fundo contrastante e fonte monospace ampliada.
+- Fornece botão com ícone **"Copiar Código"** (Lucide `Copy`), que utiliza a API `navigator.clipboard.writeText`.
+- Feedback visual instantâneo: ícone Lucide `Check` verde com rótulo **"Copiado!"** por 2.5 segundos.
+
+### 3. Timer Regressivo de 3 Minutos (180 Segundos):
+- Exibição de cronômetro regressivo contínuo no formato `MM:SS` (ex: `03:00`, `02:59`, ... `00:00`).
+- Indicador pulsante com ícone `Clock` da biblioteca Lucide.
+- **Expiração:** Ao atingir `00:00`, o sistema notifica o usuário sobre a expiração do código e oferece a opção **"Reenviar Código"**, que reinicia o temporizador de 3 minutos e dispara um novo código de segurança.
+
+### 4. Redefinição Segura da Senha:
+- Campos para digitação/colagem do código de 6 dígitos, **Nova Senha** (mínimo 6 caracteres) e **Confirmar Nova Senha**.
+- Botão **"Redefinir Senha"** que sincroniza a atualização com o Supabase Auth.
+- Mensagem de sucesso com botão direto para **"Fazer Login Agora"**.

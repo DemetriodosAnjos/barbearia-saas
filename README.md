@@ -58,6 +58,7 @@ A tela de autenticação oficial foi configurada com os seguintes padrões de UX
 - **Back-end & Banco de Dados**: Supabase (PostgreSQL) com Row Level Security (RLS).
 - **Segurança**: Cloudflare Turnstile, sanitização DOMPurify, Zod schemas e proteção CSRF/SSRF.
 - **Pagamentos**: Mercado Pago REST API & SDK oficial.
+- **Recuperação de Senha**: Supabase SQL (`tenants`/`barbers`), código de 6 dígitos via SMTP, timer regressivo de 3 min e modal de erro padronizado (`docs/recuperacao-de-senha-auth.md`).
 
 ---
 
