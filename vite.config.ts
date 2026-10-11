@@ -45,9 +45,15 @@ const dotEnvValues = loadDotEnvOverride();
  * e telemetria consulte diretamente os servidores oficiais do Mercado Pago.
  */
 function mercadoPagoProxyPlugin(): Plugin {
-  return {
-    name: 'mercado-pago-proxy',
-    configureServer(server) {
+  const attachMiddlewares = (server: { middlewares: any }) => {
+      // Normaliza prefixo de subcaminho (/barbearia-saas/api/... -> /api/...)
+      server.middlewares.use((req: any, _res: any, next: () => void) => {
+        if (req.url && req.url.startsWith('/barbearia-saas/api')) {
+          req.url = req.url.replace(/^\/barbearia-saas/, '');
+        }
+        next();
+      });
+
       // 1. Endpoint seguro para sincronização com o arquivo .env do sistema
       server.middlewares.use(async (req, res, next) => {
         if (!req.url || !req.url.startsWith('/api/env/sync')) {
@@ -365,6 +371,15 @@ function mercadoPagoProxyPlugin(): Plugin {
         }
         next();
       });
+  };
+
+  return {
+    name: 'mercado-pago-proxy',
+    configureServer(server) {
+      attachMiddlewares(server);
+    },
+    configurePreviewServer(server) {
+      attachMiddlewares(server);
     },
   };
 }

@@ -128,6 +128,8 @@ async function fetchViaServerProxy(targetPath, init = {}) {
   });
 }
 
+let serverProxyAvailable = true;
+
 async function supabaseResilientFetch(input, init = {}) {
   let rawUrl =
     typeof input === "string"
@@ -145,10 +147,15 @@ async function supabaseResilientFetch(input, init = {}) {
   }
 
   const isBrowser = !isTestEnv && typeof window !== "undefined";
+  const hostname = isBrowser ? (window.location.hostname || "").toLowerCase() : "";
   const isStaticHost =
     isBrowser &&
-    (window.location.hostname.endsWith("github.io") ||
-      window.location.hostname.includes("github.io"));
+    (!serverProxyAvailable ||
+      hostname.endsWith("github.io") ||
+      hostname.includes("github.io") ||
+      hostname.endsWith("netlify.app") ||
+      hostname.endsWith("vercel.app") ||
+      hostname.endsWith("pages.dev"));
 
   let targetPath = "";
   if (isBrowser && (rawUrl.includes("/rest/v1/") || rawUrl.includes("/auth/v1/"))) {
@@ -173,10 +180,13 @@ async function supabaseResilientFetch(input, init = {}) {
   ) {
     try {
       const proxyRes = await fetchViaServerProxy(targetPath, init);
-      if (proxyRes.status !== 404 && proxyRes.status !== 502) {
+      if (proxyRes.status === 404) {
+        serverProxyAvailable = false;
+      } else if (proxyRes.status !== 502) {
         return proxyRes;
       }
     } catch {
+      serverProxyAvailable = false;
       // Fallback para fetch direto abaixo
     }
   }

@@ -41,6 +41,31 @@ export interface PreferenceResult {
   createdAt: string;
 }
 
+// Resposta da verificação de status de pagamento
+export interface CheckPaymentInput {
+  tenantId?: string;
+  planId?: string;
+  planName?: string;
+  externalReference?: string;
+  paymentId?: string;
+  checkoutTime?: number;
+}
+
+export interface CheckPaymentResult {
+  approved: boolean;
+  status: "approved" | "pending";
+  paymentId?: string;
+  tenantId?: string;
+  planId?: string;
+  planName?: string;
+  externalReference?: string;
+  amount?: number;
+  dateApproved?: string;
+}
+
+// Cache em memória de pagamentos já confirmados
+const verifiedPaymentsCache = new Map<string, CheckPaymentResult>();
+
 // Resposta do Pix Instantâneo
 export interface PixPaymentResult {
   id: string;
@@ -215,12 +240,19 @@ export class MercadoPagoService {
 
       const sep = safeBackBase.includes("?") ? "&" : "?";
 
-      // Resolve a URL oficial do Webhook Mercado Pago registrada no SaaS
+      // Resolve a URL oficial do Webhook Mercado Pago registrada no SaaS (evitando hosts estáticos como github.io que retornam 404 para POST de webhook)
+      const originCandidate =
+        typeof window !== "undefined" &&
+        window.location?.origin?.startsWith("https://") &&
+        !window.location.hostname.includes("github.io")
+          ? window.location.origin
+          : "";
+
       const webhookBase =
         (typeof process !== "undefined" && (process.env?.VITE_APP_URL || process.env?.APP_URL)) ||
         (typeof import.meta !== "undefined" && import.meta.env?.VITE_APP_URL) ||
-        (typeof window !== "undefined" && window.location?.origin?.startsWith("https://") ? window.location.origin : "") ||
-        "https://ais-pre-musfj3getfoi6faqf7vpul-705341666319.us-west2.run.app";
+        originCandidate ||
+        "https://ais-pre-ovft74uclkgxpx5qez25ji-858409081048.us-east1.run.app";
 
       const cleanWebhookBase = webhookBase.replace(/\/$/, "");
       const notificationUrl = `${cleanWebhookBase}/api/mercadopago/webhook`;
@@ -811,6 +843,168 @@ export class MercadoPagoService {
         isRealApiCall: false,
       };
     }
+  }
+
+  /**
+   * Consulta ativa do status de pagamento diretamente na API oficial do Mercado Pago (/v1/payments/search).
+   * Compatível com ambientes full-stack e estáticos (GitHub Pages / Netlify / Cloud Run) sem erros 404 GET.
+   */
+  public async checkPaymentStatus(input: CheckPaymentInput): Promise<CheckPaymentResult> {
+    const tenantId = String(input.tenantId || "a0000000-0000-0000-0000-000000000001").trim();
+    const planId = String(input.planId || "").trim();
+    const externalRef = String(input.externalReference || "").trim();
+    const paymentId = String(input.paymentId || "").trim();
+    const checkoutTime = Number(input.checkoutTime || 0);
+
+    if (paymentId && verifiedPaymentsCache.has(paymentId)) {
+      return verifiedPaymentsCache.get(paymentId)!;
+    }
+    if (externalRef && verifiedPaymentsCache.has(externalRef)) {
+      return verifiedPaymentsCache.get(externalRef)!;
+    }
+
+    const fullConfig = mercadoPagoConfigStore.getConfig();
+    const resolved = this.resolveActiveCredentials();
+    const envToken =
+      (typeof process !== "undefined" && process.env?.MERCADO_PAGO_ACCESS_TOKEN) ||
+      "APP_USR-2637365150905441-100112-0937d7feec6bfdfe0c37c65c7636acdf-648721800";
+
+    const candidateTokens = Array.from(
+      new Set(
+        [
+          fullConfig.production?.accessToken,
+          envToken,
+          resolved.accessToken,
+          fullConfig.sandbox?.accessToken,
+        ].filter((t): t is string => Boolean(t && t.trim().startsWith("APP_USR-")))
+      )
+    );
+
+    const buildApprovalResult = (payment: any): CheckPaymentResult => {
+      const pExt = String(payment.external_reference || externalRef || "");
+      let resolvedTenantId = tenantId;
+      let resolvedPlanId = planId || "plano-de-teste";
+
+      if (pExt.includes(":")) {
+        const parts = pExt.split(":");
+        if (parts[0]) resolvedTenantId = parts[0];
+        if (parts[1]) resolvedPlanId = parts[1];
+      }
+
+      const desc = String(
+        payment.description ||
+          payment.additional_info?.items?.[0]?.title ||
+          input.planName ||
+          ""
+      ).toLowerCase();
+      const rawPlanId = resolvedPlanId.toLowerCase();
+
+      let resolvedPlanName = input.planName || "Plano Ativo";
+      if (rawPlanId.includes("teste") || rawPlanId === "trial" || desc.includes("teste") || desc === "trial") {
+        resolvedPlanName = input.planName || "Trial";
+      } else if (rawPlanId.includes("starter") || desc.includes("starter")) {
+        resolvedPlanName = "Starter";
+      } else if (rawPlanId.includes("pro") || desc.includes("pro")) {
+        resolvedPlanName = "Pro";
+      } else if (
+        rawPlanId.includes("enterprise") ||
+        rawPlanId.includes("entreprise") ||
+        desc.includes("enterprise") ||
+        desc.includes("entreprise")
+      ) {
+        resolvedPlanName = "Enterprise";
+      } else if (payment.description) {
+        resolvedPlanName = String(payment.description);
+      }
+
+      const result: CheckPaymentResult = {
+        approved: true,
+        status: "approved",
+        paymentId: String(payment.id),
+        tenantId: resolvedTenantId,
+        planId: resolvedPlanId,
+        planName: resolvedPlanName,
+        externalReference: pExt,
+        amount: Number(payment.transaction_amount || 0),
+        dateApproved: payment.date_approved || new Date().toISOString(),
+      };
+
+      if (result.paymentId) verifiedPaymentsCache.set(result.paymentId, result);
+      if (pExt) verifiedPaymentsCache.set(pExt, result);
+      return result;
+    };
+
+    for (const token of candidateTokens) {
+      try {
+        // 1. Busca direcionada por external_reference quando disponível (sempre retorna 200 OK na API do Mercado Pago)
+        if (externalRef) {
+          const byRefUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(
+            externalRef
+          )}&sort=date_created&criteria=desc`;
+          const refRes = await fetch(byRefUrl, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token.trim()}`,
+              Accept: "application/json",
+            },
+          });
+
+          if (refRes.ok) {
+            const refData = await refRes.json().catch(() => null);
+            const refResults = Array.isArray(refData?.results) ? refData.results : [];
+            const approvedMatch = refResults.find((p: any) => p && p.status === "approved");
+            if (approvedMatch) {
+              return buildApprovalResult(approvedMatch);
+            }
+          }
+        }
+
+        // 2. Busca nos últimos 15 pagamentos criados para cobrir links de fallback ou pagamento por ID
+        const searchRes = await fetch(
+          "https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=15",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token.trim()}`,
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (searchRes.ok) {
+          const searchData = await searchRes.json().catch(() => null);
+          const results = Array.isArray(searchData?.results) ? searchData.results : [];
+
+          for (const p of results) {
+            if (p && p.status === "approved") {
+              const pExt = String(p.external_reference || "").trim();
+              const isMatchExt = Boolean(externalRef && pExt === externalRef);
+              const isMatchId = Boolean(paymentId && String(p.id) === paymentId);
+
+              const paymentTimestamp = new Date(p.date_approved || p.date_created || 0).getTime();
+              const isRecentSameTenantPlan = Boolean(
+                tenantId &&
+                  planId &&
+                  pExt.startsWith(`${tenantId}:${planId}:`) &&
+                  checkoutTime > 0 &&
+                  paymentTimestamp >= checkoutTime - 180000
+              );
+
+              if (isMatchExt || isMatchId || isRecentSameTenantPlan) {
+                return buildApprovalResult(p);
+              }
+            }
+          }
+        }
+      } catch {
+        // Continua para o próximo token candidato
+      }
+    }
+
+    return {
+      approved: false,
+      status: "pending",
+    };
   }
 
   /**

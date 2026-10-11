@@ -16,7 +16,10 @@ import Alert from "../ui/Alert";
 import Spinner from "../ui/Spinner";
 import { supabase } from "../../lib/supabase";
 import { INITIAL_PLANS } from "../../pages/SuperAdmin/SuperAdminMockNuank";
-import { createPreferenceEndpoint } from "../../api/mercadoPagoEndpoints";
+import {
+  createPreferenceEndpoint,
+  checkPaymentEndpoint,
+} from "../../api/mercadoPagoEndpoints";
 
 export default function TrialBanner({
   trialDaysLeft,
@@ -349,6 +352,30 @@ export default function TrialBanner({
 
   // Monitoramento ativo e polling do status do pagamento enquanto o modal estiver aberto
   useEffect(() => {
+    // Captura retorno automático do Checkout Pro (auto_return / back_urls)
+    if (typeof window !== "undefined" && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const mpStatus = params.get("mp_status") || params.get("status") || params.get("collection_status");
+      const extRef = params.get("external_reference") || "";
+      const paymentId = params.get("payment_id") || params.get("collection_id") || "";
+
+      if (mpStatus === "success" || mpStatus === "approved") {
+        try {
+          window.localStorage.setItem(
+            "mp_payment_approved_signal",
+            JSON.stringify({
+              approved: true,
+              externalReference: extRef,
+              paymentId,
+              timestamp: Date.now(),
+            })
+          );
+        } catch {}
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isRedirectModalOpen || paymentStatus === "approved") return;
 
     let isMounted = true;
@@ -357,40 +384,55 @@ export default function TrialBanner({
     const targetExtRef = redirectInfo.externalReference || "";
     const checkoutTime = redirectInfo.checkoutTimestamp || Date.now();
 
+    const confirmApprovedPlan = (activePlanName) => {
+      if (!isMounted) return;
+      const resolvedTitle = activePlanName || targetPlan?.name || "Plano Ativo";
+      setPaymentStatus("approved");
+      setApprovedPlanTitle(resolvedTitle);
+
+      if (onSubscribePlan) {
+        onSubscribePlan(targetPlan?.id, redirectInfo.link, {
+          ...targetPlan,
+          name: resolvedTitle,
+        });
+      }
+
+      setTimeout(() => {
+        if (isMounted) {
+          setIsRedirectModalOpen(false);
+        }
+      }, 3000);
+    };
+
+    const handleStorageSignal = (event) => {
+      if (event.key === "mp_payment_approved_signal" && event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          if (parsed?.approved) {
+            confirmApprovedPlan(targetPlan?.name || redirectInfo.planName);
+          }
+        } catch {}
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleStorageSignal);
+    }
+
     async function checkApproval() {
       try {
-        // Consulta o endpoint backend /api/mercadopago/check-payment
-        const queryParams = new URLSearchParams({
+        // Consulta diretamente a API oficial do Mercado Pago via service (sem erro 404 GET em hosts estáticos)
+        const data = await checkPaymentEndpoint({
           tenantId: targetTenantId,
           planId: targetPlan?.id || "",
+          planName: targetPlan?.name || redirectInfo.planName || "",
           externalReference: targetExtRef,
-          checkoutTime: String(checkoutTime),
+          checkoutTime,
         });
 
-        const res = await fetch(`/api/mercadopago/check-payment?${queryParams.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.approved) {
-            if (isMounted) {
-              const activePlanName = data.planName || targetPlan?.name || "Plano Ativo";
-              setPaymentStatus("approved");
-              setApprovedPlanTitle(activePlanName);
-
-              if (onSubscribePlan) {
-                onSubscribePlan(targetPlan?.id, redirectInfo.link, {
-                  ...targetPlan,
-                  name: activePlanName,
-                });
-              }
-
-              setTimeout(() => {
-                if (isMounted) {
-                  setIsRedirectModalOpen(false);
-                }
-              }, 3000);
-            }
-            return true;
-          }
+        if (data && data.approved) {
+          confirmApprovedPlan(data.planName || targetPlan?.name || "Plano Ativo");
+          return true;
         }
       } catch (err) {
         console.warn("Aviso na checagem de pagamento:", err);
@@ -398,17 +440,21 @@ export default function TrialBanner({
       return false;
     }
 
-    // Checagem periódica a cada 2.5 segundos enquanto aguarda o pagamento no Mercado Pago
+    // Executa primeira checagem imediata e mantém polling a cada 3 segundos
+    checkApproval();
     const interval = setInterval(async () => {
       const isApproved = await checkApproval();
       if (isApproved) {
         clearInterval(interval);
       }
-    }, 2500);
+    }, 3000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleStorageSignal);
+      }
     };
   }, [isRedirectModalOpen, paymentStatus, redirectInfo, tenant?.id, onSubscribePlan]);
 
@@ -418,34 +464,33 @@ export default function TrialBanner({
     const targetTenantId = tenant?.id || "a0000000-0000-0000-0000-000000000001";
     const targetPlan = redirectInfo.plan;
     const targetExtRef = redirectInfo.externalReference || "";
+    const checkoutTime = redirectInfo.checkoutTimestamp || Date.now();
 
     try {
-      const queryParams = new URLSearchParams({
+      const data = await checkPaymentEndpoint({
         tenantId: targetTenantId,
         planId: targetPlan?.id || "",
+        planName: targetPlan?.name || redirectInfo.planName || "",
         externalReference: targetExtRef,
+        checkoutTime,
       });
 
-      const res = await fetch(`/api/mercadopago/check-payment?${queryParams.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.approved) {
-          const activePlanName = data.planName || targetPlan?.name || "Plano Ativo";
-          setPaymentStatus("approved");
-          setApprovedPlanTitle(activePlanName);
+      if (data && data.approved) {
+        const activePlanName = data.planName || targetPlan?.name || "Plano Ativo";
+        setPaymentStatus("approved");
+        setApprovedPlanTitle(activePlanName);
 
-          if (onSubscribePlan) {
-            onSubscribePlan(targetPlan?.id, redirectInfo.link, {
-              ...targetPlan,
-              name: activePlanName,
-            });
-          }
-
-          setTimeout(() => {
-            setIsRedirectModalOpen(false);
-          }, 2500);
-          return;
+        if (onSubscribePlan) {
+          onSubscribePlan(targetPlan?.id, redirectInfo.link, {
+            ...targetPlan,
+            name: activePlanName,
+          });
         }
+
+        setTimeout(() => {
+          setIsRedirectModalOpen(false);
+        }, 2500);
+        return;
       }
 
       // Consulta no Supabase de contingência: só aprova se o subscription_plan corresponder ao plano escolhido

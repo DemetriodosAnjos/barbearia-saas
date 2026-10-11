@@ -5,7 +5,13 @@
  * Atua como a camada de mediação segura (Server Proxy / API Route).
  */
 
-import { mercadoPago, type PreferenceResult, type PixPaymentResult } from "../services/mercadoPagoService";
+import {
+  mercadoPago,
+  type PreferenceResult,
+  type PixPaymentResult,
+  type CheckPaymentInput,
+  type CheckPaymentResult,
+} from "../services/mercadoPagoService";
 import type { MercadoPagoPreferenceInput, MercadoPagoPixInput } from "../schemas/mercadoPagoSchemas";
 
 export interface ApiResponse<T> {
@@ -14,6 +20,34 @@ export interface ApiResponse<T> {
   error?: string;
   code?: string;
   requestId?: string;
+}
+
+/**
+ * Endpoint de Consulta de Status de Pagamento (Checkout Pro / Pix)
+ * GET /api/mercadopago/check-payment
+ */
+export async function checkPaymentEndpoint(
+  input: CheckPaymentInput
+): Promise<ApiResponse<CheckPaymentResult> & CheckPaymentResult> {
+  const requestId = `req_mp_chk_${Date.now().toString(36)}`;
+  try {
+    const result = await mercadoPago.checkPaymentStatus(input);
+    return {
+      success: true,
+      data: result,
+      requestId,
+      ...result,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      approved: false,
+      status: "pending",
+      error: err.message || "Falha ao verificar status de pagamento no Mercado Pago",
+      code: "MP_CHECK_PAYMENT_ERROR",
+      requestId,
+    };
+  }
 }
 
 /**

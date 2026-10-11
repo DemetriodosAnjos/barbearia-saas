@@ -327,7 +327,11 @@ export async function dispatchApiRequest(
 
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-    const pathname = url.pathname;
+    const rawPathname = url.pathname;
+    const pathname =
+      rawPathname
+        .replace(/^\/barbearia-saas(?=\/api(\/|$))/, "")
+        .replace(/\/+$/, "") || "/";
     const method = (req.method || "GET").toUpperCase();
 
     // Tratamento direto de CORS Preflight (OPTIONS)
