@@ -645,19 +645,14 @@ export async function dispatchApiRequest(
         const planId = String(query?.planId || "");
         const externalRef = String(query?.externalReference || "");
         const paymentId = String(query?.paymentId || "");
+        const checkoutTime = Number(query?.checkoutTime || 0);
 
-        // 1. Verifica no cache de pagamentos aprovados
+        // 1. Verifica no cache de pagamentos aprovados desta transação específica
         if (paymentId && approvedPaymentsCache.has(paymentId)) {
           return sendJson(200, { success: true, approved: true, ...approvedPaymentsCache.get(paymentId) });
         }
         if (externalRef && approvedPaymentsCache.has(externalRef)) {
           return sendJson(200, { success: true, approved: true, ...approvedPaymentsCache.get(externalRef) });
-        }
-        if (tenantId && approvedPaymentsCache.has(tenantId)) {
-          const cached = approvedPaymentsCache.get(tenantId);
-          if (!planId || cached.planId === planId || cached.planName?.toLowerCase().includes(planId.toLowerCase())) {
-            return sendJson(200, { success: true, approved: true, ...cached });
-          }
         }
 
         // 2. Se houver paymentId explícito, consulta a API do Mercado Pago
@@ -689,12 +684,11 @@ export async function dispatchApiRequest(
 
             for (const p of results) {
               if (p.status === "approved") {
-                const pExt = String(p.external_reference || "");
-                const isMatchExt = externalRef && (pExt === externalRef || pExt.startsWith(externalRef));
-                const isMatchTenant = tenantId && pExt.startsWith(tenantId);
-                const isMatchId = paymentId && String(p.id) === paymentId;
+                const pExt = String(p.external_reference || "").trim();
+                const isMatchExt = Boolean(externalRef && pExt === externalRef);
+                const isMatchId = Boolean(paymentId && String(p.id) === paymentId);
 
-                if (isMatchExt || isMatchId || isMatchTenant) {
+                if (isMatchExt || isMatchId) {
                   const synced = await handlePaymentApproval(p);
                   if (synced) {
                     return sendJson(200, { success: true, approved: true, ...synced });

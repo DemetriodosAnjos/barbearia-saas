@@ -293,10 +293,109 @@ export async function authenticateGoogleUser(
       }
     }
 
+    // Se o usuário Google é novo (não possui registro em tenants), cria e persiste no banco
+    let isNewUser = !tenantMatch && !barberMatch;
+    if (isNewUser) {
+      const newTenantId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+              const r = (Math.random() * 16) | 0;
+              const v = c === "x" ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+
+      const rawName = profile.name || normalizedEmail.split("@")[0] || "Minha Barbearia";
+      const slugBase = rawName
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "") || "barbearia";
+
+      const shopSlug = `barbearia-${slugBase}-${newTenantId.slice(0, 4)}`;
+      const shopName = `Barbearia ${rawName}`;
+      const nowIso = new Date().toISOString();
+      const trialEnds = new Date();
+      trialEnds.setDate(trialEnds.getDate() + 7);
+      const trialEndsIso = trialEnds.toISOString();
+
+      try {
+        // 1. Grava de forma permanente na tabela oficial `tenants`
+        const { data: createdTenant, error: createTenantErr } = await supabase
+          .from("tenants")
+          .insert({
+            id: newTenantId,
+            name: shopName,
+            slug: shopSlug,
+            owner_name: profile.name || rawName,
+            owner_email: normalizedEmail,
+            phone: "",
+            plan: "starter",
+            status: "active",
+            barbers_count: 1,
+            mrr: 0,
+            trial_days_left: 7,
+            trial_ends_at: trialEndsIso,
+            has_white_label: false,
+            created_at: nowIso,
+            updated_at: nowIso,
+          })
+          .select()
+          .maybeSingle();
+
+        if (createTenantErr) {
+          console.warn("Aviso na inserção de tenant:", createTenantErr.message);
+        }
+
+        tenantMatch = createdTenant || {
+          id: newTenantId,
+          name: shopName,
+          slug: shopSlug,
+          owner_name: profile.name || rawName,
+          owner_email: normalizedEmail,
+          status: "active",
+          plan: "starter",
+        };
+
+        // 2. Grava na tabela `barbershops`
+        await supabase.from("barbershops").insert({
+          id: newTenantId,
+          name: shopName,
+          slug: shopSlug,
+          plan: "starter",
+          subscription_plan: "trial",
+          trial_ends_at: trialEndsIso,
+          created_at: nowIso,
+          updated_at: nowIso,
+        });
+
+        // 3. Grava o profissional na tabela `barbers`
+        const newBarberId =
+          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : "b" + newTenantId.slice(1);
+
+        await supabase.from("barbers").insert({
+          id: newBarberId,
+          barbershop_id: newTenantId,
+          name: profile.name || rawName,
+          display_name: (profile.name || rawName).split(" ")[0],
+          email: normalizedEmail,
+          role: "Master Barber",
+          avatar: profile.picture || "",
+          status: "active",
+          commission_percentage: 50,
+          created_at: nowIso,
+        });
+      } catch (dbErr) {
+        console.warn("Aviso ao persistir novo tenant Google no banco de dados:", dbErr);
+      }
+    }
+
     // Monta o usuário autenticado da sessão
     const isOwner = Boolean(tenantMatch);
     const isBarber = !isOwner && Boolean(barberMatch);
-    const isNewUser = !tenantMatch && !barberMatch && !profileMatch;
 
     const resolvedName =
       profile.name ||
@@ -342,6 +441,7 @@ export async function authenticateGoogleUser(
         role: isOwner ? "admin" : isBarber ? "barber" : "client",
         barbershop_name: tenantMatch?.name || "Barbearia",
         picture: resolvedAvatar,
+        tenant_id: barbeariaId,
       },
     };
 
@@ -352,7 +452,7 @@ export async function authenticateGoogleUser(
         email: normalizedEmail,
         role: authenticatedUser.role,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 900,
+        exp: Math.floor(Date.now() / 1000) + 86400,
       })
     )}`;
 

@@ -211,12 +211,10 @@ export default function App() {
         userMeta.trial_ends_at ||
         null;
 
-      // Se o usuário é real (UUID) e a linha em `tenants` não existia ou estava incompleta, sincroniza
-      const isUuidUser = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        String(authUser.id || "")
-      );
+      // Se o usuário possui e-mail válido e a linha em `tenants` não existia ou estava incompleta, sincroniza
+      const isRealUser = Boolean(userEmail && userEmail.includes("@"));
       const needsTenantUpsert =
-        isUuidUser &&
+        isRealUser &&
         (!tenantRow ||
           (!tenantRow.owner_email && userEmail) ||
           (!tenantRow.phone && resolvedPhone));
@@ -1115,9 +1113,8 @@ export default function App() {
                   return;
                 }
 
-                // Verifica se é primeiro acesso via Google ou se o usuário ainda não respondeu ao Quiz de Personas
-                const existingPersona = safeStorage.getItem("barber_saas_persona");
-                const isFirstTimeGoogle = Boolean(loggedUser?.isNewUser) || (!existingPersona && loggedUser?.authProvider === "google");
+                // Verifica se é primeiro acesso via Google (marcado como isNewUser na criação)
+                const isFirstTimeGoogle = Boolean(loggedUser?.isNewUser);
 
                 if (isFirstTimeGoogle) {
                   setCurrentUser(loggedUser);

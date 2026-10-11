@@ -288,6 +288,16 @@ export default function TrialBanner({
     setIsProceedingPayment(true);
     setErrorMessage("");
 
+    // Abre uma janela antecipada no clique direto do usuário para evitar bloqueio de popups
+    let paymentWindow = null;
+    try {
+      if (typeof window !== "undefined") {
+        paymentWindow = window.open("about:blank", "_blank");
+      }
+    } catch {
+      // Ignora se o navegador bloquear popups
+    }
+
     try {
       const chosenRes = await generateMercadoPagoLink(chosenPlan);
       const chosenLink =
@@ -304,26 +314,32 @@ export default function TrialBanner({
         .replace(".", ",");
       const chosenPlanName = `${chosenPlan.name} (R$ ${formattedPrice}/mês)`;
 
-      // Fecha o modal de escolha de planos
+      // Abre o checkout oficial do Mercado Pago na aba recém-criada
+      if (paymentWindow && chosenLink) {
+        paymentWindow.location.href = chosenLink;
+      } else if (chosenLink && typeof window !== "undefined") {
+        window.open(chosenLink, "_blank");
+      }
+
+      // Fecha o modal de seleção de planos
       setIsModalOpen(false);
 
-      // Abre o modal de aguardo da confirmação do pagamento
+      // Abre o modal no estado "Aguardando Pagamento"
       setRedirectInfo({
         planName: chosenPlan.name,
         formattedPlanName: chosenPlanName,
         link: chosenLink,
         plan: chosenPlan,
         externalReference: extRef,
+        checkoutTimestamp: Date.now(),
       });
       setPaymentStatus("waiting");
       setApprovedPlanTitle("");
       setIsRedirectModalOpen(true);
-
-      // Abre o checkout oficial do Mercado Pago em nova aba
-      if (chosenLink && typeof window !== "undefined") {
-        window.open(chosenLink, "_blank");
-      }
     } catch (err) {
+      if (paymentWindow) {
+        try { paymentWindow.close(); } catch {}
+      }
       console.error("[MercadoPago Checkout] Falha:", err);
       setErrorMessage("Erro ao conectar com a API do Mercado Pago. Tente novamente.");
     } finally {
@@ -339,14 +355,16 @@ export default function TrialBanner({
     const targetTenantId = tenant?.id || "a0000000-0000-0000-0000-000000000001";
     const targetPlan = redirectInfo.plan;
     const targetExtRef = redirectInfo.externalReference || "";
+    const checkoutTime = redirectInfo.checkoutTimestamp || Date.now();
 
     async function checkApproval() {
       try {
-        // 1. Consulta o endpoint backend /api/mercadopago/check-payment
+        // Consulta o endpoint backend /api/mercadopago/check-payment
         const queryParams = new URLSearchParams({
           tenantId: targetTenantId,
           planId: targetPlan?.id || "",
           externalReference: targetExtRef,
+          checkoutTime: String(checkoutTime),
         });
 
         const res = await fetch(`/api/mercadopago/check-payment?${queryParams.toString()}`);
@@ -369,42 +387,10 @@ export default function TrialBanner({
                 if (isMounted) {
                   setIsRedirectModalOpen(false);
                 }
-              }, 2500);
+              }, 3000);
             }
             return true;
           }
-        }
-
-        // 2. Consulta também o Supabase diretamente (tabela barbershops)
-        const { data: bData } = await supabase
-          .from("barbershops")
-          .select("subscription_plan")
-          .eq("id", targetTenantId)
-          .maybeSingle();
-
-        if (
-          bData &&
-          bData.subscription_plan &&
-          bData.subscription_plan.toLowerCase() !== "trial"
-        ) {
-          if (isMounted) {
-            setPaymentStatus("approved");
-            setApprovedPlanTitle(bData.subscription_plan);
-
-            if (onSubscribePlan) {
-              onSubscribePlan(targetPlan?.id, redirectInfo.link, {
-                ...targetPlan,
-                name: bData.subscription_plan,
-              });
-            }
-
-            setTimeout(() => {
-              if (isMounted) {
-                setIsRedirectModalOpen(false);
-              }
-            }, 2500);
-          }
-          return true;
         }
       } catch (err) {
         console.warn("Aviso na checagem de pagamento:", err);
@@ -412,10 +398,7 @@ export default function TrialBanner({
       return false;
     }
 
-    // Checagem imediata ao abrir o modal
-    checkApproval();
-
-    // Polling contínuo a cada 2.5 segundos
+    // Checagem periódica a cada 2.5 segundos enquanto aguarda o pagamento no Mercado Pago
     const interval = setInterval(async () => {
       const isApproved = await checkApproval();
       if (isApproved) {
@@ -839,7 +822,7 @@ export default function TrialBanner({
       >
         {paymentStatus === "approved" ? (
           <div className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4 select-none">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shadow-lg shadow-emerald-500/10">
               <Check className="w-8 h-8 text-emerald-400" />
             </div>
 
@@ -858,23 +841,38 @@ export default function TrialBanner({
 
             <Button
               variant="primary"
-              onClick={() => setIsRedirectModalOpen(false)}
-              className="text-xs py-2 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer"
+              onClick={() => {
+                setIsRedirectModalOpen(false);
+                if (onSubscribePlan && redirectInfo.plan) {
+                  onSubscribePlan(redirectInfo.plan.id, redirectInfo.link, {
+                    ...redirectInfo.plan,
+                    name: approvedPlanTitle || redirectInfo.planName,
+                  });
+                }
+              }}
+              className="text-xs py-2.5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer w-full"
             >
               Concluir e Acessar
             </Button>
           </div>
         ) : (
           <div className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4 select-none">
-            <Spinner
-              size="xl"
-              color="primary"
-              label="Aguardando confirmação do pagamento..."
-            />
+            {/* Ícone de Aguardando Pagamento: Relógio âmbar com anel pulsante */}
+            <div className="relative flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                <Clock className="w-8 h-8 text-amber-400 animate-pulse" />
+              </div>
+              <div className="absolute -top-1 -right-1">
+                <span className="flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                </span>
+              </div>
+            </div>
 
             <div className="space-y-1.5">
               <h4 className="text-base font-bold text-white">
-                {isVerifying ? "Verificando confirmação..." : "Aguardando confirmação do pagamento..."}
+                {isVerifying ? "Consultando Mercado Pago..." : "Aguardando Pagamento"}
               </h4>
               <p className="text-xs text-neutral-300 max-w-xs mx-auto leading-relaxed">
                 Conclua o pagamento via Pix ou Cartão no Mercado Pago para o plano{" "}
@@ -883,32 +881,39 @@ export default function TrialBanner({
                 </strong>
                 .
               </p>
-              <p className="text-[11px] text-neutral-400 max-w-xs mx-auto">
-                Assim que a transação for concluída, o status do seu plano será atualizado automaticamente nesta tela.
+              <p className="text-[11px] text-neutral-400 max-w-xs mx-auto leading-normal">
+                Assim que o pagamento for concluído, o webhook do Mercado Pago avisa o banco de dados e esta tela é atualizada automaticamente com a confirmação.
               </p>
             </div>
 
-            <div className="w-full flex flex-col gap-2 pt-2">
-              <Button
-                variant="secondary"
-                onClick={handleManualCheckPayment}
-                disabled={isVerifying}
-                className="w-full text-xs py-2 font-bold cursor-pointer"
-              >
-                {isVerifying ? "Consultando..." : "Já realizei o pagamento, verificar agora"}
-              </Button>
-
+            <div className="w-full flex flex-col gap-2.5 pt-2">
               {redirectInfo.link && (
                 <a
                   href={redirectInfo.link}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[11px] text-amber-500 hover:underline inline-flex items-center justify-center gap-1 cursor-pointer font-semibold py-1"
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-neutral-950 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-amber-500/20"
                 >
-                  <span>Reabrir página de pagamento do Mercado Pago</span>
-                  <ExternalLink className="w-3 h-3 text-amber-500" />
+                  <span>Abrir Página de Pagamento do Mercado Pago</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-neutral-950" />
                 </a>
               )}
+
+              <Button
+                variant="secondary"
+                onClick={handleManualCheckPayment}
+                disabled={isVerifying}
+                className="w-full text-xs py-2 font-bold cursor-pointer flex items-center justify-center gap-2"
+              >
+                {isVerifying ? (
+                  <>
+                    <Spinner size="xs" color="primary" />
+                    <span>Verificando com o Mercado Pago...</span>
+                  </>
+                ) : (
+                  <span>Já realizei o pagamento, verificar agora</span>
+                )}
+              </Button>
             </div>
           </div>
         )}

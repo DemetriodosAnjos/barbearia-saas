@@ -160,11 +160,14 @@ async function supabaseResilientFetch(input, init = {}) {
     }
   }
 
-  // 1. As tabelas administrativas (`tenants`, `plans`, `saas_config`) utilizam o proxy server-side para contornar RLS apenas em ambiente full-stack com backend ativo
+  // 1. As tabelas administrativas utilizam o proxy server-side para contornar RLS em ambiente com backend ativo
   if (
     isBrowser &&
     !isStaticHost &&
     (targetPath.startsWith("/rest/v1/tenants") ||
+      targetPath.startsWith("/rest/v1/barbershops") ||
+      targetPath.startsWith("/rest/v1/barbers") ||
+      targetPath.startsWith("/rest/v1/profiles") ||
       targetPath.startsWith("/rest/v1/plans") ||
       targetPath.startsWith("/rest/v1/saas_config"))
   ) {
