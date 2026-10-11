@@ -387,7 +387,7 @@ function mercadoPagoProxyPlugin(): Plugin {
 export default defineConfig(({ mode }) => {
   loadDotEnvOverride();
   return {
-    base: process.env.VITE_BASE_PATH || (process.env.GITHUB_PAGES === 'true' ? '/barbearia-saas/' : './'),
+    base: process.env.VITE_BASE_PATH || (process.env.GITHUB_PAGES === 'true' ? '/barbearia-saas/' : '/'),
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(
         dotEnvValues.VITE_SUPABASE_URL || 'https://njgeevywotbflikilway.supabase.co'

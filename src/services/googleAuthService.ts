@@ -261,16 +261,33 @@ export async function authenticateGoogleUser(
     // 3. Busca em 'profiles' (identidade)
     let profileMatch: any = null;
     try {
-      const { data: profiles } = await supabase
+      const { data: profiles, error: pErr } = await supabase
         .from("profiles")
         .select("id, full_name, role, barbershop_id")
         .ilike("email", normalizedEmail);
 
-      if (profiles && profiles.length > 0) {
+      if (!pErr && profiles && profiles.length > 0) {
         profileMatch = profiles[0];
       }
     } catch (pErr) {
       console.warn("Aviso ao buscar profiles para Google SSO:", pErr);
+    }
+
+    // Se profiles não tem coluna email ou não encontrou, busca profile pelo barbershop_id do tenant
+    if (!profileMatch && tenantMatch?.id) {
+      try {
+        const { data: pByShop, error: pbErr } = await supabase
+          .from("profiles")
+          .select("id, full_name, role, barbershop_id")
+          .eq("barbershop_id", tenantMatch.id)
+          .limit(1);
+
+        if (!pbErr && pByShop && pByShop.length > 0) {
+          profileMatch = pByShop[0];
+        }
+      } catch (err) {
+        console.warn("Aviso ao buscar profiles por barbershop_id:", err);
+      }
     }
 
     // RN-04 & EX-05: Checagem de Status da Conta
@@ -410,12 +427,12 @@ export async function authenticateGoogleUser(
       barberMatch?.avatar_url ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedName)}&background=d97706&color=fff&bold=true`;
 
-    const userId = tenantMatch
-      ? tenantMatch.id
+    const userId = profileMatch
+      ? profileMatch.id
       : barberMatch
       ? barberMatch.id
-      : profileMatch
-      ? profileMatch.id
+      : tenantMatch
+      ? tenantMatch.id
       : `usr_google_${profile.sub || Date.now()}`;
 
     const barbeariaId = tenantMatch
@@ -424,11 +441,44 @@ export async function authenticateGoogleUser(
       ? barberMatch.tenant_id || barberMatch.barbershop_id || "a0000000-0000-0000-0000-000000000001"
       : profileMatch?.barbershop_id || "a0000000-0000-0000-0000-000000000001";
 
+    // Vincula google_id no tenant existente se a coluna estiver presente
+    if (tenantMatch?.id) {
+      try {
+        await supabase
+          .from("tenants")
+          .update({
+            google_id: profile.sub,
+            auth_provider: "linked",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", tenantMatch.id);
+      } catch {
+        // segue se colunas ainda não existirem
+      }
+    }
+
+    if (profileMatch?.id) {
+      try {
+        await supabase
+          .from("profiles")
+          .update({
+            google_id: profile.sub,
+            email: normalizedEmail,
+            auth_provider: "linked",
+            avatar_url: profile.picture || undefined,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", profileMatch.id);
+      } catch {
+        // segue se colunas ainda não existirem
+      }
+    }
+
     const authenticatedUser = {
       id: userId,
       email: normalizedEmail,
       name: resolvedName,
-      role: isOwner ? "owner" : isBarber ? "barber" : "client",
+      role: isOwner ? "admin" : isBarber ? "barber" : "client",
       barbeariaId,
       barbershop_name: tenantMatch?.name || undefined,
       avatarUrl: resolvedAvatar,

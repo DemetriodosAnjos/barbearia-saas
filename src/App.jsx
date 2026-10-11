@@ -305,6 +305,41 @@ export default function App() {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error || !session?.user) {
           if (!isMounted) return;
+          // Verifica se há sessão ativa via Google SSO em safeStorage antes de forçar logout
+          const savedUserStr = safeStorage.getItem("saas_auth_user");
+          const savedToken = safeStorage.getItem("saas_jwt_access_token");
+          if (savedUserStr && savedToken && savedToken.startsWith("g_sso_")) {
+            try {
+              const savedUser = JSON.parse(savedUserStr);
+              if (savedUser?.email) {
+                const role =
+                  savedUser.user_metadata?.role ||
+                  savedUser.role ||
+                  USER_ROLES.ADMIN;
+                const normalizedRole =
+                  role === "owner" || role === "tenant" ? USER_ROLES.ADMIN : role;
+                const userWithRole = {
+                  ...savedUser,
+                  user_metadata: {
+                    ...(savedUser.user_metadata || {}),
+                    role: normalizedRole,
+                  },
+                };
+                setCurrentUser(userWithRole);
+                setActiveUserRole(normalizedRole);
+                resolveAndSyncUserTenant(userWithRole);
+                if (currentScreen === "login") {
+                  setCurrentScreen(
+                    normalizedRole === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
+                  );
+                }
+                return;
+              }
+            } catch {
+              // segue deslogando se JSON corrompido
+            }
+          }
+
           // Não reseta usuário nem redireciona se estiver no SuperAdmin, Design System, etc.
           if (currentScreen !== "superadmin" && currentScreen !== "design-system" && currentScreen !== "client-app" && currentScreen !== "onboarding") {
             setCurrentUser(null);
