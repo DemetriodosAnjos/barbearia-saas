@@ -344,6 +344,14 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
     brandSecondary: raw.brandSecondary || raw.brand_secondary || "#16a34a",
     logo_url: raw.logo_url ?? raw.logoUrl ?? "",
     logoUrl: raw.logoUrl ?? raw.logo_url ?? "",
+    payment_status: raw.payment_status || raw.paymentStatus || (raw.status === "trial" ? "trial" : "paid"),
+    paymentStatus: raw.payment_status || raw.paymentStatus || (raw.status === "trial" ? "trial" : "paid"),
+    last_payment_id: raw.last_payment_id || raw.lastPaymentId || null,
+    lastPaymentId: raw.last_payment_id || raw.lastPaymentId || null,
+    last_payment_date: raw.last_payment_date || raw.lastPaymentDate || null,
+    lastPaymentDate: raw.last_payment_date || raw.lastPaymentDate || null,
+    subscription_expires_at: raw.subscription_expires_at || raw.subscriptionExpiresAt || null,
+    subscriptionExpiresAt: raw.subscription_expires_at || raw.subscriptionExpiresAt || null,
   };
 }
 

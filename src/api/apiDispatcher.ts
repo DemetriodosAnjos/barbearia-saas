@@ -126,42 +126,122 @@ async function handlePaymentApproval(payment: any) {
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ2Vldnl3b3RiZmxpa2lsd2F5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTkzNzIxOCwiZXhwIjoyMTA1NTEzMjE4fQ.BD2nXZJyGwQN3FA5yfhgCWabkUpjM8d0wxYForx4pZc";
 
-    // 1. Atualiza public.barbershops
-    await fetch(`${supabaseUrl}/rest/v1/barbershops?id=eq.${tenantId}`, {
-      method: "PATCH",
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        subscription_plan: planName,
-        updated_at: new Date().toISOString(),
-      }),
-    });
+    const paymentId = String(payment.id || "");
+    const paymentMethod = String(payment.payment_method_id || payment.payment_type_id || "pix");
+    const nowIso = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
 
-    // 2. Atualiza public.tenants (respeita a constraint de plan válida: 'starter', 'pro', 'enterprise')
+    // 1. Atualiza public.barbershops (tenta com novas colunas de pagamento e faz fallback se ainda não existirem)
+    try {
+      const bsRes = await fetch(`${supabaseUrl}/rest/v1/barbershops?id=eq.${tenantId}`, {
+        method: "PATCH",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subscription_plan: planName,
+          payment_status: "paid",
+          last_payment_id: paymentId,
+          last_payment_date: nowIso,
+          updated_at: nowIso,
+        }),
+      });
+
+      if (!bsRes.ok) {
+        // Fallback defensivo para tabela sem as novas colunas
+        await fetch(`${supabaseUrl}/rest/v1/barbershops?id=eq.${tenantId}`, {
+          method: "PATCH",
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            subscription_plan: planName,
+            updated_at: nowIso,
+          }),
+        });
+      }
+    } catch {
+      // Continua
+    }
+
+    // 2. Atualiza public.tenants (respeita constraint de plan válida: 'starter', 'pro', 'enterprise')
     const sqlValidPlan = planName.toLowerCase().includes("enterprise")
       ? "enterprise"
       : planName.toLowerCase().includes("starter")
       ? "starter"
       : "pro";
 
-    await fetch(`${supabaseUrl}/rest/v1/tenants?id=eq.${tenantId}`, {
-      method: "PATCH",
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        status: "active",
-        plan: sqlValidPlan,
-        trial_days_left: 30,
-        mrr: Number(payment.transaction_amount || 0) > 0 ? Number(payment.transaction_amount) : undefined,
-        updated_at: new Date().toISOString(),
-      }),
-    });
+    try {
+      const tRes = await fetch(`${supabaseUrl}/rest/v1/tenants?id=eq.${tenantId}`, {
+        method: "PATCH",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "active",
+          plan: sqlValidPlan,
+          payment_status: "paid",
+          last_payment_id: paymentId,
+          last_payment_date: nowIso,
+          payment_method: paymentMethod,
+          subscription_expires_at: expiresAt,
+          trial_days_left: 30,
+          mrr: Number(payment.transaction_amount || 0) > 0 ? Number(payment.transaction_amount) : undefined,
+          updated_at: nowIso,
+        }),
+      });
+
+      if (!tRes.ok) {
+        // Fallback defensivo para tabela sem as novas colunas
+        await fetch(`${supabaseUrl}/rest/v1/tenants?id=eq.${tenantId}`, {
+          method: "PATCH",
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: "active",
+            plan: sqlValidPlan,
+            trial_days_left: 30,
+            mrr: Number(payment.transaction_amount || 0) > 0 ? Number(payment.transaction_amount) : undefined,
+            updated_at: nowIso,
+          }),
+        });
+      }
+    } catch {
+      // Continua
+    }
+
+    // 3. Tenta registrar na tabela de histórico de pagamentos de assinaturas (se existir)
+    try {
+      await fetch(`${supabaseUrl}/rest/v1/subscription_payments`, {
+        method: "POST",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          payment_id: paymentId,
+          plan_id: planId,
+          plan_name: planName,
+          amount: Number(payment.transaction_amount || 0),
+          status: "approved",
+          payment_method: paymentMethod,
+          payer_email: payment.payer?.email || null,
+        }),
+      });
+    } catch {
+      // Tabela opcional
+    }
   } catch (dbErr) {
     console.warn("Aviso ao persistir aprovação no Supabase:", dbErr);
   }
