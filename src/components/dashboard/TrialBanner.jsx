@@ -448,18 +448,22 @@ export default function TrialBanner({
         }
       }
 
-      // Consulta no Supabase
+      // Consulta no Supabase de contingência: só aprova se o subscription_plan corresponder ao plano escolhido
       const { data: bData } = await supabase
         .from("barbershops")
         .select("subscription_plan")
         .eq("id", targetTenantId)
         .maybeSingle();
 
-      if (
+      const chosenPlanName = targetPlan?.name || "Starter";
+      const isMatchingPlan =
         bData &&
         bData.subscription_plan &&
-        bData.subscription_plan.toLowerCase() !== "trial"
-      ) {
+        bData.subscription_plan.toLowerCase() !== "trial" &&
+        (bData.subscription_plan.toLowerCase().includes(chosenPlanName.toLowerCase()) ||
+          chosenPlanName.toLowerCase().includes(bData.subscription_plan.toLowerCase()));
+
+      if (isMatchingPlan) {
         setPaymentStatus("approved");
         setApprovedPlanTitle(bData.subscription_plan);
 
