@@ -46,6 +46,129 @@ export interface EndpointHandlerConfig {
   webhookProvider?: "mercadopago" | "stripe" | "whatsapp";
 }
 
+export const approvedPaymentsCache = new Map<string, any>();
+
+async function fetchAndSyncMercadoPagoPayment(paymentId: string) {
+  const token =
+    process.env.MERCADO_PAGO_ACCESS_TOKEN ||
+    "APP_USR-2637365150905441-100112-0937d7feec6bfdfe0c37c65c7636acdf-648721800";
+  try {
+    const res = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) return null;
+    const payment = await res.json();
+    return await handlePaymentApproval(payment);
+  } catch (err) {
+    console.warn("Erro ao buscar pagamento no Mercado Pago:", err);
+    return null;
+  }
+}
+
+async function handlePaymentApproval(payment: any) {
+  if (!payment || payment.status !== "approved") return null;
+
+  const extRef = String(payment.external_reference || "");
+  let tenantId = "a0000000-0000-0000-0000-000000000001";
+  let planId = "plano-de-teste";
+
+  if (extRef.includes(":")) {
+    const parts = extRef.split(":");
+    if (parts[0]) tenantId = parts[0];
+    if (parts[1]) planId = parts[1];
+  }
+
+  // Normaliza o nome do plano
+  let planName = "Plano de Teste";
+  const desc = String(
+    payment.description ||
+    payment.additional_info?.items?.[0]?.title ||
+    ""
+  ).toLowerCase();
+  const rawPlanId = planId.toLowerCase();
+
+  if (rawPlanId.includes("teste") || desc.includes("teste")) {
+    planName = "Plano de Teste";
+  } else if (rawPlanId.includes("starter") || desc.includes("starter")) {
+    planName = "Starter";
+  } else if (rawPlanId.includes("pro") || desc.includes("pro")) {
+    planName = "Pro";
+  } else if (rawPlanId.includes("enterprise") || desc.includes("enterprise") || desc.includes("entreprise")) {
+    planName = "Enterprise";
+  } else {
+    planName = payment.description || "Plano Ativo";
+  }
+
+  const approvalData = {
+    paymentId: String(payment.id),
+    status: "approved",
+    tenantId,
+    planId,
+    planName,
+    externalReference: extRef,
+    amount: payment.transaction_amount,
+    dateApproved: payment.date_approved || new Date().toISOString(),
+  };
+
+  approvedPaymentsCache.set(String(payment.id), approvalData);
+  approvedPaymentsCache.set(tenantId, approvalData);
+  if (extRef) approvedPaymentsCache.set(extRef, approvalData);
+
+  // Sincroniza diretamente com o Supabase
+  try {
+    const supabaseUrl =
+      process.env.VITE_SUPABASE_URL ||
+      "https://njgeevywotbflikilway.supabase.co";
+    const serviceKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ2Vldnl3b3RiZmxpa2lsd2F5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTkzNzIxOCwiZXhwIjoyMTA1NTEzMjE4fQ.BD2nXZJyGwQN3FA5yfhgCWabkUpjM8d0wxYForx4pZc";
+
+    // 1. Atualiza public.barbershops
+    await fetch(`${supabaseUrl}/rest/v1/barbershops?id=eq.${tenantId}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        subscription_plan: planName,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+
+    // 2. Atualiza public.tenants (respeita a constraint de plan válida: 'starter', 'pro', 'enterprise')
+    const sqlValidPlan = planName.toLowerCase().includes("enterprise")
+      ? "enterprise"
+      : planName.toLowerCase().includes("starter")
+      ? "starter"
+      : "pro";
+
+    await fetch(`${supabaseUrl}/rest/v1/tenants?id=eq.${tenantId}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: "active",
+        plan: sqlValidPlan,
+        trial_days_left: 30,
+        mrr: Number(payment.transaction_amount || 0) > 0 ? Number(payment.transaction_amount) : undefined,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch (dbErr) {
+    console.warn("Aviso ao persistir aprovação no Supabase:", dbErr);
+  }
+
+  return approvalData;
+}
+
 export const ENDPOINT_CATALOG: EndpointHandlerConfig[] = [
   { method: "POST", pathPattern: /^\/api\/auth\/login$/, schema: API_SCHEMAS.auth.login },
   { method: "GET", pathPattern: /^\/api\/auth\/google\/url$/ },
@@ -72,6 +195,7 @@ export const ENDPOINT_CATALOG: EndpointHandlerConfig[] = [
   { method: "POST", pathPattern: /^\/api\/mercadopago\/preference$/ },
   { method: "POST", pathPattern: /^\/api\/mercadopago\/pix$/ },
   { method: "GET", pathPattern: /^\/api\/mercadopago\/status$/ },
+  { method: "GET", pathPattern: /^\/api\/mercadopago\/check-payment$/ },
   { method: "POST", pathPattern: /^\/api\/email\/send$/ },
   { method: "POST", pathPattern: /^\/api\/email\/test$/ },
   { method: "POST", pathPattern: /^\/api\/mercadopago\/webhook$/ },
@@ -516,18 +640,96 @@ export async function dispatchApiRequest(
         return sendJson(200, statusRes);
       }
 
+      if (pathname === "/api/mercadopago/check-payment" && method === "GET") {
+        const tenantId = String(query?.tenantId || "a0000000-0000-0000-0000-000000000001");
+        const planId = String(query?.planId || "");
+        const externalRef = String(query?.externalReference || "");
+        const paymentId = String(query?.paymentId || "");
+
+        // 1. Verifica no cache de pagamentos aprovados
+        if (paymentId && approvedPaymentsCache.has(paymentId)) {
+          return sendJson(200, { success: true, approved: true, ...approvedPaymentsCache.get(paymentId) });
+        }
+        if (externalRef && approvedPaymentsCache.has(externalRef)) {
+          return sendJson(200, { success: true, approved: true, ...approvedPaymentsCache.get(externalRef) });
+        }
+        if (tenantId && approvedPaymentsCache.has(tenantId)) {
+          const cached = approvedPaymentsCache.get(tenantId);
+          if (!planId || cached.planId === planId || cached.planName?.toLowerCase().includes(planId.toLowerCase())) {
+            return sendJson(200, { success: true, approved: true, ...cached });
+          }
+        }
+
+        // 2. Se houver paymentId explícito, consulta a API do Mercado Pago
+        if (paymentId && /^\d+$/.test(paymentId)) {
+          const syncRes = await fetchAndSyncMercadoPagoPayment(paymentId);
+          if (syncRes) {
+            return sendJson(200, { success: true, approved: true, ...syncRes });
+          }
+        }
+
+        // 3. Consulta pagamentos recentes diretamente na API do Mercado Pago
+        const token =
+          process.env.MERCADO_PAGO_ACCESS_TOKEN ||
+          "APP_USR-2637365150905441-100112-0937d7feec6bfdfe0c37c65c7636acdf-648721800";
+        try {
+          const searchRes = await fetch(
+            "https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=15",
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            }
+          );
+
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            const results = Array.isArray(searchData?.results) ? searchData.results : [];
+
+            for (const p of results) {
+              if (p.status === "approved") {
+                const pExt = String(p.external_reference || "");
+                const isMatchExt = externalRef && (pExt === externalRef || pExt.startsWith(externalRef));
+                const isMatchTenant = tenantId && pExt.startsWith(tenantId);
+                const isMatchId = paymentId && String(p.id) === paymentId;
+
+                if (isMatchExt || isMatchId || isMatchTenant) {
+                  const synced = await handlePaymentApproval(p);
+                  if (synced) {
+                    return sendJson(200, { success: true, approved: true, ...synced });
+                  }
+                }
+              }
+            }
+          }
+        } catch (searchErr) {
+          console.warn("Aviso ao buscar pagamentos recentes no Mercado Pago:", searchErr);
+        }
+
+        return sendJson(200, { success: true, approved: false, status: "pending" });
+      }
+
       if (pathname === "/api/mercadopago/webhook" && (method === "POST" || method === "GET")) {
         const payloadObj = typeof parsedBody === "object" && parsedBody !== null ? parsedBody : {};
-        const paymentId = String(payloadObj?.data?.id || payloadObj?.id || query?.["data.id"] || query?.id || "123456");
+        const paymentId = String(payloadObj?.data?.id || payloadObj?.id || query?.["data.id"] || query?.id || "");
         const action = String(payloadObj?.action || query?.topic || query?.type || "payment.updated");
+
+        let approvalResult: any = null;
+        if (paymentId && /^\d+$/.test(paymentId)) {
+          approvalResult = await fetchAndSyncMercadoPagoPayment(paymentId);
+        }
+
         return sendJson(200, {
           status: 200,
           success: true,
           processed: true,
-          paymentId,
+          paymentId: paymentId || "123456",
           action,
+          approved: Boolean(approvalResult),
+          plan: approvalResult?.planName,
           liveMode: Boolean(payloadObj?.live_mode),
-          message: "Notificação de Webhook Mercado Pago recebida com sucesso (200 OK).",
+          message: "Notificação de Webhook Mercado Pago recebida e processada com sucesso (200 OK).",
         });
       }
 

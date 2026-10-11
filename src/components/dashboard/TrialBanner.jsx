@@ -45,9 +45,18 @@ export default function TrialBanner({
   const [loadingPlanId, setLoadingPlanId] = useState(null);
   const [isProceedingPayment, setIsProceedingPayment] = useState(false);
 
-  // Estados do Modal de Redirecionamento com Spinner
+  // Estados do Modal de Redirecionamento e Confirmação de Pagamento
   const [isRedirectModalOpen, setIsRedirectModalOpen] = useState(false);
-  const [redirectInfo, setRedirectInfo] = useState({ planName: "", link: "" });
+  const [redirectInfo, setRedirectInfo] = useState({
+    planName: "",
+    formattedPlanName: "",
+    link: "",
+    plan: null,
+    externalReference: "",
+  });
+  const [paymentStatus, setPaymentStatus] = useState("waiting"); // "waiting" | "approved"
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [approvedPlanTitle, setApprovedPlanTitle] = useState("");
 
   const showBanner = trialDaysLeft !== undefined && trialDaysLeft !== null;
   const isExpired = typeof trialDaysLeft === "number" ? trialDaysLeft <= 0 : false;
@@ -174,7 +183,7 @@ export default function TrialBanner({
         planId: String(plan.id),
         planName: String(plan.name),
         price: Number(plan.price),
-        tenantId: tenant?.id || "tenant_default",
+        tenantId: tenant?.id || "a0000000-0000-0000-0000-000000000001",
         tenantName: tenant?.name || "Minha Barbearia",
         payerEmail: user?.email || tenant?.ownerEmail || "gestor@barbearia.com.br",
         payerName: tenant?.ownerName || user?.user_metadata?.full_name || "Gestor da Barbearia",
@@ -184,11 +193,15 @@ export default function TrialBanner({
 
       if (res.success && res.data?.initPoint) {
         const generatedLink = res.data.initPoint;
+        const extRef =
+          res.data.externalReference ||
+          `${tenant?.id || "a0000000-0000-0000-0000-000000000001"}:${plan.id}:${Date.now()}`;
+        const resultObj = { link: generatedLink, externalReference: extRef };
         setMpCheckoutUrls((prev) => ({
           ...prev,
-          [plan.id]: generatedLink,
+          [plan.id]: resultObj,
         }));
-        return generatedLink;
+        return resultObj;
       }
     } catch (err) {
       console.warn("[MercadoPago API] Falha na criação da preferência:", err);
@@ -203,11 +216,16 @@ export default function TrialBanner({
       plan.nubank_payment_link ||
       `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_mp_${plan.id}`;
 
+    const fallbackObj = {
+      link: fallback,
+      externalReference: `${tenant?.id || "a0000000-0000-0000-0000-000000000001"}:${plan.id}:${Date.now()}`,
+    };
+
     setMpCheckoutUrls((prev) => ({
       ...prev,
-      [plan.id]: fallback,
+      [plan.id]: fallbackObj,
     }));
-    return fallback;
+    return fallbackObj;
   };
 
   // Pré-carrega o link da API do Mercado Pago para o plano selecionado assim que o modal abre
@@ -271,33 +289,210 @@ export default function TrialBanner({
     setErrorMessage("");
 
     try {
-      const chosenLink = await generateMercadoPagoLink(chosenPlan);
+      const chosenRes = await generateMercadoPagoLink(chosenPlan);
+      const chosenLink =
+        typeof chosenRes === "string"
+          ? chosenRes
+          : chosenRes?.link || "";
+      const extRef =
+        typeof chosenRes === "object" && chosenRes?.externalReference
+          ? chosenRes.externalReference
+          : `${tenant?.id || "a0000000-0000-0000-0000-000000000001"}:${chosenPlan.id}:${Date.now()}`;
 
       const formattedPrice = Number(chosenPlan.price || 0)
         .toFixed(2)
         .replace(".", ",");
       const chosenPlanName = `${chosenPlan.name} (R$ ${formattedPrice}/mês)`;
 
-      // Fecha o modal de planos
+      // Fecha o modal de escolha de planos
       setIsModalOpen(false);
 
-      // Abre o modal de redirecionamento seguro com Spinner
-      setRedirectInfo({ planName: chosenPlanName, link: chosenLink });
+      // Abre o modal de aguardo da confirmação do pagamento
+      setRedirectInfo({
+        planName: chosenPlan.name,
+        formattedPlanName: chosenPlanName,
+        link: chosenLink,
+        plan: chosenPlan,
+        externalReference: extRef,
+      });
+      setPaymentStatus("waiting");
+      setApprovedPlanTitle("");
       setIsRedirectModalOpen(true);
 
       // Abre o checkout oficial do Mercado Pago em nova aba
       if (chosenLink && typeof window !== "undefined") {
         window.open(chosenLink, "_blank");
       }
-
-      if (onSubscribePlan) {
-        onSubscribePlan(chosenPlan.id, chosenLink, chosenPlan);
-      }
     } catch (err) {
       console.error("[MercadoPago Checkout] Falha:", err);
       setErrorMessage("Erro ao conectar com a API do Mercado Pago. Tente novamente.");
     } finally {
       setIsProceedingPayment(false);
+    }
+  };
+
+  // Monitoramento ativo e polling do status do pagamento enquanto o modal estiver aberto
+  useEffect(() => {
+    if (!isRedirectModalOpen || paymentStatus === "approved") return;
+
+    let isMounted = true;
+    const targetTenantId = tenant?.id || "a0000000-0000-0000-0000-000000000001";
+    const targetPlan = redirectInfo.plan;
+    const targetExtRef = redirectInfo.externalReference || "";
+
+    async function checkApproval() {
+      try {
+        // 1. Consulta o endpoint backend /api/mercadopago/check-payment
+        const queryParams = new URLSearchParams({
+          tenantId: targetTenantId,
+          planId: targetPlan?.id || "",
+          externalReference: targetExtRef,
+        });
+
+        const res = await fetch(`/api/mercadopago/check-payment?${queryParams.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.approved) {
+            if (isMounted) {
+              const activePlanName = data.planName || targetPlan?.name || "Plano Ativo";
+              setPaymentStatus("approved");
+              setApprovedPlanTitle(activePlanName);
+
+              if (onSubscribePlan) {
+                onSubscribePlan(targetPlan?.id, redirectInfo.link, {
+                  ...targetPlan,
+                  name: activePlanName,
+                });
+              }
+
+              setTimeout(() => {
+                if (isMounted) {
+                  setIsRedirectModalOpen(false);
+                }
+              }, 2500);
+            }
+            return true;
+          }
+        }
+
+        // 2. Consulta também o Supabase diretamente (tabela barbershops)
+        const { data: bData } = await supabase
+          .from("barbershops")
+          .select("subscription_plan")
+          .eq("id", targetTenantId)
+          .maybeSingle();
+
+        if (
+          bData &&
+          bData.subscription_plan &&
+          bData.subscription_plan.toLowerCase() !== "trial"
+        ) {
+          if (isMounted) {
+            setPaymentStatus("approved");
+            setApprovedPlanTitle(bData.subscription_plan);
+
+            if (onSubscribePlan) {
+              onSubscribePlan(targetPlan?.id, redirectInfo.link, {
+                ...targetPlan,
+                name: bData.subscription_plan,
+              });
+            }
+
+            setTimeout(() => {
+              if (isMounted) {
+                setIsRedirectModalOpen(false);
+              }
+            }, 2500);
+          }
+          return true;
+        }
+      } catch (err) {
+        console.warn("Aviso na checagem de pagamento:", err);
+      }
+      return false;
+    }
+
+    // Checagem imediata ao abrir o modal
+    checkApproval();
+
+    // Polling contínuo a cada 2.5 segundos
+    const interval = setInterval(async () => {
+      const isApproved = await checkApproval();
+      if (isApproved) {
+        clearInterval(interval);
+      }
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isRedirectModalOpen, paymentStatus, redirectInfo, tenant?.id, onSubscribePlan]);
+
+  // Checagem manual disparada pelo botão do usuário
+  const handleManualCheckPayment = async () => {
+    setIsVerifying(true);
+    const targetTenantId = tenant?.id || "a0000000-0000-0000-0000-000000000001";
+    const targetPlan = redirectInfo.plan;
+    const targetExtRef = redirectInfo.externalReference || "";
+
+    try {
+      const queryParams = new URLSearchParams({
+        tenantId: targetTenantId,
+        planId: targetPlan?.id || "",
+        externalReference: targetExtRef,
+      });
+
+      const res = await fetch(`/api/mercadopago/check-payment?${queryParams.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.approved) {
+          const activePlanName = data.planName || targetPlan?.name || "Plano Ativo";
+          setPaymentStatus("approved");
+          setApprovedPlanTitle(activePlanName);
+
+          if (onSubscribePlan) {
+            onSubscribePlan(targetPlan?.id, redirectInfo.link, {
+              ...targetPlan,
+              name: activePlanName,
+            });
+          }
+
+          setTimeout(() => {
+            setIsRedirectModalOpen(false);
+          }, 2500);
+          return;
+        }
+      }
+
+      // Consulta no Supabase
+      const { data: bData } = await supabase
+        .from("barbershops")
+        .select("subscription_plan")
+        .eq("id", targetTenantId)
+        .maybeSingle();
+
+      if (
+        bData &&
+        bData.subscription_plan &&
+        bData.subscription_plan.toLowerCase() !== "trial"
+      ) {
+        setPaymentStatus("approved");
+        setApprovedPlanTitle(bData.subscription_plan);
+
+        if (onSubscribePlan) {
+          onSubscribePlan(targetPlan?.id, redirectInfo.link, {
+            ...targetPlan,
+            name: bData.subscription_plan,
+          });
+        }
+
+        setTimeout(() => {
+          setIsRedirectModalOpen(false);
+        }, 2500);
+      }
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -634,54 +829,89 @@ export default function TrialBanner({
       </Modal>
 
       {/* ======================================================== */}
-      {/* 3. MODAL COM SPINNER DE REDIRECIONAMENTO DE CHECKOUT    */}
+      {/* 3. MODAL COM SPINNER DE STATUS E CONFIRMAÇÃO DE PAGAMENTO */}
       {/* ======================================================== */}
       <Modal
         isOpen={isRedirectModalOpen}
         onClose={() => setIsRedirectModalOpen(false)}
-        title="Redirecionando para Pagamento"
+        title={paymentStatus === "approved" ? "Pagamento Confirmado!" : "Aguardando Pagamento"}
         size="sm"
       >
-        <div className="py-6 px-2 flex flex-col items-center justify-center text-center space-y-4 select-none">
-          <Spinner
-            size="xl"
-            color="primary"
-            label="Conectando com o Mercado Pago..."
-          />
+        {paymentStatus === "approved" ? (
+          <div className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4 select-none">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
+              <Check className="w-8 h-8 text-emerald-400" />
+            </div>
 
-          <div className="space-y-1">
-            <h4 className="text-base font-bold text-white">
-              Preparando ambiente seguro
-            </h4>
-            <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-              Gerando preferência oficial na API Mercado Pago para o plano{" "}
-              <strong className="text-amber-400">
-                {redirectInfo.planName}
-              </strong>
-              ...
+            <div className="space-y-1.5">
+              <h4 className="text-lg font-bold text-white">
+                Pagamento realizado com sucesso!
+              </h4>
+              <p className="text-xs text-neutral-300 max-w-xs mx-auto">
+                O plano <strong className="text-amber-400 font-bold">{approvedPlanTitle || redirectInfo.planName}</strong> foi ativado com sucesso para sua barbearia.
+              </p>
+            </div>
+
+            <p className="text-[11px] text-neutral-400">
+              Retornando ao sistema em instantes...
             </p>
+
+            <Button
+              variant="primary"
+              onClick={() => setIsRedirectModalOpen(false)}
+              className="text-xs py-2 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer"
+            >
+              Concluir e Acessar
+            </Button>
           </div>
+        ) : (
+          <div className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4 select-none">
+            <Spinner
+              size="xl"
+              color="primary"
+              label="Aguardando confirmação do pagamento..."
+            />
 
-          <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-2xl text-[11px] text-neutral-400 max-w-xs w-full space-y-1">
-            <p className="flex items-center justify-center gap-1.5 text-emerald-400 font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              API Mercado Pago Integrada (Checkout Pro)
-            </p>
-            <p className="text-neutral-500 text-[10px]">
-              Uma nova aba foi aberta para conclusão com PIX ou Cartão em até 12x.
-            </p>
+            <div className="space-y-1.5">
+              <h4 className="text-base font-bold text-white">
+                {isVerifying ? "Verificando confirmação..." : "Aguardando confirmação do pagamento..."}
+              </h4>
+              <p className="text-xs text-neutral-300 max-w-xs mx-auto leading-relaxed">
+                Conclua o pagamento via Pix ou Cartão no Mercado Pago para o plano{" "}
+                <strong className="text-amber-400">
+                  {redirectInfo.planName}
+                </strong>
+                .
+              </p>
+              <p className="text-[11px] text-neutral-400 max-w-xs mx-auto">
+                Assim que a transação for concluída, o status do seu plano será atualizado automaticamente nesta tela.
+              </p>
+            </div>
+
+            <div className="w-full flex flex-col gap-2 pt-2">
+              <Button
+                variant="secondary"
+                onClick={handleManualCheckPayment}
+                disabled={isVerifying}
+                className="w-full text-xs py-2 font-bold cursor-pointer"
+              >
+                {isVerifying ? "Consultando..." : "Já realizei o pagamento, verificar agora"}
+              </Button>
+
+              {redirectInfo.link && (
+                <a
+                  href={redirectInfo.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-amber-500 hover:underline inline-flex items-center justify-center gap-1 cursor-pointer font-semibold py-1"
+                >
+                  <span>Reabrir página de pagamento do Mercado Pago</span>
+                  <ExternalLink className="w-3 h-3 text-amber-500" />
+                </a>
+              )}
+            </div>
           </div>
-
-          <a
-            href={redirectInfo.link}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[11px] text-amber-500 hover:underline pt-2 inline-flex items-center gap-1 cursor-pointer font-semibold"
-          >
-            <span>Clique aqui para abrir o link do Mercado Pago</span>
-            <ExternalLink className="w-3 h-3 text-amber-500" />
-          </a>
-        </div>
+        )}
       </Modal>
     </>
   );

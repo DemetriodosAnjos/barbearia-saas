@@ -346,8 +346,14 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
 
 export async function ensureDefaultBarbershop() {
   try {
-    await supabase.from("barbershops").upsert(
-      [
+    const { data: existing } = await supabase
+      .from("barbershops")
+      .select("id")
+      .eq("id", "a0000000-0000-0000-0000-000000000001")
+      .maybeSingle();
+
+    if (!existing) {
+      await supabase.from("barbershops").insert([
         {
           id: "a0000000-0000-0000-0000-000000000001",
           name: "Barbearia Matriz",
@@ -356,9 +362,8 @@ export async function ensureDefaultBarbershop() {
           plan: "pro",
           subscription_plan: "trial",
         },
-      ],
-      { onConflict: "id" }
-    );
+      ]);
+    }
   } catch (_e) {
     // Non-blocking fallback
   }

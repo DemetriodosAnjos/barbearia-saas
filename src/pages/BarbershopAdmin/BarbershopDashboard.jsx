@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DOMPurify from "dompurify";
 import { barbershopStyles } from "./BarbershopDashboard.styles";
 import Sidebar from "../../components/ui/Sidebar";
@@ -19,6 +19,8 @@ import CashierPosView from "./CashierPosView";
 import FinancialDashboardView from "./FinancialDashboardView";
 import SkeletonDashboard from "../../components/resilience/SkeletonDashboard";
 import ProjectIcon from "../../components/ui/ProjectIcon";
+import { supabase } from "../../lib/supabase";
+import { safeStorage } from "../../utils/safeStorage";
 
 export default function BarbershopDashboard({
   tenant, // Objeto real da barbearia vindo do Supabase
@@ -67,6 +69,45 @@ export default function BarbershopDashboard({
       )
     : (tenant?.trialDaysLeft ?? null);
 
+  // Sincroniza o status ativo do plano da barbearia a partir do Supabase na inicialização
+  useEffect(() => {
+    let isMounted = true;
+    const tenantId = tenant?.id || "a0000000-0000-0000-0000-000000000001";
+
+    async function syncTenantPlanFromSupabase() {
+      try {
+        const { data: bData } = await supabase
+          .from("barbershops")
+          .select("subscription_plan, plan")
+          .eq("id", tenantId)
+          .maybeSingle();
+
+        if (
+          bData?.subscription_plan &&
+          bData.subscription_plan.toLowerCase() !== "trial"
+        ) {
+          if (isMounted && onUpdateTenant) {
+            onUpdateTenant({
+              ...tenant,
+              subscription_plan: bData.subscription_plan,
+              status: "active",
+              trialDaysLeft: 30,
+              trial_days_left: 30,
+            });
+          }
+        }
+      } catch (err) {
+        // Non-blocking
+      }
+    }
+
+    syncTenantPlanFromSupabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tenant?.id]);
+
   const barbershopMenuItems = [
     {
       id: "agenda",
@@ -112,7 +153,64 @@ export default function BarbershopDashboard({
         setIsPlansModalOpen={setIsPlansModalOpen}
         tenant={tenant}
         user={user}
-        onSubscribePlan={(plan) => console.log("Plano assinado:", plan)}
+        onSubscribePlan={async (planId, link, planObj) => {
+          const planName =
+            planObj?.name ||
+            (typeof planId === "string" && planId.includes("teste") ? "Plano de Teste" : planId) ||
+            "Plano Ativo";
+
+          const sqlValidPlan = String(planObj?.id || planId).toLowerCase().includes("enterprise")
+            ? "enterprise"
+            : String(planObj?.id || planId).toLowerCase().includes("starter")
+            ? "starter"
+            : "pro";
+
+          const updatedTenant = {
+            ...tenant,
+            subscription_plan: planName,
+            plan: sqlValidPlan,
+            status: "active",
+            trial_days_left: 30,
+            trialDaysLeft: 30,
+          };
+
+          if (onUpdateTenant) {
+            onUpdateTenant(updatedTenant);
+          }
+
+          try {
+            safeStorage.setItem("saas_active_tenant", JSON.stringify(updatedTenant));
+            safeStorage.setItem("barbearia_tenant_cache", JSON.stringify(updatedTenant));
+          } catch {}
+
+          const tenantId = tenant?.id || "a0000000-0000-0000-0000-000000000001";
+
+          try {
+            await supabase
+              .from("barbershops")
+              .update({
+                subscription_plan: planName,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", tenantId);
+          } catch (e) {
+            console.warn("Aviso ao atualizar barbershops:", e);
+          }
+
+          try {
+            await supabase
+              .from("tenants")
+              .update({
+                status: "active",
+                plan: sqlValidPlan,
+                trial_days_left: 30,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", tenantId);
+          } catch (e) {
+            console.warn("Aviso ao atualizar tenants:", e);
+          }
+        }}
       />
 
       {/* Banner de alerta: orienta o profissional autônomo a completar o perfil e cadastrar PIX */}
