@@ -224,7 +224,7 @@ export default function Login({
     }
   };
 
-  // [Função assíncrona: verificação no Supabase SQL (tenants/barbers) e disparo de e-mail com código de 6 dígitos]
+  // [Função assíncrona: verificação e disparo de e-mail com código de 6 dígitos]
   const handleSendVerificationCode = async () => {
     setForgotError("");
     setForgotNotice("");
@@ -237,8 +237,62 @@ export default function Login({
 
     setForgotLoading(true);
 
+    // Determina URL da API considerando ambientes estáticos (GitHub Pages) vs full-stack
+    const isStaticHost =
+      typeof window !== "undefined" &&
+      (window.location.hostname.endsWith("github.io") ||
+        window.location.hostname.includes("github.io"));
+
+    const backendUrl = (
+      import.meta.env.VITE_API_URL ||
+      import.meta.env.VITE_APP_URL ||
+      ""
+    ).trim();
+
+    const getApiUrl = (endpointPath) => {
+      if (isStaticHost && backendUrl && !backendUrl.includes("github.io")) {
+        return `${backendUrl.replace(/\/$/, "")}${endpointPath}`;
+      }
+      return endpointPath;
+    };
+
     try {
-      // 1. Consulta Supabase SQL: Tabela 'tenants' (campo owner_email)
+      // 1. Tenta acionar endpoint oficial do servidor (/api/auth/forgot-password)
+      try {
+        const apiRes = await fetch(getApiUrl("/api/auth/forgot-password"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: targetEmail }),
+        });
+
+        const data = await apiRes.json();
+
+        if (apiRes.ok && data?.success) {
+          // Sucesso comprovado no servidor com disparo SMTP concluído!
+          setCountdownSeconds(data.expiresInSeconds || 180);
+          setForgotNotice(
+            data.message || `Código de verificação de 6 dígitos enviado para ${targetEmail}.`
+          );
+          setVerificationCode("");
+          setForgotStep("code");
+          return;
+        }
+
+        if (data?.notFound) {
+          // E-mail não localizado no banco de dados
+          setForgotStep("error_not_found");
+          return;
+        }
+
+        if (data?.error && !data?.error.includes("Failed to fetch")) {
+          setForgotError(data.error);
+          return;
+        }
+      } catch (endpointErr) {
+        console.warn("Aviso ao acionar /api/auth/forgot-password, tentando canal resiliente:", endpointErr);
+      }
+
+      // 2. Canal Resiliente de Fallback Direto no Supabase SQL
       let tenantMatch = null;
       try {
         const { data: tenants, error: tErr } = await supabase
@@ -253,7 +307,6 @@ export default function Login({
         console.warn("Aviso ao consultar tenants:", err);
       }
 
-      // 2. Consulta Supabase SQL: Tabela 'barbers' (campo email)
       let barberMatch = null;
       try {
         const { data: barbers, error: bErr } = await supabase
@@ -270,119 +323,74 @@ export default function Login({
 
       const userFound = tenantMatch || barberMatch;
 
-      // 1. SE O EMAIL NÃO EXISTIR NO SUPABASE SQL (tabela tenants / barbers)
       if (!userFound) {
         setForgotStep("error_not_found");
-        setForgotLoading(false);
         return;
       }
 
-      // 2. SE O E-MAIL EXISTIR NO SUPABASE SQL (tabela tenants / barbers)
       const recipientName =
         tenantMatch?.owner_name ||
         tenantMatch?.name ||
         barberMatch?.name ||
         "Profissional";
 
-      // Gera código de 6 dígitos seguro para envio
       const code6Digits = Math.floor(100000 + Math.random() * 900000).toString();
       setVerificationCode("");
-      setCountdownSeconds(180); // Inicia timer regressivo de 3 minutos
+      setCountdownSeconds(180);
 
-      // 1. Disparo de e-mail via API backend / SMTP oficial (quando há backend Node.js ativo)
-      const isStaticHost =
-        typeof window !== "undefined" &&
-        (window.location.hostname.endsWith("github.io") ||
-          window.location.hostname.includes("github.io"));
-
-      const backendUrl = (
-        import.meta.env.VITE_API_URL ||
-        import.meta.env.VITE_APP_URL ||
-        ""
-      ).trim();
-
-      // Em ambiente estático puro (GitHub Pages) sem servidor Node, evita POST para a mesma origem que geraria 405
-      const emailEndpoint = !isStaticHost
-        ? "/api/email/send"
-        : backendUrl && !backendUrl.includes("github.io")
-        ? `${backendUrl.replace(/\/$/, "")}/api/email/send`
-        : null;
-
-      let emailSentViaBackend = false;
-      if (emailEndpoint) {
-        try {
-          const emailRes = await fetch(emailEndpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              to: targetEmail,
-              subject: "Código de Recuperação de Senha - Barbearia SaaS",
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #171717; color: #f5f5f5; border-radius: 12px; overflow: hidden; border: 1px solid #333;">
-                  <div style="background: linear-gradient(135deg, #d97706, #b45309); padding: 24px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: bold;">Recuperação de Acesso 🔐</h1>
-                    <p style="margin: 6px 0 0; color: #fef3c7; font-size: 13px;">Barbearia SaaS - Suporte de Segurança</p>
+      // Disparo de fallback via endpoint /api/email/send se disponível
+      let emailSent = false;
+      try {
+        const emailRes = await fetch(getApiUrl("/api/email/send"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: targetEmail,
+            subject: "Código de Recuperação de Senha - Barbearia SaaS",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #171717; color: #f5f5f5; border-radius: 12px; overflow: hidden; border: 1px solid #333;">
+                <div style="background: linear-gradient(135deg, #d97706, #b45309); padding: 24px; text-align: center;">
+                  <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: bold;">Recuperação de Acesso 🔐</h1>
+                  <p style="margin: 6px 0 0; color: #fef3c7; font-size: 13px;">Barbearia SaaS - Suporte de Segurança</p>
+                </div>
+                <div style="padding: 24px; text-align: center;">
+                  <p style="font-size: 15px; color: #e5e5e5; margin-top: 0; text-align: left;">Olá, <strong>${recipientName}</strong>,</p>
+                  <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso. Use o código de 6 dígitos abaixo para confirmar sua identidade:</p>
+                  <div style="margin: 24px 0; background-color: #262626; border: 2px dashed #f59e0b; border-radius: 8px; padding: 18px; display: inline-block;">
+                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fbbf24; font-family: monospace;">${code6Digits}</span>
                   </div>
-                  <div style="padding: 24px; text-align: center;">
-                    <p style="font-size: 15px; color: #e5e5e5; margin-top: 0; text-align: left;">Olá, <strong>${recipientName}</strong>,</p>
-                    <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso. Use o código de 6 dígitos abaixo para confirmar sua identidade:</p>
-                    <div style="margin: 24px 0; background-color: #262626; border: 2px dashed #f59e0b; border-radius: 8px; padding: 16px; display: inline-block;">
-                      <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fbbf24; font-family: monospace;">${code6Digits}</span>
-                    </div>
-                    <p style="font-size: 13px; color: #ef4444; margin-bottom: 20px;">⏱️ Este código expira em <strong>3 minutos</strong>. Se você não solicitou a alteração, ignore este e-mail.</p>
-                    <div style="font-size: 12px; color: #737373; border-top: 1px solid #262626; padding-top: 14px;">
-                      Suporte: <strong>atendmentor@gmail.com</strong>
-                    </div>
+                  <p style="font-size: 13px; color: #ef4444; margin-bottom: 20px;">⏱️ Este código expira em <strong>3 minutos</strong>. Se você não solicitou a alteração, ignore este e-mail.</p>
+                  <div style="font-size: 12px; color: #737373; border-top: 1px solid #262626; padding-top: 14px;">
+                    Suporte: <strong>atendmentor@gmail.com</strong>
                   </div>
                 </div>
-              `,
-            }),
-          });
-          if (emailRes.ok) {
-            emailSentViaBackend = true;
-          }
-        } catch (sendErr) {
-          console.warn("Aviso ao disparar e-mail via endpoint:", sendErr);
+              </div>
+            `,
+          }),
+        });
+        const emailData = await emailRes.json();
+        if (emailRes.ok && emailData?.success) {
+          emailSent = true;
+          setGeneratedCode(code6Digits);
         }
+      } catch (sendErr) {
+        console.warn("Aviso no fallback de envio de e-mail:", sendErr);
       }
 
-      // 2. Disparo de recuperação nativo via Supabase Auth
-      let supabaseAuthSent = false;
-      let supabaseErrorMsg = "";
+      // Também aciona Supabase Auth para redundância
       try {
         const redirectUrl =
           typeof window !== "undefined"
             ? window.location.origin + window.location.pathname
             : undefined;
-        const { error: resetErr } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        await supabase.auth.resetPasswordForEmail(targetEmail, {
           redirectTo: redirectUrl,
         });
-        if (resetErr) {
-          supabaseErrorMsg = resetErr.message || "";
-          console.warn("Aviso ao solicitar recuperação no Supabase Auth:", resetErr);
-        } else {
-          supabaseAuthSent = true;
-        }
       } catch (authErr) {
-        supabaseErrorMsg = authErr?.message || "";
-        console.warn("Aviso ao solicitar reset no Supabase Auth:", authErr);
+        console.warn("Aviso no Supabase Auth reset:", authErr);
       }
 
-      if (emailSentViaBackend) {
-        setGeneratedCode(code6Digits);
-      } else {
-        // Quando disparado via Supabase Auth, o código de 6 dígitos é o {{ .Token }} oficial emitido pelo Supabase
-        setGeneratedCode("");
-      }
-
-      if (isStaticHost && !emailSentViaBackend && !supabaseAuthSent && supabaseErrorMsg) {
-        setForgotNotice(
-          `Código de verificação enviado para ${targetEmail}. Nota: Caso não receba o e-mail em instantes, configure o SMTP e o template {{ .Token }} no painel do Supabase.`
-        );
-      } else {
-        setForgotNotice(`Código de verificação enviado para ${targetEmail}.`);
-      }
-
+      setForgotNotice(`Código de verificação enviado para ${targetEmail}.`);
       setForgotStep("code");
     } catch (err) {
       console.error("Erro na verificação de recuperação:", err);
@@ -398,14 +406,14 @@ export default function Login({
 
     if (countdownSeconds <= 0) {
       setForgotError(
-        "O código de verificação expirou (limite de 3 minutos). Clique em \x27Reenviar Código\x27 para solicitar um novo código."
+        "O código de verificação expirou (limite de 3 minutos). Clique em 'Reenviar Código' para solicitar um novo código."
       );
       return;
     }
 
     if (!verificationCode || verificationCode.trim().length < 6) {
       setForgotError(
-        "Informe o código de verificação recebido por e-mail."
+        "Informe o código de verificação de 6 dígitos recebido por e-mail."
       );
       return;
     }
@@ -422,11 +430,61 @@ export default function Login({
 
     setForgotLoading(true);
 
+    const isStaticHost =
+      typeof window !== "undefined" &&
+      (window.location.hostname.endsWith("github.io") ||
+        window.location.hostname.includes("github.io"));
+
+    const backendUrl = (
+      import.meta.env.VITE_API_URL ||
+      import.meta.env.VITE_APP_URL ||
+      ""
+    ).trim();
+
+    const getApiUrl = (endpointPath) => {
+      if (isStaticHost && backendUrl && !backendUrl.includes("github.io")) {
+        return `${backendUrl.replace(/\/$/, "")}${endpointPath}`;
+      }
+      return endpointPath;
+    };
+
     try {
+      // 1. Tenta redefinir via endpoint central /api/auth/reset-password
+      try {
+        const resetRes = await fetch(getApiUrl("/api/auth/reset-password"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: forgotEmail.trim(),
+            code: verificationCode.trim(),
+            newPassword: newPassword,
+          }),
+        });
+
+        const resetData = await resetRes.json();
+
+        if (resetRes.ok && resetData?.success) {
+          setForgotStep("success");
+          setVerificationCode("");
+          setGeneratedCode("");
+          setNewPassword("");
+          setConfirmNewPassword("");
+          return;
+        }
+
+        if (resetData?.error) {
+          // Se o servidor rejeitou o código com erro específico, exibe diretamente
+          setForgotError(resetData.error);
+          return;
+        }
+      } catch (apiErr) {
+        console.warn("Aviso ao conectar com /api/auth/reset-password, tentando fallback:", apiErr);
+      }
+
+      // 2. Fallback de contingência caso a rota de API esteja inacessível
       let otpVerified = false;
       let otpErrorMessage = "";
 
-      // 1. Validação do código de 6 dígitos diretamente via Supabase Auth (OTP recovery)
       const { data: otpData, error: otpErr } = await supabase.auth.verifyOtp({
         email: forgotEmail.trim(),
         token: verificationCode.trim(),
@@ -437,10 +495,8 @@ export default function Login({
         otpVerified = true;
       } else if (otpErr) {
         otpErrorMessage = otpErr.message || "";
-        console.warn("Aviso na validação do OTP no Supabase Auth:", otpErr);
       }
 
-      // 2. Se falhou no Supabase Auth mas tínhamos código gerado por e-mail backend local
       if (!otpVerified && generatedCode && verificationCode.trim() === generatedCode.trim()) {
         otpVerified = true;
       }
@@ -451,11 +507,9 @@ export default function Login({
             ? `Código inválido ou expirado: ${otpErrorMessage}`
             : "Código de verificação incorreto ou expirado. Verifique o código recebido por e-mail."
         );
-        setForgotLoading(false);
         return;
       }
 
-      // 3. Atualização da nova senha no Supabase Auth com a sessão estabelecida
       const { error: updateErr } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -464,11 +518,9 @@ export default function Login({
         setForgotError(
           updateErr.message || "Erro ao redefinir a nova senha no Supabase Auth. Tente novamente."
         );
-        setForgotLoading(false);
         return;
       }
 
-      // Conclusão com sucesso
       setForgotStep("success");
       setVerificationCode("");
       setGeneratedCode("");

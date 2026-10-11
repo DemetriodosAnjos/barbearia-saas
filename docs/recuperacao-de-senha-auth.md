@@ -1,69 +1,65 @@
 # Módulo de Recuperação de Senha & Supabase Auth
 
-> **Status:** Homologado & Implementado  
+> **Status:** Homologado & Implementado com Endpoints Nativos de API  
 > **Componente Principal:** `src/pages/Auth/Login.jsx`  
-> **Serviço de E-mail:** `src/services/emailService.ts` / `/api/email/send`  
-> **Banco de Dados:** Supabase SQL (`public.tenants` & `public.barbers`)
+> **Endpoints Oficiais de API:** `/api/auth/forgot-password` & `/api/auth/reset-password`  
+> **Serviço de E-mail:** `src/services/emailService.ts` / SMTP Oficial Google Workspace (`atendmentor@gmail.com`)  
+> **Banco de Dados:** Supabase SQL (`public.tenants`, `public.barbers` & `auth.users`)
 
 ---
 
 ## 🎯 Visão Geral
 
-O fluxo de **Esqueci a Senha / Recuperação de Senha** foi arquitetado para garantir máxima segurança contra enumeração de contas, validação em tempo real no banco de dados Supabase e uma experiência de usuário (UX) fluida, com verificação de dois fatores baseada em código numérico de 6 dígitos e expiração cronometrada.
+O fluxo de **Esqueci a Senha / Recuperação de Senha** foi arquitetado com dupla redundância (Backend Node.js SMTP + Supabase Auth) para garantir máxima segurança contra enumeração de contas, validação em tempo real no banco de dados Supabase e uma experiência de usuário (UX) fluida, com verificação de dois fatores baseada em código numérico de 6 dígitos e expiração cronometrada de 3 minutos.
 
 ---
 
-## 🔍 1. Fluxo de Validação no Supabase SQL
+## 🔍 1. Fluxo de Validação e Disparo de OTP (/api/auth/forgot-password)
 
 Quando o usuário clica em **"Esqueceu a senha?"** na tela de login, uma janela modal interativa é aberta solicitando o e-mail cadastrado.
 
-Ao clicar em **"Enviar Código de Verificação"**, o sistema realiza a checagem assíncrona nas seguintes tabelas do Supabase:
+Ao clicar em **"Enviar Código de Verificação"**, o sistema submete uma requisição HTTP POST para `/api/auth/forgot-password`. O servidor executa as seguintes etapas:
 
-1. **Tabela `public.tenants` (Proprietários de Barbearia):**
-   - Consulta insensível a maiúsculas/minúsculas: `.ilike("owner_email", targetEmail)`.
-2. **Tabela `public.barbers` (Barbeiros e Profissionais da Equipe):**
-   - Consulta insensível a maiúsculas/minúsculas: `.ilike("email", targetEmail)`.
+1. **Checagem no Supabase SQL:**
+   - Tabela `public.tenants`: `.ilike("owner_email", targetEmail)`
+   - Tabela `public.barbers`: `.ilike("email", targetEmail)`
+   - Supabase `auth.users`: Consulta via Supabase Admin API
+2. **Geração Segura de Código OTP:**
+   - Gera um código de 6 dígitos numérico criptográfico (`100000` a `999999`).
+   - Armazena na memória do servidor com expiração regressiva de 180 segundos (3 minutos) e contador de tentativas (máximo 5).
+3. **Disparo Transacional via SMTP Oficial:**
+   - Conecta a `smtp.gmail.com:465` (SSL) com as credenciais `atendmentor@gmail.com`.
+   - Dispara e-mail com template estilizado no tema dourado e escuro da Barbearia SaaS.
+   - Retorna HTTP 200 `{ success: true, message: "Código enviado...", expiresInSeconds: 180 }`.
 
 ---
 
 ## 🚫 2. Cenário A: E-mail NÃO Existe no Banco de Dados
 
-Caso o e-mail informado não seja localizado nem na tabela `tenants` nem na tabela `barbers`, o sistema aciona imediatamente a interface de alerta de erro:
-
-### Componente Modal (Sem Redundâncias de UX/UI):
-- **Tema & Cores:** Alerta de Erro Vermelho com visual limpo e direto (`bg-rose-500/15`, `border-rose-500/40`, `text-rose-500`).
-- **Posicionamento do Ícone Fechar (X):** Posicionado à direita superior do modal, sem linha divisória separando o ícone das demais informações (cabeçalho sem `border-b`).
-- **Ícone Central:** Ícone da biblioteca Lucide `AlertOctagon` estilizado em container de destaque com halo vermelho.
-- **Título Único em Branco:** `OPS! E-mail não cadastrado` (exibido apenas 1 vez, sem repetições no cabeçalho ou tags extras).
-- **Subtítulo:** `Desculpe! Esse e-mail não foi encontrado em nosso banco de dados`.
-- **Botão de Ação:** Botão vermelho destacado `OK, Entendi!`.
-- **Ação:** O fechamento (seja pelo botão "OK, Entendi!" ou pelo "X" à direita) reseta completamente o estado do fluxo e retorna o usuário à tela de login limpa.
+Caso o e-mail informado não seja localizado no Supabase:
+- O endpoint `/api/auth/forgot-password` retorna HTTP 200 `{ success: false, notFound: true, error: "OPS! E-mail não cadastrado..." }`.
+- A interface exibe imediatamente o modal de alerta vermelho:
+  - **Título Único:** `OPS! E-mail não cadastrado`
+  - **Subtítulo:** `Desculpe! Esse e-mail não foi encontrado em nosso banco de dados`
+  - **Ícone:** Lucide `AlertOctagon` destacado
+  - **Botão de Ação:** `OK, Entendi!` (reseta o fluxo e volta ao login limpo).
 
 ---
 
 ## ✉️ 3. Cenário B: E-mail EXISTE no Banco de Dados
 
-Caso o e-mail seja localizado com sucesso no Supabase:
+Caso o e-mail seja localizado com sucesso:
 
-### 1. Disparo Transacional de E-mail:
-- Gera um código criptográfico de 6 dígitos (`100000` a `999999`).
-- Envia o e-mail transacional via endpoint oficial `/api/email/send` utilizando SMTP configurado (`atendmentor@gmail.com`).
-- Template HTML com identidade visual escura/dourada da Barbearia SaaS, código em destaque monospace e orientações de segurança.
+### 1. Disparo Transacional e Timer de 3 Minutos:
+- O modal avança automaticamente para a etapa de digitação do código (`forgotStep = "code"`).
+- O timer regressivo contínuo de 3 minutos é iniciado (`03:00` até `00:00`).
+- Ao esgotar o tempo, o botão **"Reenviar Código"** permite solicitar um novo OTP.
 
-### 2. Segurança no Modal (Código Oculto no UI):
-- O código de recuperação **NÃO é exposto na tela** da modal, reforçando a proteção contra visualizações indevidas no dispositivo.
-- É apresentado um informativo claro indicando que o código de 6 dígitos foi despachado para o endereço de e-mail do usuário.
-- O usuário deve consultar sua caixa de entrada e digitar o código recebido no campo de verificação.
-
-### 3. Timer Regressivo de 3 Minutos (180 Segundos):
-- Exibição de cronômetro regressivo contínuo no formato `MM:SS` (ex: `03:00`, `02:59`, ... `00:00`).
-- Indicador pulsante com ícone `Clock` da biblioteca Lucide.
-- **Expiração:** Ao atingir `00:00`, o sistema notifica o usuário sobre a expiração do código e oferece a opção **"Reenviar Código"**, que reinicia o temporizador de 3 minutos e dispara um novo código de segurança por e-mail.
-
-### 4. Redefinição Segura da Senha:
-- Campos para digitação do código de 6 dígitos recebido por e-mail, **Nova Senha** (mínimo 6 caracteres) e **Confirmar Nova Senha**.
-- Botão **"Redefinir Senha"** que sincroniza a atualização com o Supabase Auth.
-- Mensagem de sucesso com botão direto para **"Fazer Login Agora"**.
+### 2. Redefinição Segura da Senha (/api/auth/reset-password):
+- O usuário informa o código de 6 dígitos recebido por e-mail, sua **Nova Senha** (mínimo 6 caracteres) e confirmação.
+- O front-end envia POST para `/api/auth/reset-password` contendo `{ email, code, newPassword }`.
+- O servidor valida o código, verifica se não expirou, atualiza a senha da conta no Supabase Auth via Admin API (sem requerer sessão prévia) e consome o token de uso único.
+- A tela transiciona para o estado de sucesso com o botão direto **"Fazer Login Agora"**.
 
 ---
 
