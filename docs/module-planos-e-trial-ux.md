@@ -28,18 +28,34 @@ O componente visual do topo (`TrialBanner`):
 - Usuários em planos pagos mantêm o selo do seu plano ativo visível no menu lateral (Sidebar) (ex: `STARTER`, `PRO`, `ENTREPRISE`).
 - Ao clicar no link `"Planos"` na Sidebar, o modal oficial *"Escolha o plano ideal para sua barbearia"* é aberto permitindo fazer upgrades futuros (ex: de Starter para Pro ou Entreprise via Mercado Pago).
 
-### C. Ocultação do Plano Trial para Usuários Pagantes & Exclusividade do SuperAdmin
-- **Ocultação do Card de Teste (Trial):** Para qualquer usuário que já possua um plano contratado e ativo (`Starter`, `Pro`, `Entreprise`), a opção do "Plano de Teste" **não é exibida** na grade de planos do modal de upgrades (`displayPlans` filtra estritamente o plano de teste quando `!isCurrentTrial`). O usuário pagante visualiza exclusivamente os planos pagos disponíveis para upgrade ou manutenção.
+### C. Ocultação do Plano Trial para Usuários Pagantes, Ativação em Trial & Exclusividade do SuperAdmin
+- **Ocultação do Card de Teste (Trial) para Pagantes:** Para qualquer usuário que já possua um plano contratado e ativo (`Starter`, `Pro`, `Entreprise`), a opção do "Plano de Teste" **não é exibida** na grade de planos do modal de upgrades (`displayPlans` filtra estritamente o plano de teste quando `!isCurrentTrial`). O usuário pagante visualiza exclusivamente os planos pagos disponíveis para upgrade ou manutenção.
+- **Acesso ao Modal via Menu Lateral (Sidebar):**
+  - No link do menu lateral (`Nome do plano` + Tag `"Planos"`), ao clicar para abrir a tela *"Escolha o plano ideal para sua barbearia"*:
+  - **Quando em Modo Trial:** A barbearia visualiza o card do "Plano de Teste" ativado e destacado com a badge oficial **"Seu Plano Atual"** no topo e o botão correspondente **"Seu Plano Atual"**, além dos outros planos pagos disponíveis para upgrade.
+  - **Quando em Modo Pago:** O modal abre exibindo o plano contratado (ex: Starter) com a tag "Seu Plano Atual" e os planos superiores para upgrade, mantendo o Trial ocultado.
 - **Autoridade Única do SuperAdmin (`atendmentor@gmail.com`):**
   - Somente o SuperAdmin oficial possui a credencial e a permissão administrativa para reverter uma barbearia com plano pago de volta ao status `trial` ou atribuir dias adicionais de teste.
   - A opção de selecionar e ativar o "Plano de Teste (Trial Grátis 7 Dias - Exclusivo SuperAdmin)" existe **exclusivamente no Painel SuperAdmin** (`/superadmin`), no modal de edição de barbearias e no modal de bônus de dias.
   - Usuários finais e administradores comuns da barbearia não têm permissão para atribuir a si mesmos o plano de teste.
 
-### D. Reversibilidade Dinâmica
+### D. Modal de Confirmação de Alteração de Plano no SuperAdmin
+- Ao clicar no botão **"Salvar Alterações"** do modal *"Gerenciar Barbearia: [nome da barbearia]"* no Painel SuperAdmin, o sistema intercepta o fluxo e exibe um modal de confirmação:
+  > **Confirmar Alteração de Plano**  
+  > *"Tem certeza de que deseja realizar a alteração do Plano 'X' para o Plano 'Y'?"*  
+  > Botões:  
+  > 1. `[ SIM, alterar plano ]` (Confirmação primária)  
+  > 2. `[ Cancelar ]` (Retorna à edição sem alterar)
+- Ao clicar em **"SIM, alterar plano"**, o sistema sincroniza o banco de dados Supabase da mesma forma que a seleção feita pelo usuário:
+  - Se alterado para `trial`: define `status: 'trial'`, `trial_days_left: 7`, `trial_ends_at: +7 dias` nas tabelas `tenants` e `barbershops`.
+  - Se alterado para plano pago (`starter`, `pro`, `enterprise`): define `status: 'active'`, `trial_days_left: 0`, `trial_ends_at: null` nas tabelas `tenants` e `barbershops`.
+  - Atualiza em tempo real o estado em memória e os caches `saas_active_tenant` e `barbearia_tenant_cache`.
+
+### E. Reversibilidade Dinâmica
 - Caso o SuperAdmin reative o plano Trial para a barbearia (ou conceda bônus de dias de teste), o banco de dados Supabase (`tenants` e `barbershops`) e o cache local (`safeStorage`) são atualizados imediatamente.
 - Na tela da barbearia, o componente de contagem regressiva e o botão `[ Fazer Upgrade / Assinar ]` **voltam a aparecer automaticamente na interface (UI)** refletindo os dias restantes concedidos.
 
-### E. Eliminação Total de Mocks e Fallbacks Falsos-Positivos
+### F. Eliminação Total de Mocks e Fallbacks Falsos-Positivos
 - **Consistência Direta com o Banco de Dados (Supabase):** Toda e qualquer lista estática ou de contingência com dados fictícios (nomes de barbearias fictícias como "Vintage Club", serviços genéricos, produtos de vitrine/bar e barbeiros como Carlos Silva) foi totalmente removida do fluxo operacional.
 - **Tabelas Oficiais Consultadas:** `barbershops`, `tenants`, `services`, `products`, `barbers`, `appointments`, `clients`.
 - **Estados Vazios Autênticos:** Se a barbearia não possuir produtos cadastrados, o painel exibe um estado vazio autêntico e limpo com botão para cadastro, sem injetar itens ou preços simulados.

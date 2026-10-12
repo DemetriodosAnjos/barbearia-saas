@@ -199,6 +199,21 @@ export default function SuperAdminDashboard({
   const [editPlan, setEditPlan] = useState("pro");
   const [editStatus, setEditStatus] = useState("active");
 
+  // Modal de Confirmação de Alteração de Plano (SuperAdmin)
+  const [confirmChangePlanModal, setConfirmChangePlanModal] = useState(null);
+  const [isSavingTenantPlan, setIsSavingTenantPlan] = useState(false);
+
+  // Auxiliar de formatação amigável do nome do plano para o modal de confirmação
+  const formatPlanDisplayName = (planValue) => {
+    if (!planValue) return "Plano de Teste";
+    const val = String(planValue).toLowerCase().trim();
+    if (val.includes("trial") || val.includes("teste")) return "Plano de Teste";
+    if (val.includes("starter") || val.includes("solo")) return "Starter";
+    if (val.includes("pro")) return "Pro";
+    if (val.includes("enterprise") || val.includes("entreprise") || val.includes("franquia")) return "Entreprise";
+    return planValue;
+  };
+
   // Modal de White-Label
   const [selectedTenantForWhiteLabel, setSelectedTenantForWhiteLabel] =
     useState(null);
@@ -369,30 +384,65 @@ export default function SuperAdminDashboard({
     });
   };
 
-  // [Função assíncrona: persiste o novo plano de assinatura e status no Supabase]
-  const handleSaveTenantChanges = async () => {
+  // [Abertura do Modal de Confirmação antes de persistir alteração de plano no Supabase]
+  const handleRequestSaveTenant = () => {
     if (!selectedTenantForEdit) return;
 
-    const isChangingToTrial = editPlan === "trial" || editStatus === "trial";
+    const oldPlanName = formatPlanDisplayName(
+      selectedTenantForEdit.subscription_plan || selectedTenantForEdit.plan
+    );
+    const newPlanName = formatPlanDisplayName(editPlan);
+
+    setConfirmChangePlanModal({
+      tenant: selectedTenantForEdit,
+      oldPlanName,
+      newPlanName,
+      newPlan: editPlan,
+      newStatus: editStatus,
+    });
+  };
+
+  // [Função assíncrona: acionada ao confirmar "SIM, alterar plano" no modal de confirmação]
+  const handleConfirmPlanChange = async () => {
+    if (!confirmChangePlanModal?.tenant) return;
+
+    const targetTenant = confirmChangePlanModal.tenant;
+    const targetId = targetTenant.id;
+    const chosenPlan = confirmChangePlanModal.newPlan;
+    const chosenStatus = confirmChangePlanModal.newStatus;
+
+    setIsSavingTenantPlan(true);
+
+    const isChangingToTrial =
+      chosenPlan === "trial" || String(chosenPlan).toLowerCase().includes("teste");
+
     const newMrr =
-      editPlan === "starter"
+      chosenPlan === "starter"
         ? 69.9
-        : editPlan === "pro"
+        : chosenPlan === "pro"
         ? 149.9
-        : editPlan === "trial"
+        : chosenPlan === "trial"
         ? 0
         : 279.9;
 
     const newSubscriptionPlan =
-      editPlan === "trial"
+      chosenPlan === "trial"
         ? "Plano de Teste"
-        : editPlan === "starter"
+        : chosenPlan === "starter"
         ? "Starter"
-        : editPlan === "pro"
+        : chosenPlan === "pro"
         ? "Pro"
         : "Entreprise";
 
-    const newStatus = isChangingToTrial ? "trial" : editStatus;
+    // Da mesma maneira que muda quando o usuário escolhe outro plano:
+    // Se escolheu Trial: status "trial", trial_days_left: 7, trial_ends_at: 7 dias
+    // Se escolheu plano pago (Starter, Pro, Entreprise): status "active", trial_days_left: 0, trial_ends_at: null
+    const newStatus = isChangingToTrial
+      ? "trial"
+      : chosenStatus === "trial"
+      ? "active"
+      : chosenStatus || "active";
+
     const newTrialDaysLeft = isChangingToTrial ? 7 : 0;
     const newTrialEndsAt = isChangingToTrial
       ? new Date(Date.now() + 7 * 86400000).toISOString()
@@ -400,10 +450,10 @@ export default function SuperAdminDashboard({
 
     setTenants((prev) =>
       prev.map((t) =>
-        t.id === selectedTenantForEdit.id
+        t.id === targetId
           ? {
               ...t,
-              plan: editPlan,
+              plan: chosenPlan,
               status: newStatus,
               mrr: newMrr,
               subscription_plan: newSubscriptionPlan,
@@ -416,14 +466,11 @@ export default function SuperAdminDashboard({
       ),
     );
 
-    const targetId = selectedTenantForEdit.id;
-    setSelectedTenantForEdit(null);
-
     try {
-      const { error } = await supabase
+      const { error: tenantError } = await supabase
         .from("tenants")
         .update({
-          plan: editPlan,
+          plan: chosenPlan,
           status: newStatus,
           mrr: newMrr,
           trial_days_left: newTrialDaysLeft,
@@ -432,17 +479,24 @@ export default function SuperAdminDashboard({
         })
         .eq("id", targetId);
 
-      if (error) throw error;
+      if (tenantError) {
+        console.warn("Aviso ao atualizar tabela tenants no Supabase:", tenantError);
+      }
 
-      await supabase
+      const { error: shopError } = await supabase
         .from("barbershops")
         .update({
-          plan: editPlan,
+          plan: chosenPlan,
           subscription_plan: newSubscriptionPlan,
+          status: newStatus,
           trial_ends_at: newTrialEndsAt,
           updated_at: new Date().toISOString(),
         })
         .eq("id", targetId);
+
+      if (shopError) {
+        console.warn("Aviso ao atualizar tabela barbershops no Supabase:", shopError);
+      }
 
       try {
         const cachedRaw = safeStorage.getItem("saas_active_tenant");
@@ -451,7 +505,7 @@ export default function SuperAdminDashboard({
           if (cached?.id === targetId) {
             const updatedCache = {
               ...cached,
-              plan: editPlan,
+              plan: chosenPlan,
               subscription_plan: newSubscriptionPlan,
               status: newStatus,
               trial_days_left: newTrialDaysLeft,
@@ -469,6 +523,10 @@ export default function SuperAdminDashboard({
         "Erro ao salvar alterações de assinatura no Supabase:",
         err,
       );
+    } finally {
+      setIsSavingTenantPlan(false);
+      setConfirmChangePlanModal(null);
+      setSelectedTenantForEdit(null);
     }
   };
 
@@ -1529,7 +1587,7 @@ export default function SuperAdminDashboard({
             >
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleSaveTenantChanges}>
+            <Button variant="primary" onClick={handleRequestSaveTenant}>
               Salvar Alterações
             </Button>
           </>
@@ -1570,6 +1628,46 @@ export default function SuperAdminDashboard({
               { value: "suspended", label: "Suspensa / Bloqueada" },
             ]}
           />
+        </div>
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* MODAL 4.1: CONFIRMAÇÃO DE ALTERAÇÃO DE PLANO             */}
+      {/* ======================================================== */}
+      <Modal
+        isOpen={!!confirmChangePlanModal}
+        onClose={() => {
+          if (!isSavingTenantPlan) {
+            setConfirmChangePlanModal(null);
+          }
+        }}
+        title="Confirmar Alteração de Plano"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmChangePlanModal(null)}
+              disabled={isSavingTenantPlan}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleConfirmPlanChange}
+              disabled={isSavingTenantPlan}
+              className="bg-amber-600 hover:bg-amber-500 font-bold"
+            >
+              {isSavingTenantPlan ? "Alterando plano..." : "SIM, alterar plano"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 text-left py-2">
+          <p className="text-sm text-neutral-200 leading-relaxed">
+            Tem certeza de que deseja realizar a alteração do Plano{" "}
+            <strong className="text-white font-bold">"{confirmChangePlanModal?.oldPlanName}"</strong> para o Plano{" "}
+            <strong className="text-amber-400 font-bold">"{confirmChangePlanModal?.newPlanName}"</strong>?
+          </p>
         </div>
       </Modal>
 

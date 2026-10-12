@@ -164,7 +164,15 @@ export default function TrialBanner({
                 features: Array.isArray(p.features) ? p.features : [],
               };
             });
-            setPlans(mapped);
+            // Garante que o Plano de Teste (Trial) esteja disponível na coleção de planos
+            const hasTrialInDb = mapped.some(
+              (p) =>
+                p.isTrial ||
+                p.id === "trial" ||
+                String(p.name || "").toLowerCase().includes("teste")
+            );
+            const fullPlans = !hasTrialInDb ? [INITIAL_PLANS[0], ...mapped] : mapped;
+            setPlans(fullPlans);
           }
         } else if (isMounted) {
           setPlans(INITIAL_PLANS);
@@ -188,7 +196,9 @@ export default function TrialBanner({
     };
   }, [isModalOpen, propPlans]);
 
-  // Ordena os planos: para usuários pagantes, oculta completamente a opção do Plano de Teste (Trial)
+  // Ordena os planos:
+  // Se a barbearia estiver no plano Trial (isCurrentTrial), retorna o card Trial ativado com a tag "Seu Plano Atual".
+  // Se o usuário já possuir plano pago ativo (!isCurrentTrial), oculta o plano Trial da grade.
   const displayPlans = useMemo(() => {
     const active = plans.filter((p) => p.active !== false);
     const baseList = active.length > 0 ? active : plans;
@@ -205,16 +215,20 @@ export default function TrialBanner({
 
     const sorted = [...baseList].sort((a, b) => getRank(a) - getRank(b));
 
-    // A opção de atribuir o plano Trial (teste) é exclusiva do Painel do SuperAdmin.
-    // Oculta o plano Trial para todos os usuários pagantes (Starter / Pro / Enterprise) e da contratação pelos tenants.
-    return sorted.filter(
-      (p) =>
-        !p.isTrial &&
-        p.id !== "trial" &&
-        p.id !== "plano-de-teste" &&
-        !String(p.name || "").toLowerCase().includes("teste")
-    );
-  }, [plans]);
+    // Apenas oculta o Trial se a barbearia já possuir um plano pago ativo (!isCurrentTrial).
+    // Quando em período de testes (isCurrentTrial), o Plano de Teste é mantido na grade com status ativo.
+    if (!isCurrentTrial) {
+      return sorted.filter(
+        (p) =>
+          !p.isTrial &&
+          p.id !== "trial" &&
+          p.id !== "plano-de-teste" &&
+          !String(p.name || "").toLowerCase().includes("teste")
+      );
+    }
+
+    return sorted;
+  }, [plans, isCurrentTrial]);
 
   // Seleciona automaticamente o plano em destaque ou o primeiro da lista
   useEffect(() => {
@@ -775,12 +789,13 @@ export default function TrialBanner({
 
                 const currentPlanNormalized = String(tenant?.subscription_plan || tenant?.plan || "").toLowerCase();
                 const isThisCurrentActivePlan =
-                  !isCurrentTrial &&
-                  (plan.id.toLowerCase() === currentPlanNormalized ||
-                    plan.name.toLowerCase() === currentPlanNormalized ||
-                    (plan.id === "starter" && currentPlanNormalized.includes("starter")) ||
-                    (plan.id === "pro" && currentPlanNormalized.includes("pro")) ||
-                    (plan.id === "enterprise" && (currentPlanNormalized.includes("enterprise") || currentPlanNormalized.includes("entreprise"))));
+                  (isCurrentTrial && isPlanTrial) ||
+                  (!isCurrentTrial &&
+                    (plan.id.toLowerCase() === currentPlanNormalized ||
+                      plan.name.toLowerCase() === currentPlanNormalized ||
+                      (plan.id === "starter" && currentPlanNormalized.includes("starter")) ||
+                      (plan.id === "pro" && currentPlanNormalized.includes("pro")) ||
+                      (plan.id === "enterprise" && (currentPlanNormalized.includes("enterprise") || currentPlanNormalized.includes("entreprise")))));
 
                 const isHighlighted =
                   (plan.tag || "").toLowerCase().includes("popular") ||
@@ -976,7 +991,7 @@ export default function TrialBanner({
                       ) : isThisCurrentActivePlan ? (
                         <>
                           <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Plano Ativo</span>
+                          <span>{isPlanTrial ? "Seu Plano Atual" : "Plano Ativo"}</span>
                         </>
                       ) : isFetchingThisLink ? (
                         <>
