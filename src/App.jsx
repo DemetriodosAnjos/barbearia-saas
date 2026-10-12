@@ -352,13 +352,14 @@ export default function App() {
           }
         } else {
           if (!isMounted) return;
-          const rawRole = session.user.user_metadata?.role;
+          const rawRole = session.user.user_metadata?.role || session.user.role;
           const normalizedRole =
-            !rawRole || rawRole === "owner" || rawRole === "tenant"
+            !rawRole || rawRole === "owner" || rawRole === "tenant" || rawRole === "authenticated"
               ? USER_ROLES.ADMIN
               : rawRole;
           const userWithRole = {
             ...session.user,
+            role: normalizedRole,
             user_metadata: {
               ...(session.user.user_metadata || {}),
               role: normalizedRole,
@@ -388,13 +389,14 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       if (session?.user) {
-        const rawRole = session.user.user_metadata?.role;
+        const rawRole = session.user.user_metadata?.role || session.user.role;
         const normalizedRole =
-          !rawRole || rawRole === "owner" || rawRole === "tenant"
+          !rawRole || rawRole === "owner" || rawRole === "tenant" || rawRole === "authenticated"
             ? USER_ROLES.ADMIN
             : rawRole;
         const userWithRole = {
           ...session.user,
+          role: normalizedRole,
           user_metadata: {
             ...(session.user.user_metadata || {}),
             role: normalizedRole,
@@ -969,13 +971,14 @@ export default function App() {
                 // Faz o login na conta existente (vincula o Google à conta já cadastrada).
                 // O usuário entra direto no painel da barbearia dele. Zero duplicidade.
                 // =====================================================================
-                const rawRole = loggedUser?.user_metadata?.role;
+                const rawRole = loggedUser?.user_metadata?.role || loggedUser?.role;
                 const role =
-                  !rawRole || rawRole === "owner" || rawRole === "tenant"
+                  !rawRole || rawRole === "owner" || rawRole === "tenant" || rawRole === "authenticated"
                     ? USER_ROLES.ADMIN
                     : rawRole;
                 const userWithRole = {
                   ...loggedUser,
+                  role: role,
                   user_metadata: {
                     ...(loggedUser?.user_metadata || {}),
                     role: role,
