@@ -204,6 +204,119 @@ export async function requestGoogleAccountProfile(clientId?: string): Promise<Go
  * Processa as Regras de Negócio oficiais de docs/entrar-com-google.md (RN-01 a RN-05)
  * a partir do perfil real retornado pela API do Google.
  */
+/**
+ * Consulta unificada no banco de dados para verificar se o e-mail já existe
+ * em tenants (owner_email), barbers (email) ou profiles (email).
+ * Utilizado para validação prévia na Etapa 1 do Onboarding e para Account Linking do Google.
+ */
+export async function findExistingAccountByEmail(email: string): Promise<{
+  exists: boolean;
+  tenant: any;
+  barber: any;
+  profile: any;
+}> {
+  const normalizedEmail = (email || "").trim().toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    return { exists: false, tenant: null, barber: null, profile: null };
+  }
+
+  let tenantMatch: any = null;
+  let barberMatch: any = null;
+  let profileMatch: any = null;
+
+  try {
+    // 1. Busca em 'tenants' por owner_email
+    const { data: tenants, error: tErr } = await supabase
+      .from("tenants")
+      .select("id, name, slug, owner_name, owner_email, status, phone, plan, logo_url")
+      .ilike("owner_email", normalizedEmail);
+
+    if (!tErr && tenants && tenants.length > 0) {
+      tenantMatch = tenants[0];
+    }
+  } catch (err) {
+    console.warn("Aviso ao buscar tenants por e-mail:", err);
+  }
+
+  // Fallback caso ilike divirja de formato exato
+  if (!tenantMatch) {
+    try {
+      const { data: tEq } = await supabase
+        .from("tenants")
+        .select("id, name, slug, owner_name, owner_email, status, phone, plan, logo_url")
+        .eq("owner_email", normalizedEmail);
+      if (tEq && tEq.length > 0) {
+        tenantMatch = tEq[0];
+      }
+    } catch {
+      // continua busca
+    }
+  }
+
+  try {
+    // 2. Busca em 'barbers' por email
+    const { data: barbers, error: bErr } = await supabase
+      .from("barbers")
+      .select("id, name, email, status, tenant_id, avatar_url, barbershop_id")
+      .ilike("email", normalizedEmail);
+
+    if (!bErr && barbers && barbers.length > 0) {
+      barberMatch = barbers[0];
+    }
+  } catch (err) {
+    console.warn("Aviso ao buscar barbers por e-mail:", err);
+  }
+
+  try {
+    // 3. Busca em 'profiles' por email
+    const { data: profiles, error: pErr } = await supabase
+      .from("profiles")
+      .select("id, full_name, role, barbershop_id, email")
+      .ilike("email", normalizedEmail);
+
+    if (!pErr && profiles && profiles.length > 0) {
+      profileMatch = profiles[0];
+    }
+  } catch (err) {
+    console.warn("Aviso ao buscar profiles por e-mail:", err);
+  }
+
+  // 4. Se encontrou tenant mas não profile, busca profile pelo barbershop_id
+  if (!profileMatch && tenantMatch?.id) {
+    try {
+      const { data: pByShop, error: pbErr } = await supabase
+        .from("profiles")
+        .select("id, full_name, role, barbershop_id")
+        .eq("barbershop_id", tenantMatch.id)
+        .limit(1);
+
+      if (!pbErr && pByShop && pByShop.length > 0) {
+        profileMatch = pByShop[0];
+      }
+    } catch {
+      // continua
+    }
+  }
+
+  const exists = Boolean(tenantMatch || barberMatch || profileMatch);
+
+  return {
+    exists,
+    tenant: tenantMatch,
+    barber: barberMatch,
+    profile: profileMatch,
+  };
+}
+
+/**
+ * Processa as Regras de Negócio oficiais de docs/entrar-com-google.md (RN-01 a RN-05)
+ * com Account Linking Inteligente (Opção 2 - Recomendada).
+ *
+ * - Cenário 2 (E-mail JÁ existe no banco): Vincula a conta existente sem criar novo UUID
+ *   ou tenant duplicado. Usuário entra direto na barbearia existente.
+ * - Cenário 3 (E-mail NÃO existe no banco): NÃO insere no banco automaticamente. Retorna
+ *   isNewUser = true para que o usuário seja conduzido ao setup limpo de Onboarding.
+ */
 export async function authenticateGoogleUser(
   profile: GoogleUserProfile
 ): Promise<GoogleAuthResult> {
@@ -227,68 +340,11 @@ export async function authenticateGoogleUser(
   }
 
   try {
-    // RN-01: Associação de Contas por E-mail
-    // 1. Busca em 'tenants' (owner_email)
-    let tenantMatch: any = null;
-    try {
-      const { data: tenants, error: tErr } = await supabase
-        .from("tenants")
-        .select("id, name, owner_name, owner_email, status, logo_url")
-        .ilike("owner_email", normalizedEmail);
-
-      if (!tErr && tenants && tenants.length > 0) {
-        tenantMatch = tenants[0];
-      }
-    } catch (err) {
-      console.warn("Aviso ao buscar tenants para Google SSO:", err);
-    }
-
-    // 2. Busca em 'barbers' (email)
-    let barberMatch: any = null;
-    try {
-      const { data: barbers, error: bErr } = await supabase
-        .from("barbers")
-        .select("id, name, email, status, tenant_id, avatar_url, barbershop_id")
-        .ilike("email", normalizedEmail);
-
-      if (!bErr && barbers && barbers.length > 0) {
-        barberMatch = barbers[0];
-      }
-    } catch (err) {
-      console.warn("Aviso ao buscar barbers para Google SSO:", err);
-    }
-
-    // 3. Busca em 'profiles' (identidade)
-    let profileMatch: any = null;
-    try {
-      const { data: profiles, error: pErr } = await supabase
-        .from("profiles")
-        .select("id, full_name, role, barbershop_id")
-        .ilike("email", normalizedEmail);
-
-      if (!pErr && profiles && profiles.length > 0) {
-        profileMatch = profiles[0];
-      }
-    } catch (pErr) {
-      console.warn("Aviso ao buscar profiles para Google SSO:", pErr);
-    }
-
-    // Se profiles não tem coluna email ou não encontrou, busca profile pelo barbershop_id do tenant
-    if (!profileMatch && tenantMatch?.id) {
-      try {
-        const { data: pByShop, error: pbErr } = await supabase
-          .from("profiles")
-          .select("id, full_name, role, barbershop_id")
-          .eq("barbershop_id", tenantMatch.id)
-          .limit(1);
-
-        if (!pbErr && pByShop && pByShop.length > 0) {
-          profileMatch = pByShop[0];
-        }
-      } catch (err) {
-        console.warn("Aviso ao buscar profiles por barbershop_id:", err);
-      }
-    }
+    // Consulta centralizada de existência da conta no banco
+    const accountCheck = await findExistingAccountByEmail(normalizedEmail);
+    const tenantMatch = accountCheck.tenant;
+    const barberMatch = accountCheck.barber;
+    let profileMatch = accountCheck.profile;
 
     // RN-04 & EX-05: Checagem de Status da Conta
     const matchedRecord = tenantMatch || barberMatch;
@@ -310,113 +366,58 @@ export async function authenticateGoogleUser(
       }
     }
 
-    // Se o usuário Google é novo (não possui registro em tenants), cria e persiste no banco
-    let isNewUser = !tenantMatch && !barberMatch;
+    const isNewUser = !tenantMatch && !barberMatch && !profileMatch;
+
+    // =========================================================================
+    // CENÁRIO 3 (Opção 2): Usuário Google Novo (e-mail NÃO existe no banco)
+    // NÃO cria UUID nem persiste tenant falso no banco de dados!
+    // Retorna isNewUser = true para o Onboarding coletar os dados reais da barbearia.
+    // =========================================================================
     if (isNewUser) {
-      const newTenantId =
-        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID()
-          : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-              const r = (Math.random() * 16) | 0;
-              const v = c === "x" ? r : (r & 0x3) | 0x8;
-              return v.toString(16);
-            });
-
-      const rawName = profile.name || normalizedEmail.split("@")[0] || "Minha Barbearia";
-      const slugBase = rawName
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "") || "barbearia";
-
-      const shopSlug = `barbearia-${slugBase}-${newTenantId.slice(0, 4)}`;
-      const shopName = `Barbearia ${rawName}`;
-      const nowIso = new Date().toISOString();
-      const trialEnds = new Date();
-      trialEnds.setDate(trialEnds.getDate() + 7);
-      const trialEndsIso = trialEnds.toISOString();
-
-      try {
-        // 1. Grava de forma permanente na tabela oficial `tenants`
-        const { data: createdTenant, error: createTenantErr } = await supabase
-          .from("tenants")
-          .insert({
-            id: newTenantId,
-            name: shopName,
-            slug: shopSlug,
-            owner_name: profile.name || rawName,
-            owner_email: normalizedEmail,
-            phone: "",
-            plan: "starter",
-            status: "active",
-            barbers_count: 1,
-            mrr: 0,
-            trial_days_left: 7,
-            trial_ends_at: trialEndsIso,
-            has_white_label: false,
-            created_at: nowIso,
-            updated_at: nowIso,
-          })
-          .select()
-          .maybeSingle();
-
-        if (createTenantErr) {
-          console.warn("Aviso na inserção de tenant:", createTenantErr.message);
-        }
-
-        tenantMatch = createdTenant || {
-          id: newTenantId,
-          name: shopName,
-          slug: shopSlug,
-          owner_name: profile.name || rawName,
+      const candidateUser = {
+        id: `usr_google_${profile.sub || Date.now()}`,
+        email: normalizedEmail,
+        name: profile.name || normalizedEmail.split("@")[0],
+        given_name: profile.given_name,
+        family_name: profile.family_name,
+        role: "admin",
+        avatarUrl:
+          profile.picture ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || "Usuario")}&background=d97706&color=fff&bold=true`,
+        googleId: profile.sub,
+        emailVerified: true,
+        status: "active",
+        authProvider: "google",
+        isNewUser: true,
+        accountLinked: false,
+        user_metadata: {
+          name: profile.name || normalizedEmail.split("@")[0],
+          owner_name: profile.name || normalizedEmail.split("@")[0],
           owner_email: normalizedEmail,
-          status: "active",
-          plan: "starter",
-        };
+          picture: profile.picture,
+          role: "admin",
+        },
+      };
 
-        // 2. Grava na tabela `barbershops`
-        await supabase.from("barbershops").insert({
-          id: newTenantId,
-          name: shopName,
-          slug: shopSlug,
-          plan: "starter",
-          subscription_plan: "trial",
-          trial_ends_at: trialEndsIso,
-          created_at: nowIso,
-          updated_at: nowIso,
-        });
-
-        // 3. Grava o profissional na tabela `barbers`
-        const newBarberId =
-          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : "b" + newTenantId.slice(1);
-
-        await supabase.from("barbers").insert({
-          id: newBarberId,
-          barbershop_id: newTenantId,
-          name: profile.name || rawName,
-          display_name: (profile.name || rawName).split(" ")[0],
-          email: normalizedEmail,
-          role: "Master Barber",
-          avatar: profile.picture || "",
-          status: "active",
-          commission_percentage: 50,
-          created_at: nowIso,
-        });
-      } catch (dbErr) {
-        console.warn("Aviso ao persistir novo tenant Google no banco de dados:", dbErr);
-      }
+      return {
+        success: true,
+        user: candidateUser,
+        isNewUser: true,
+        accountLinked: false,
+      };
     }
 
-    // Monta o usuário autenticado da sessão
+    // =========================================================================
+    // CENÁRIO 2 (Opção 2): E-mail JÁ existe no banco (Account Linking Inteligente)
+    // Vincula a credencial do Google ao tenant/profile já existente.
+    // Zero duplicidade de UUID ou registros em 'tenants' e 'barbershops'.
+    // =========================================================================
     const isOwner = Boolean(tenantMatch);
     const isBarber = !isOwner && Boolean(barberMatch);
 
     const resolvedName =
-      profile.name ||
       tenantMatch?.owner_name ||
+      profile.name ||
       barberMatch?.name ||
       profileMatch?.full_name ||
       normalizedEmail.split("@")[0];
@@ -441,7 +442,7 @@ export async function authenticateGoogleUser(
       ? barberMatch.tenant_id || barberMatch.barbershop_id || "a0000000-0000-0000-0000-000000000001"
       : profileMatch?.barbershop_id || "a0000000-0000-0000-0000-000000000001";
 
-    // Vincula google_id no tenant existente se a coluna estiver presente
+    // Atualiza vínculo google_id de forma transparente no registro existente
     if (tenantMatch?.id) {
       try {
         await supabase
@@ -453,7 +454,7 @@ export async function authenticateGoogleUser(
           })
           .eq("id", tenantMatch.id);
       } catch {
-        // segue se colunas ainda não existirem
+        // segue se colunas não existirem
       }
     }
 
@@ -470,7 +471,7 @@ export async function authenticateGoogleUser(
           })
           .eq("id", profileMatch.id);
       } catch {
-        // segue se colunas ainda não existirem
+        // segue se colunas não existirem
       }
     }
 
@@ -485,13 +486,15 @@ export async function authenticateGoogleUser(
       googleId: profile.sub,
       emailVerified: true,
       status: "active",
-      authProvider: isNewUser ? "google" : "linked",
+      authProvider: "linked",
+      accountLinked: true,
       user_metadata: {
         name: resolvedName,
         role: isOwner ? "admin" : isBarber ? "barber" : "client",
         barbershop_name: tenantMatch?.name || "Barbearia",
         picture: resolvedAvatar,
         tenant_id: barbeariaId,
+        barbershop_id: barbeariaId,
       },
     };
 
@@ -513,8 +516,8 @@ export async function authenticateGoogleUser(
       success: true,
       user: authenticatedUser,
       accessToken: sessionToken,
-      isNewUser,
-      accountLinked: !isNewUser,
+      isNewUser: false,
+      accountLinked: true,
     };
   } catch (err: any) {
     console.error("Erro ao autenticar usuário Google:", err);

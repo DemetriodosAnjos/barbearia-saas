@@ -49,12 +49,21 @@ export { GOOGLE_SSO_MESSAGES };
 export default function Login({
   onLoginSuccess,
   onGoToSignup, // Redireciona para o Onboarding
+  initialEmail = "",
 }) {
   // 1. Campos de Login
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => (initialEmail ? initialEmail.trim() : ""));
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+
+  // Sincroniza e-mail inicial pré-preenchido caso venha do Onboarding
+  useEffect(() => {
+    if (initialEmail && initialEmail.trim()) {
+      setEmail(initialEmail.trim());
+      setErrors((prev) => ({ ...prev, email: null }));
+    }
+  }, [initialEmail]);
 
   // 2. Estados de Controle e Segurança Anti-Brute Force / CAPTCHA
   const [errors, setErrors] = useState({});
@@ -569,7 +578,11 @@ export default function Login({
       setIsLockedOut(false);
       setRemainingAttempts(5);
       if (onLoginSuccess) {
-        onLoginSuccess({ ...authResult.user, isNewUser: Boolean(authResult.isNewUser) });
+        onLoginSuccess({
+          ...authResult.user,
+          isNewUser: Boolean(authResult.isNewUser),
+          accountLinked: Boolean(authResult.accountLinked),
+        });
       }
     } catch (err) {
       if (err?.message === "CANCELLED") {
@@ -606,7 +619,11 @@ export default function Login({
       setIsLockedOut(false);
       setRemainingAttempts(5);
       if (onLoginSuccess) {
-        onLoginSuccess({ ...authResult.user, isNewUser: Boolean(authResult.isNewUser) });
+        onLoginSuccess({
+          ...authResult.user,
+          isNewUser: Boolean(authResult.isNewUser),
+          accountLinked: Boolean(authResult.accountLinked),
+        });
       }
     } catch (err) {
       if (err?.message !== "CANCELLED") {

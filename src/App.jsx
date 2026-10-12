@@ -54,6 +54,8 @@ export default function App() {
   })();
 
   const [currentScreen, setCurrentScreen] = useState(initialScreen);
+  const [loginPrefillEmail, setLoginPrefillEmail] = useState("");
+  const [googleNewUserCandidate, setGoogleNewUserCandidate] = useState(null);
 
   const handleNavigate = useCallback((screenId) => {
     setCurrentScreen(screenId);
@@ -585,10 +587,15 @@ export default function App() {
   };
 
   const handleGoToOnboarding = useCallback(() => {
+    setGoogleNewUserCandidate(null);
     setCurrentScreen("onboarding");
   }, []);
 
-  const handleGoToLogin = useCallback(() => {
+  const handleGoToLogin = useCallback((prefillEmail = "") => {
+    if (prefillEmail && typeof prefillEmail === "string") {
+      setLoginPrefillEmail(prefillEmail);
+    }
+    setGoogleNewUserCandidate(null);
     setCurrentScreen("login");
   }, []);
 
@@ -848,8 +855,21 @@ export default function App() {
         {currentScreen === "onboarding" && (
           <ErrorBoundary componentName="Onboarding Wizard">
             <OnboardingWizard
-              onGoToLogin={() => setCurrentScreen("login")}
+              initialGoogleUser={googleNewUserCandidate}
+              onGoToLogin={(prefillEmail) => {
+                if (prefillEmail) setLoginPrefillEmail(prefillEmail);
+                setGoogleNewUserCandidate(null);
+                setCurrentScreen("login");
+              }}
+              onLoginSuccess={async (existingUser) => {
+                setGoogleNewUserCandidate(null);
+                setCurrentUser(existingUser);
+                setActiveUserRole(USER_ROLES.ADMIN);
+                await resolveAndSyncUserTenant(existingUser);
+                setCurrentScreen("barbershop");
+              }}
               onCompleteOnboarding={({ user: newUser, tenant: newTenant }) => {
+                setGoogleNewUserCandidate(null);
                 if (newUser) setCurrentUser(newUser);
                 if (newTenant) setTenant(normalizeTenantRecord(newTenant, newUser));
                 setActiveUserRole(USER_ROLES.ADMIN);
@@ -904,6 +924,7 @@ export default function App() {
         {currentScreen === "login" && (
           <ErrorBoundary componentName="Tela de Login">
             <Login
+              initialEmail={loginPrefillEmail}
               onGoToSignup={handleGoToOnboarding}
               onLoginSuccess={async (loggedUser) => {
                 const userEmail = (
@@ -932,15 +953,22 @@ export default function App() {
                   return;
                 }
 
-                // Verifica se é primeiro acesso via Google (marcado como isNewUser na criação)
-                const isFirstTimeGoogle = Boolean(loggedUser?.isNewUser);
-
-                if (isFirstTimeGoogle) {
-                  setCurrentUser(loggedUser);
-                  setCurrentScreen("onboarding-quiz");
+                // =====================================================================
+                // CENÁRIO 3 (Opção 2): Novo usuário via Google (isNewUser = true)
+                // Direciona o novo usuário para o Onboarding / Setup inicial da sua barbearia.
+                // Criação limpa da primeira conta sem duplicidade!
+                // =====================================================================
+                if (loggedUser?.isNewUser) {
+                  setGoogleNewUserCandidate(loggedUser);
+                  setCurrentScreen("onboarding");
                   return;
                 }
 
+                // =====================================================================
+                // CENÁRIO 2 (Opção 2): E-mail que JÁ existe no banco (Account Linking)
+                // Faz o login na conta existente (vincula o Google à conta já cadastrada).
+                // O usuário entra direto no painel da barbearia dele. Zero duplicidade.
+                // =====================================================================
                 const rawRole = loggedUser?.user_metadata?.role;
                 const role =
                   !rawRole || rawRole === "owner" || rawRole === "tenant"

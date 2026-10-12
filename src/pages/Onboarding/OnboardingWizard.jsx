@@ -17,6 +17,11 @@ import TurnstileWidget from "../../components/security/TurnstileWidget";
 import { secureSignUp } from "../../security/authSecurityService";
 import { generateFreshTestToken } from "../../security/captchaValidator";
 import { USER_ROLES } from "../../security/authorizationMatrix";
+import {
+  findExistingAccountByEmail,
+  requestGoogleAccountProfile,
+  authenticateGoogleUser,
+} from "../../services/googleAuthService";
 
 const generateUUID = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -32,24 +37,40 @@ const generateUUID = () => {
 export default function OnboardingWizard({
   onCompleteOnboarding,
   onGoToLogin,
+  onLoginSuccess,
+  initialGoogleUser = null,
 }) {
-  const [currentStep, setCurrentStep] = useState(1); // 1 = Dono, 2 = Barbearia
+  const [currentStep, setCurrentStep] = useState(() => (initialGoogleUser ? 2 : 1)); // 1 = Dono, 2 = Barbearia
 
-  const [formData, setFormData] = useState({
-    // Etapa 1: Dono
-    ownerName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
+  const [formData, setFormData] = useState(() => {
+    const googleName = initialGoogleUser?.name || initialGoogleUser?.user_metadata?.name || "";
+    const googleEmail = initialGoogleUser?.email || initialGoogleUser?.user_metadata?.owner_email || "";
+    const cleanShopName = googleName ? `Barbearia ${googleName}` : "";
+    const slugBase = cleanShopName
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
 
-    // Etapa 2: Barbearia (Tenant)
-    barbershopName: "",
-    phone: "",
-    slug: "",
+    return {
+      // Etapa 1: Dono
+      ownerName: googleName,
+      email: googleEmail,
+      password: initialGoogleUser ? "GoogleSSO@" + Math.random().toString(36).slice(-8) : "",
+      confirmPassword: initialGoogleUser ? "GoogleSSO@" + Math.random().toString(36).slice(-8) : "",
+
+      // Etapa 2: Barbearia (Tenant)
+      barbershopName: cleanShopName,
+      phone: "",
+      slug: slugBase,
+    };
   });
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
   const [captchaResetCount, setCaptchaResetCount] = useState(0);
 
@@ -159,6 +180,36 @@ export default function OnboardingWizard({
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
+  };
+
+  // [PARTE A - Opção 2]: Validação imediata na Etapa 1 se o e-mail já existe no banco
+  const handleStep1Next = async () => {
+    if (!validateStep1()) return;
+
+    const normalizedEmail = formData.email.trim().toLowerCase();
+    setIsCheckingEmail(true);
+    setApiError("");
+    setIsExistingUser(false);
+
+    try {
+      const accountCheck = await findExistingAccountByEmail(normalizedEmail);
+      if (accountCheck.exists) {
+        // Interrompe imediatamente com aviso e conduz à tela de login com o e-mail preenchido
+        setIsExistingUser(true);
+        setApiError(
+          `Este e-mail já possui cadastro. Faça login para acessar sua barbearia.`
+        );
+        setIsCheckingEmail(false);
+        return;
+      }
+    } catch (checkErr) {
+      console.warn("Aviso na checagem prévia de e-mail:", checkErr);
+    } finally {
+      setIsCheckingEmail(false);
+    }
+
+    // Se o e-mail for limpo/novo, avança para os dados da barbearia
+    setCurrentStep(2);
   };
 
   const validateStep2 = () => {
@@ -507,10 +558,11 @@ export default function OnboardingWizard({
                       {onGoToLogin && (
                         <button
                           type="button"
-                          onClick={onGoToLogin}
-                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors cursor-pointer shadow-sm"
+                          onClick={() => onGoToLogin(formData.email.trim().toLowerCase())}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
                         >
-                          Ir para o Login
+                          <span>Ir para o Login</span>
+                          <ProjectIcon name="ArrowRight" size={12} colorVariant="inherit" />
                         </button>
                       )}
                       <button
@@ -544,20 +596,61 @@ export default function OnboardingWizard({
                 </p>
               </div>
 
-              {/* [Ação: autenticação oficial do Google via Supabase Auth] */}
+              {/* [PARTE B & Opção 2]: Google Auth no Onboarding com Account Linking */}
               <button
                 type="button"
                 onClick={async () => {
                   try {
-                    await supabase.auth.signInWithOAuth({
-                      provider: "google",
-                      options: { redirectTo: window.location.origin },
-                    });
+                    setIsLoading(true);
+                    setApiError("");
+                    setIsExistingUser(false);
+                    const profile = await requestGoogleAccountProfile();
+                    const authResult = await authenticateGoogleUser(profile);
+
+                    if (!authResult.success) {
+                      setApiError(authResult.error || "Não foi possível autenticar com o Google.");
+                      setIsLoading(false);
+                      return;
+                    }
+
+                    if (authResult.accountLinked && !authResult.isNewUser) {
+                      // Cenário 2: E-mail JÁ existe no banco -> faz login direto na barbearia existente! Zero duplicidade.
+                      if (onLoginSuccess) {
+                        onLoginSuccess(authResult.user);
+                      } else if (onCompleteOnboarding) {
+                        onCompleteOnboarding({ user: authResult.user, tenant: authResult.user });
+                      }
+                      return;
+                    }
+
+                    // Cenário 3: Novo usuário Google -> pré-preenche o formulário e avança para a Etapa 2
+                    const rawName = profile.name || profile.email.split("@")[0] || "Minha Barbearia";
+                    const cleanShopName = `Barbearia ${rawName}`;
+                    const slugBase = cleanShopName
+                      .toLowerCase()
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .replace(/[^a-z0-9]/g, "-")
+                      .replace(/-+/g, "-")
+                      .replace(/^-|-$/g, "");
+
+                    setFormData((prev) => ({
+                      ...prev,
+                      ownerName: profile.name || prev.ownerName,
+                      email: profile.email || prev.email,
+                      password: prev.password || "GoogleSSO@" + Math.random().toString(36).slice(-8),
+                      confirmPassword: prev.confirmPassword || "GoogleSSO@" + Math.random().toString(36).slice(-8),
+                      barbershopName: prev.barbershopName || cleanShopName,
+                      slug: prev.slug || slugBase,
+                    }));
+                    setCurrentStep(2);
                   } catch (err) {
-                    console.error("Erro no cadastro com Google:", err);
-                    setApiError(
-                      "Não foi possível iniciar o cadastro com o Google.",
-                    );
+                    if (err?.message !== "CANCELLED") {
+                      console.error("Erro no cadastro com Google:", err);
+                      setApiError("Não foi possível autenticar com o Google. Tente com e-mail e senha.");
+                    }
+                  } finally {
+                    setIsLoading(false);
                   }
                 }}
                 className={onboardingStyles.googleButton}
@@ -758,7 +851,11 @@ export default function OnboardingWizard({
             ) : (
               <button
                 type="button"
-                onClick={onGoToLogin}
+                onClick={() => {
+                  if (onGoToLogin) {
+                    onGoToLogin(formData.email.trim().toLowerCase());
+                  }
+                }}
                 className="text-xs text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
               >
                 Já tem conta? <strong>Fazer Login</strong>
@@ -768,9 +865,8 @@ export default function OnboardingWizard({
             {currentStep === 1 ? (
               <Button
                 variant="primary"
-                onClick={() => {
-                  if (validateStep1()) setCurrentStep(2);
-                }}
+                isLoading={isCheckingEmail}
+                onClick={handleStep1Next}
                 className="text-xs py-2.5 px-5"
               >
                 <span className="flex items-center justify-center gap-1.5">
