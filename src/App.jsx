@@ -584,58 +584,8 @@ export default function App() {
     setAppointments((prev) => [...prev, createdAppointment]);
   };
 
-  // Handlers para navegação limpa a partir da tela de login para os outros módulos
-  const handleGoToBarbershop = useCallback(() => {
-    setActiveUserRole(USER_ROLES.ADMIN);
-    if (!currentUser) {
-      setCurrentUser({
-        id: "owner-usr-01",
-        email: tenant?.owner_email || "ddoanjos@gmail.com",
-        user_metadata: {
-          name: tenant?.owner_name || "Demetrio A L dos Anjos",
-          role: USER_ROLES.ADMIN,
-          barbershop_name: tenant?.name || "Barbearia Dos Anjos",
-        },
-      });
-    }
-    setCurrentScreen("barbershop");
-  }, [currentUser, tenant]);
-
-  const handleGoToSuperAdmin = useCallback(() => {
-    setActiveUserRole(USER_ROLES.SUPERADMIN);
-    if (!currentUser) {
-      setCurrentUser({
-        id: "superadmin-usr-01",
-        email: "atendmentor@gmail.com",
-        user_metadata: {
-          name: "SuperAdmin Master",
-          role: USER_ROLES.SUPERADMIN,
-        },
-      });
-    }
-    setCurrentScreen("superadmin");
-  }, [currentUser]);
-
-  const handleGoToClientApp = useCallback(() => {
-    setCurrentScreen("client-app");
-  }, []);
-
-  const handleGoToQuiz = useCallback(() => {
-    setCurrentScreen("onboarding-quiz");
-  }, []);
-
   const handleGoToOnboarding = useCallback(() => {
     setCurrentScreen("onboarding");
-  }, []);
-
-  const handleGoToDesignSystem = useCallback(() => {
-    setActiveUserRole(USER_ROLES.ADMIN);
-    setCurrentScreen("design-system");
-  }, []);
-
-  const handleGoToQAPanel = useCallback(() => {
-    setActiveUserRole(USER_ROLES.SUPERADMIN);
-    setCurrentScreen("qa-panel");
   }, []);
 
   const handleGoToLogin = useCallback(() => {
@@ -950,17 +900,11 @@ export default function App() {
           </ErrorBoundary>
         )}
 
-        {/* 5. LOGIN: Autenticação de usuários e hub de acesso aos módulos */}
+        {/* 5. LOGIN: Autenticação de usuários */}
         {currentScreen === "login" && (
           <ErrorBoundary componentName="Tela de Login">
             <Login
               onGoToSignup={handleGoToOnboarding}
-              onGoToBarbershop={handleGoToBarbershop}
-              onGoToSuperAdmin={handleGoToSuperAdmin}
-              onGoToClientApp={handleGoToClientApp}
-              onGoToQuiz={handleGoToQuiz}
-              onGoToDesignSystem={handleGoToDesignSystem}
-              onGoToQAPanel={handleGoToQAPanel}
               onLoginSuccess={async (loggedUser) => {
                 const userEmail = (
                   loggedUser?.email ||
