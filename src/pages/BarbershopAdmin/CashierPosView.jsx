@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import DOMPurify from "dompurify";
 import { supabase } from "../../lib/supabase";
 import { posStyles } from "./CashierPosView.styles";
@@ -22,10 +22,43 @@ import {
   ClipboardList,
   Beer,
   Ticket,
-  CreditCard,
+  Calendar,
   CheckCircle2,
+  TrendingUp,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
   Filter,
 } from "lucide-react";
+
+// Helper defensivo para formatar data em YYYY-MM-DD
+const formatDateToYMD = (dateObj) => {
+  if (!dateObj) return "";
+  const d = dateObj instanceof Date ? dateObj : new Date(dateObj);
+  if (Number.isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// Helper para extrair YYYY-MM-DD de um agendamento
+const getAppointmentDateYMD = (appt) => {
+  if (!appt) return formatDateToYMD(new Date());
+  const rawDate = appt.date || appt.bookingDate || "";
+  if (typeof rawDate === "string" && rawDate.trim().length >= 10) {
+    return rawDate.trim().slice(0, 10);
+  }
+  const rawStart = appt.startTime || appt.start_time || "";
+  if (typeof rawStart === "string" && rawStart.includes("T")) {
+    return rawStart.slice(0, 10);
+  }
+  const rawCreated = appt.created_at || appt.createdAt || "";
+  if (typeof rawCreated === "string" && rawCreated.trim().length >= 10) {
+    return rawCreated.trim().slice(0, 10);
+  }
+  return formatDateToYMD(new Date());
+};
 
 export default function CashierPosView({
   sharedComandas = [],
@@ -39,25 +72,27 @@ export default function CashierPosView({
   onUpdateProducts,
   onBack,
 }) {
-  // Sincronização inicial de produtos reais do Supabase
+  // 1. Data Operacional do Caixa (Padrão: Hoje)
+  const [selectedDate, setSelectedDate] = useState(() => formatDateToYMD(new Date()));
+  const [viewAllDates, setViewAllDates] = useState(false);
+
+  // Produtos e Fila
   const [products, setProducts] = useState(initialProducts);
   const [waitlist, setWaitlist] = useState([]);
 
-  // Filtro de exibição das comandas (Todas, Pendentes, Na Cadeira, Pagas)
+  // Filtro de status das comandas (Todas, Pendentes, Na Cadeira, Pagas)
   const [activeFilter, setActiveFilter] = useState("all"); // 'all' | 'pending' | 'open' | 'paid'
 
-  // Modal Mercado Pago
+  // Modais de Pagamento
   const [mercadoPagoTarget, setMercadoPagoTarget] = useState(null);
-
-  // Estados de Liquidação / Pagamento Tradicional de Balcão
   const [comandaToPay, setComandaToPay] = useState(null);
 
-  // Estados para Adicionar Item Rápido a uma Comanda Aberta
+  // Adicionar item em comanda
   const [selectedComandaIdForAdd, setSelectedComandaIdForAdd] = useState("");
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [productToAdd, setProductToAdd] = useState(null);
 
-  // Estados para Abrir Nova Comanda Balcão Avulsa
+  // Nova comanda balcão
   const [isNewComandaModalOpen, setIsNewComandaModalOpen] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   const [newBarberName, setNewBarberName] = useState(
@@ -74,7 +109,7 @@ export default function CashierPosView({
     }
   }, [initialProducts]);
 
-  // Efeito de ciclo de vida: busca catálogo real de produtos no Supabase se vazio
+  // Carrega produtos reais se vazio
   useEffect(() => {
     let isMounted = true;
     async function loadPosProducts() {
@@ -112,79 +147,206 @@ export default function CashierPosView({
     };
   }, [initialProducts, onUpdateProducts]);
 
-  // 1. SINCRONIZAÇÃO UNIFICADA: Comandas de balcão e atendimentos vindos da agenda
+  // =========================================================================
+  // 2. SINCRONIZAÇÃO UNIFICADA: MERGE ENTRE AGENDA E COMANDAS DE BALCÃO
+  // =========================================================================
+  // Estado local contendo comandas completas (balcão e comandas personalizadas)
   const [comandas, setComandas] = useState(() => {
     return Array.isArray(sharedComandas) ? [...sharedComandas] : [];
   });
 
-  // Sincroniza com as comandas do dashboard global ou alterações nos appointments
+  // Atualiza comandas mesclando appointments da agenda automaticamente
   useEffect(() => {
-    if (!sharedComandas) return;
-    setComandas(Array.isArray(sharedComandas) ? [...sharedComandas] : []);
-  }, [sharedComandas]);
+    setComandas((prevComandas) => {
+      const mergedMap = new Map();
 
-  // Sincroniza status vindo de appointments (ex: se ScheduleView alterou o status)
-  useEffect(() => {
-    if (!appointments || appointments.length === 0) return;
-
-    setComandas((prev) => {
-      return prev.map((cmd) => {
-        const matching = appointments.find((a) => a.id === cmd.id);
-        if (matching) {
-          const derivedStatus = matching.isPaid
-            ? "paid"
-            : matching.status === "cancelled"
-            ? "cancelled"
-            : matching.status === "completed"
-            ? "pending_payment"
-            : "open";
-          return {
-            ...cmd,
-            status: derivedStatus,
-            clientName: matching.clientName || cmd.clientName,
-            barberName: matching.barberName || cmd.barberName,
-          };
-        }
-        return cmd;
+      // 1. Manter comandas manuais de balcão pré-existentes
+      prevComandas.forEach((cmd) => {
+        mergedMap.set(cmd.id, cmd);
       });
+
+      // 2. Também incluir as sharedComandas
+      if (Array.isArray(sharedComandas)) {
+        sharedComandas.forEach((cmd) => {
+          if (!mergedMap.has(cmd.id)) {
+            mergedMap.set(cmd.id, cmd);
+          }
+        });
+      }
+
+      // 3. Converter e sincronizar TODOS os appointments registrados
+      if (Array.isArray(appointments) && appointments.length > 0) {
+        appointments.forEach((appt) => {
+          const isPaid = Boolean(
+            appt.isPaid || appt.is_paid || appt.status === "paid",
+          );
+          const isCancelled = appt.status === "cancelled";
+
+          let derivedStatus = "open";
+          if (isPaid) {
+            derivedStatus = "paid";
+          } else if (isCancelled) {
+            derivedStatus = "cancelled";
+          } else if (appt.status === "completed") {
+            derivedStatus = "pending_payment";
+          } else {
+            derivedStatus = "open";
+          }
+
+          const apptPrice = Number(appt.price || 0);
+          const existing = mergedMap.get(appt.id);
+
+          if (existing) {
+            // Se já existe no caixa, atualiza status e dados básicos sem perder produtos extras
+            mergedMap.set(appt.id, {
+              ...existing,
+              clientName: appt.clientName || appt.client_name || existing.clientName,
+              clientPhone: appt.clientPhone || appt.client_phone || existing.clientPhone,
+              barberName: appt.barberName || appt.barber_name || existing.barberName,
+              barberId: appt.barberId || appt.barber_id || existing.barberId,
+              status: derivedStatus,
+              isPaid: isPaid,
+              date: getAppointmentDateYMD(appt),
+              openedAt: appt.startTime || appt.start_time || existing.openedAt,
+              services:
+                existing.services && existing.services.length > 0
+                  ? existing.services
+                  : [
+                      {
+                        id: `serv-${appt.id}`,
+                        name: appt.serviceName || appt.service_name || "Serviço Agendado",
+                        price: apptPrice,
+                        barberCommission: apptPrice * 0.5,
+                      },
+                    ],
+            });
+          } else {
+            // Cria nova comanda automática oriunda da agenda
+            mergedMap.set(appt.id, {
+              id: appt.id,
+              appointmentId: appt.id,
+              source: "agenda",
+              clientName: appt.clientName || appt.client_name || "Cliente Agendado",
+              clientPhone: appt.clientPhone || appt.client_phone || "",
+              barberName: appt.barberName || appt.barber_name || "Barbeiro",
+              barberId: appt.barberId || appt.barber_id || "",
+              openedAt: appt.startTime || appt.start_time || "Agendado",
+              date: getAppointmentDateYMD(appt),
+              status: derivedStatus,
+              isPaid: isPaid,
+              services: [
+                {
+                  id: `serv-${appt.id}`,
+                  name: appt.serviceName || appt.service_name || "Serviço Agendado",
+                  price: apptPrice,
+                  barberCommission: apptPrice * 0.5,
+                },
+              ],
+              products: [],
+            });
+          }
+        });
+      }
+
+      const mergedList = Array.from(mergedMap.values());
+      return mergedList;
     });
-  }, [appointments]);
+  }, [appointments, sharedComandas]);
 
-  // Cálculos de Caixa em Tempo Real
-  const openComandasCount = comandas.filter((c) => c.status !== "paid" && c.status !== "cancelled").length;
-  const pendingPaymentCount = comandas.filter(
-    (c) => c.status === "pending_payment",
+  // Propaga comandas para o pai quando sofrem mutação interna
+  const updateComandasState = useCallback(
+    (newComandas) => {
+      setComandas(newComandas);
+      if (onUpdateComandas) {
+        onUpdateComandas(newComandas);
+      }
+    },
+    [onUpdateComandas],
+  );
+
+  // =========================================================================
+  // 3. CÁLCULO DOS 3 INDICADORES FINANCEIROS NO TOPO (REGRAS DE NEGÓCIO)
+  // =========================================================================
+  // Comandas pertinentes à data selecionada (ou todas se viewAllDates = true)
+  const dateScopedComandas = useMemo(() => {
+    return comandas.filter((cmd) => {
+      if (viewAllDates) return true;
+      const cmdDate = cmd.date || selectedDate;
+      return cmdDate === selectedDate;
+    });
+  }, [comandas, selectedDate, viewAllDates]);
+
+  // Indicador 1: Previsão Total do Dia (Todos os atendimentos ativos não cancelados)
+  const totalForecast = useMemo(() => {
+    return dateScopedComandas
+      .filter((c) => c.status !== "cancelled")
+      .reduce((acc, cmd) => {
+        const servicesSum = (cmd.services || []).reduce(
+          (sum, s) => sum + Number(s.price || 0),
+          0,
+        );
+        const productsSum = (cmd.products || []).reduce(
+          (sum, p) =>
+            sum +
+            Number(
+              p.total ||
+                Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+            ),
+          0,
+        );
+        return acc + servicesSum + productsSum;
+      }, 0);
+  }, [dateScopedComandas]);
+
+  // Indicador 2: Recebido Hoje (Valores efetivamente liquidados como pagos)
+  const totalReceivedToday = useMemo(() => {
+    return dateScopedComandas
+      .filter((c) => c.status === "paid" || c.isPaid === true)
+      .reduce((acc, cmd) => {
+        const servicesSum = (cmd.services || []).reduce(
+          (sum, s) => sum + Number(s.price || 0),
+          0,
+        );
+        const productsSum = (cmd.products || []).reduce(
+          (sum, p) =>
+            sum +
+            Number(
+              p.total ||
+                Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+            ),
+          0,
+        );
+        return acc + servicesSum + productsSum;
+      }, 0);
+  }, [dateScopedComandas]);
+
+  // Indicador 3: Saldo Pendente (Previsão que ainda não foi liquidada)
+  const pendingAmount = useMemo(() => {
+    return Math.max(0, totalForecast - totalReceivedToday);
+  }, [totalForecast, totalReceivedToday]);
+
+  // Contadores analíticos
+  const expectedCount = dateScopedComandas.filter((c) => c.status !== "cancelled").length;
+  const paidCount = dateScopedComandas.filter((c) => c.status === "paid" || c.isPaid === true).length;
+  const pendingCount = dateScopedComandas.filter(
+    (c) => c.status !== "paid" && c.status !== "cancelled" && !c.isPaid,
   ).length;
+  const openCount = dateScopedComandas.filter((c) => c.status === "open").length;
 
-  const totalReceivedToday = comandas
-    .filter((c) => c.status === "paid")
-    .reduce((acc, cmd) => {
-      const servicesTotal = (cmd.services || []).reduce(
-        (sum, s) => sum + Number(s.price || 0),
-        0,
-      );
-      const productsTotal = (cmd.products || []).reduce(
-        (sum, p) => sum + Number(p.total || 0),
-        0,
-      );
-      return acc + servicesTotal + productsTotal;
-    }, 0);
-
-  // 2. ALTERAÇÃO MANUAL DE STATUS (FEAT 1)
+  // =========================================================================
+  // 4. AÇÕES DE LIQUIDAÇÃO E ALTERAÇÃO DE STATUS COM SINCRONIZAÇÃO
+  // =========================================================================
   const handleComandaStatusChange = async (comandaId, newStatus) => {
+    const isPaid = newStatus === "paid";
     const updated = comandas.map((c) =>
-      c.id === comandaId ? { ...c, status: newStatus } : c,
+      c.id === comandaId ? { ...c, status: newStatus, isPaid } : c,
     );
-    setComandas(updated);
-    if (onUpdateComandas) {
-      onUpdateComandas(updated);
-    }
+    updateComandasState(updated);
 
-    // Se a comanda corresponder a um agendamento na agenda, sincroniza o appointment correspondente
+    // Sincroniza com a Agenda e Supabase se for um agendamento vinculado
     if (appointments && appointments.length > 0) {
       const matchingAppt = appointments.find((a) => a.id === comandaId);
       if (matchingAppt) {
-        const isPaid = newStatus === "paid";
         const apptStatus =
           newStatus === "paid"
             ? "completed"
@@ -220,12 +382,27 @@ export default function CashierPosView({
     };
 
     setAlertSuccess(
-      `Status do atendimento/comanda #${comandaId} alterado manualmente para "${labelMap[newStatus] || newStatus}"!`,
+      `Comanda #${comandaId} atualizada para "${labelMap[newStatus] || newStatus}"! Previsão financeira e status sincronizados.`,
     );
     setTimeout(() => setAlertSuccess(""), 4500);
   };
 
-  // 3. AÇÃO: Lançar Produto do Bar em uma Comanda Ativa
+  // Liquidação pelo Modal Tradicional de Caixa
+  const handleFinishComandaPayment = async (paymentsSummary) => {
+    if (!comandaToPay) return;
+
+    await handleComandaStatusChange(comandaToPay.id, "paid");
+    const paidId = comandaToPay.id;
+    const clientName = comandaToPay.clientName;
+    setComandaToPay(null);
+
+    setAlertSuccess(
+      `Comanda #${paidId} (${clientName}) foi QUITADA com sucesso! Receita e comissão consolidadas.`,
+    );
+    setTimeout(() => setAlertSuccess(""), 5000);
+  };
+
+  // Lançar Produto na Comanda
   const handleQuickAddProduct = (product) => {
     setProductToAdd(product);
     setIsAddItemModalOpen(true);
@@ -234,54 +411,47 @@ export default function CashierPosView({
   const handleConfirmAddProductToComanda = () => {
     if (!productToAdd || !selectedComandaIdForAdd) return;
 
-    setComandas((prev) => {
-      const updated = prev.map((cmd) => {
-        if (cmd.id !== selectedComandaIdForAdd) return cmd;
+    const updated = comandas.map((cmd) => {
+      if (cmd.id !== selectedComandaIdForAdd) return cmd;
 
-        const existingProdIndex = (cmd.products || []).findIndex(
-          (p) => p.id === productToAdd.id,
+      const existingProdIndex = (cmd.products || []).findIndex(
+        (p) => p.id === productToAdd.id,
+      );
+      let updatedProducts;
+
+      if (existingProdIndex >= 0) {
+        updatedProducts = cmd.products.map((p, idx) =>
+          idx === existingProdIndex
+            ? {
+                ...p,
+                quantity: p.quantity + 1,
+                total: (p.quantity + 1) * p.unitPrice,
+                sellerCommission:
+                  (p.quantity + 1) *
+                  (p.unitPrice * ((productToAdd.commissionPercent || 0) / 100)),
+              }
+            : p,
         );
-        let updatedProducts;
-
-        if (existingProdIndex >= 0) {
-          updatedProducts = cmd.products.map((p, idx) =>
-            idx === existingProdIndex
-              ? {
-                  ...p,
-                  quantity: p.quantity + 1,
-                  total: (p.quantity + 1) * p.unitPrice,
-                  sellerCommission:
-                    (p.quantity + 1) *
-                    (p.unitPrice *
-                      ((productToAdd.commissionPercent || 0) / 100)),
-                }
-              : p,
-          );
-        } else {
-          updatedProducts = [
-            ...(cmd.products || []),
-            {
-              id: productToAdd.id,
-              name: productToAdd.name,
-              quantity: 1,
-              unitPrice: productToAdd.price,
-              total: productToAdd.price,
-              sellerCommission:
-                productToAdd.price *
-                ((productToAdd.commissionPercent || 0) / 100),
-            },
-          ];
-        }
-
-        return { ...cmd, products: updatedProducts };
-      });
-
-      if (onUpdateComandas) {
-        onUpdateComandas(updated);
+      } else {
+        updatedProducts = [
+          ...(cmd.products || []),
+          {
+            id: productToAdd.id,
+            name: productToAdd.name,
+            quantity: 1,
+            unitPrice: productToAdd.price,
+            total: productToAdd.price,
+            sellerCommission:
+              productToAdd.price *
+              ((productToAdd.commissionPercent || 0) / 100),
+          },
+        ];
       }
-      return updated;
+
+      return { ...cmd, products: updatedProducts };
     });
 
+    updateComandasState(updated);
     setIsAddItemModalOpen(false);
     setAlertSuccess(
       `Item "${productToAdd.name}" lançado na Comanda #${selectedComandaIdForAdd}!`,
@@ -289,7 +459,7 @@ export default function CashierPosView({
     setTimeout(() => setAlertSuccess(""), 4000);
   };
 
-  // 4. AÇÃO: Abrir Comanda Avulsa
+  // Criar Comanda Balcão Avulsa
   const handleCreateWalkinComanda = () => {
     const cleanClientName = DOMPurify.sanitize(newClientName.trim(), { ALLOWED_TAGS: [] });
     if (!cleanClientName) {
@@ -300,6 +470,7 @@ export default function CashierPosView({
     const newCmdId = `CMD-${Math.floor(1000 + Math.random() * 9000)}`;
     const created = {
       id: newCmdId,
+      source: "balcao",
       clientName: cleanClientName,
       clientPhone: "",
       barberName: DOMPurify.sanitize(newBarberName, { ALLOWED_TAGS: [] }),
@@ -308,6 +479,7 @@ export default function CashierPosView({
         hour: "2-digit",
         minute: "2-digit",
       }),
+      date: selectedDate,
       services: [
         {
           id: `s-${Date.now()}`,
@@ -319,10 +491,7 @@ export default function CashierPosView({
       products: [],
     };
 
-    setComandas((prev) => [created, ...prev]);
-    if (onUpdateComandas) {
-      onUpdateComandas([created, ...comandas]);
-    }
+    updateComandasState([created, ...comandas]);
     setIsNewComandaModalOpen(false);
     setNewClientName("");
     setAlertSuccess(
@@ -331,12 +500,12 @@ export default function CashierPosView({
     setTimeout(() => setAlertSuccess(""), 4000);
   };
 
-  // 5. AÇÃO: Transformar Ticket da Fila em Comanda Aberta
+  // Transformar Ticket da Fila em Comanda
   const handleStartQueueService = (ticket) => {
     const newCmdId = `CMD-${Math.floor(1000 + Math.random() * 9000)}`;
-
     const newComanda = {
       id: newCmdId,
+      source: "balcao",
       clientName: ticket.clientName,
       clientPhone: ticket.phone,
       barberName: barbers[0]?.name || "Barbeiro",
@@ -345,6 +514,7 @@ export default function CashierPosView({
         hour: "2-digit",
         minute: "2-digit",
       }),
+      date: selectedDate,
       services: [
         {
           id: `s-${Date.now()}`,
@@ -356,10 +526,7 @@ export default function CashierPosView({
       products: [],
     };
 
-    setComandas((prev) => [newComanda, ...prev]);
-    if (onUpdateComandas) {
-      onUpdateComandas([newComanda, ...comandas]);
-    }
+    updateComandasState([newComanda, ...comandas]);
     setWaitlist((prev) => prev.filter((t) => t.id !== ticket.id));
     setAlertSuccess(
       `Cliente ${ticket.clientName} sentado na cadeira! Comanda #${newCmdId} aberta.`,
@@ -367,69 +534,68 @@ export default function CashierPosView({
     setTimeout(() => setAlertSuccess(""), 4000);
   };
 
-  // 6. Liquidação de Comanda pelo Caixa Tradicional
-  const handleFinishComandaPayment = (paymentsSummary) => {
-    if (!comandaToPay) return;
-
-    handleComandaStatusChange(comandaToPay.id, "paid");
-    const paidId = comandaToPay.id;
-    const clientName = comandaToPay.clientName;
-    setComandaToPay(null);
-
-    setAlertSuccess(
-      `Comanda #${paidId} (${clientName}) foi QUITADA E ARQUIVADA no caixa!`,
-    );
-    setTimeout(() => setAlertSuccess(""), 5000);
+  // Navegação de Datas (< Hoje >)
+  const handlePrevDay = () => {
+    const current = new Date(selectedDate + "T12:00:00");
+    current.setDate(current.getDate() - 1);
+    setSelectedDate(formatDateToYMD(current));
+    setViewAllDates(false);
   };
 
-  // Filtragem das comandas a exibir
+  const handleNextDay = () => {
+    const current = new Date(selectedDate + "T12:00:00");
+    current.setDate(current.getDate() + 1);
+    setSelectedDate(formatDateToYMD(current));
+    setViewAllDates(false);
+  };
+
+  const handleSetToday = () => {
+    setSelectedDate(formatDateToYMD(new Date()));
+    setViewAllDates(false);
+  };
+
+  // Filtragem final para a coluna de comandas
   const filteredComandas = useMemo(() => {
-    if (activeFilter === "all") {
-      return comandas;
-    }
+    let list = dateScopedComandas;
     if (activeFilter === "pending") {
-      return comandas.filter((c) => c.status === "pending_payment");
+      list = list.filter((c) => c.status === "pending_payment");
+    } else if (activeFilter === "open") {
+      list = list.filter((c) => c.status === "open");
+    } else if (activeFilter === "paid") {
+      list = list.filter((c) => c.status === "paid" || c.isPaid === true);
     }
-    if (activeFilter === "open") {
-      return comandas.filter((c) => c.status === "open");
-    }
-    if (activeFilter === "paid") {
-      return comandas.filter((c) => c.status === "paid");
-    }
-    return comandas;
-  }, [comandas, activeFilter]);
+    return list;
+  }, [dateScopedComandas, activeFilter]);
+
+  // Formatação amigável da data selecionada
+  const formattedSelectedDate = useMemo(() => {
+    if (viewAllDates) return "Todos os agendamentos e comandas";
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString("pt-BR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }, [selectedDate, viewAllDates]);
 
   return (
     <div className={posStyles.container}>
-      {/* 1. CABEÇALHO DO CAIXA COM KPIS */}
+      {/* 1. CABEÇALHO DO CAIXA */}
       <div className={posStyles.headerCard}>
         <div className={posStyles.headerInfo}>
           <h1 className={posStyles.title}>
-            <Receipt className="w-5 h-5 text-amber-500 inline-block mr-2" />
+            <Receipt className="w-6 h-6 text-amber-500 inline-block mr-2" />
             <span>Frente de Caixa (PDV) & Comandas</span>
           </h1>
           <p className={posStyles.subtitle}>
-            Gestão de atendimentos, comandas da recepção, pagamentos via Mercado Pago
-            e alteração manual de status em tempo real.
+            Sincronização automática entre a Agenda e o Caixa. Acompanhe a previsão diária,
+            valores liquidados e saldo a receber em tempo real.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-          <div className={posStyles.kpiGroup}>
-            <div className={`${posStyles.kpiBadge} ${posStyles.kpiRevenue}`}>
-              <DollarSign className="w-3.5 h-3.5 text-emerald-400 inline-block mr-1" />
-              <span>
-                Recebido Hoje: R${" "}
-                {totalReceivedToday.toFixed(2).replace(".", ",")}
-              </span>
-            </div>
-
-            <div className={`${posStyles.kpiBadge} ${posStyles.kpiOpen}`}>
-              <Clock className="w-3.5 h-3.5 text-amber-400 inline-block mr-1" />
-              <span>{openComandasCount} comandas abertas</span>
-            </div>
-          </div>
-
           <Button
             variant="primary"
             onClick={() => setIsNewComandaModalOpen(true)}
@@ -446,10 +612,138 @@ export default function CashierPosView({
             >
               <span className="flex items-center gap-1.5">
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Voltar</span>
+                <span>Voltar para Agenda</span>
               </span>
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* 2. BARRA DE CONTROLE E NAVEGAÇÃO DE DATA */}
+      <div className={posStyles.dateControlBar}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className={posStyles.dateNavGroup}>
+            <button
+              type="button"
+              onClick={handlePrevDay}
+              className={posStyles.dateButton}
+              title="Dia Anterior"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 inline-block mr-0.5" />
+              <span>Anterior</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSetToday}
+              className={
+                !viewAllDates && selectedDate === formatDateToYMD(new Date())
+                  ? posStyles.dateActiveButton
+                  : posStyles.dateButton
+              }
+            >
+              Hoje
+            </button>
+
+            <button
+              type="button"
+              onClick={handleNextDay}
+              className={posStyles.dateButton}
+              title="Próximo Dia"
+            >
+              <span>Próximo</span>
+              <ChevronRight className="w-3.5 h-3.5 inline-block ml-0.5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-amber-500 hidden sm:inline-block" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedDate(e.target.value);
+                  setViewAllDates(false);
+                }
+              }}
+              className={posStyles.datePickerInput}
+              aria-label="Selecionar data do caixa"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setViewAllDates((prev) => !prev)}
+            className={viewAllDates ? posStyles.dateActiveButton : posStyles.dateButton}
+          >
+            <Filter className="w-3 h-3 inline-block mr-1" />
+            <span>{viewAllDates ? "Filtrando: Todas as Datas" : "Ver Todas as Datas"}</span>
+          </button>
+        </div>
+
+        <div className="text-xs font-semibold text-neutral-300 capitalize">
+          {formattedSelectedDate}
+        </div>
+      </div>
+
+      {/* 3. OS 3 CARTÕES DE PREVISÃO FINANCEIRA (REGRAS DE NEGÓCIO) */}
+      <div className={posStyles.kpiGrid}>
+        {/* KPI 1: Previsão Total do Dia */}
+        <div className={`${posStyles.kpiCard} ${posStyles.kpiCardForecast}`}>
+          <div>
+            <div className={posStyles.kpiCardHeader}>
+              <span className={posStyles.kpiCardLabel}>Previsão Total do Dia</span>
+              <TrendingUp className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className={`${posStyles.kpiCardValue} text-white`}>
+              R$ {totalForecast.toFixed(2).replace(".", ",")}
+            </div>
+          </div>
+          <div className={posStyles.kpiCardSubtext}>
+            <Calendar className="w-3.5 h-3.5 text-neutral-500" />
+            <span>
+              {expectedCount} {expectedCount === 1 ? "atendimento previsto" : "atendimentos previstos"}
+            </span>
+          </div>
+        </div>
+
+        {/* KPI 2: Recebido Hoje (Realizado) */}
+        <div className={`${posStyles.kpiCard} ${posStyles.kpiCardReceived}`}>
+          <div>
+            <div className={posStyles.kpiCardHeader}>
+              <span className={posStyles.kpiCardLabel}>Recebido Hoje (Realizado)</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className={`${posStyles.kpiCardValue} text-emerald-400`}>
+              R$ {totalReceivedToday.toFixed(2).replace(".", ",")}
+            </div>
+          </div>
+          <div className={posStyles.kpiCardSubtext}>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+            <span>
+              {paidCount} {paidCount === 1 ? "comanda quitada" : "comandas quitadas"}
+            </span>
+          </div>
+        </div>
+
+        {/* KPI 3: Saldo Pendente (A Receber) */}
+        <div className={`${posStyles.kpiCard} ${posStyles.kpiCardPending}`}>
+          <div>
+            <div className={posStyles.kpiCardHeader}>
+              <span className={posStyles.kpiCardLabel}>Saldo Pendente (A Receber)</span>
+              <Clock className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className={`${posStyles.kpiCardValue} text-amber-400`}>
+              R$ {pendingAmount.toFixed(2).replace(".", ",")}
+            </div>
+          </div>
+          <div className={posStyles.kpiCardSubtext}>
+            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+            <span>
+              {pendingCount} {pendingCount === 1 ? "comanda em aberto" : "comandas em aberto"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -464,7 +758,7 @@ export default function CashierPosView({
         </Alert>
       )}
 
-      {/* 2. GRADE CENTRAL DO PDV (2 COLUNAS) */}
+      {/* 4. GRADE CENTRAL DO PDV (2 COLUNAS) */}
       <div className={posStyles.gridContent}>
         {/* COLUNA ESQUERDA: LISTA DE COMANDAS E ATENDIMENTOS */}
         <div className={posStyles.comandasColumn}>
@@ -475,58 +769,58 @@ export default function CashierPosView({
                 <span>Comandas & Atendimentos ({filteredComandas.length})</span>
               </h2>
 
-              {pendingPaymentCount > 0 && (
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
-                  {pendingPaymentCount} aguardando quitação
+              {pendingCount > 0 && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  {pendingCount} a receber
                 </span>
               )}
             </div>
 
             {/* Filtros Rápidos */}
-            <div className="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-800 text-[11px]">
+            <div className="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-800 text-[11px] overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setActiveFilter("all")}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer shrink-0 ${
                   activeFilter === "all"
                     ? "bg-amber-600 text-white"
                     : "text-neutral-400 hover:text-white"
                 }`}
               >
-                Todas ({comandas.length})
+                Todas ({dateScopedComandas.length})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter("pending")}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer shrink-0 ${
                   activeFilter === "pending"
                     ? "bg-amber-600 text-white"
                     : "text-neutral-400 hover:text-white"
                 }`}
               >
-                Pendentes ({pendingPaymentCount})
+                Pendentes ({dateScopedComandas.filter((c) => c.status === "pending_payment").length})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter("open")}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer shrink-0 ${
                   activeFilter === "open"
                     ? "bg-amber-600 text-white"
                     : "text-neutral-400 hover:text-white"
                 }`}
               >
-                Na Cadeira ({comandas.filter((c) => c.status === "open").length})
+                Na Cadeira ({openCount})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter("paid")}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer shrink-0 ${
                   activeFilter === "paid"
                     ? "bg-amber-600 text-white"
                     : "text-neutral-400 hover:text-white"
                 }`}
               >
-                Pagas ({comandas.filter((c) => c.status === "paid").length})
+                Pagas ({paidCount})
               </button>
             </div>
           </div>
@@ -543,47 +837,64 @@ export default function CashierPosView({
                   setIsAddItemModalOpen(true);
                 }}
                 onRemoveService={(servId) => {
-                  setComandas((prev) =>
-                    prev.map((c) =>
-                      c.id === cmd.id
-                        ? {
-                            ...c,
-                            services: c.services.filter((s) => s.id !== servId),
-                          }
-                        : c,
-                    ),
+                  const updated = comandas.map((c) =>
+                    c.id === cmd.id
+                      ? {
+                          ...c,
+                          services: (c.services || []).filter((s) => s.id !== servId),
+                        }
+                      : c,
                   );
+                  updateComandasState(updated);
                 }}
                 onRemoveProduct={(prodId) => {
-                  setComandas((prev) =>
-                    prev.map((c) =>
-                      c.id === cmd.id
-                        ? {
-                            ...c,
-                            products: c.products.filter((p) => p.id !== prodId),
-                          }
-                        : c,
-                    ),
+                  const updated = comandas.map((c) =>
+                    c.id === cmd.id
+                      ? {
+                          ...c,
+                          products: (c.products || []).filter((p) => p.id !== prodId),
+                        }
+                      : c,
                   );
+                  updateComandasState(updated);
                 }}
                 onStatusChange={(newStatus) => {
                   handleComandaStatusChange(cmd.id, newStatus);
                 }}
-                onPayMercadoPago={(comanda) => {
-                  setMercadoPagoTarget(comanda);
+                onPayMercadoPago={(targetComanda) => {
+                  setMercadoPagoTarget(targetComanda);
                 }}
-                onProceedToPayment={(comanda) => {
-                  setComandaToPay(comanda);
+                onProceedToPayment={(targetComanda) => {
+                  setComandaToPay(targetComanda);
                 }}
               />
             ))}
 
             {filteredComandas.length === 0 && (
               <div className="p-12 text-center text-xs text-neutral-500 bg-neutral-900 border border-neutral-800 rounded-3xl space-y-2">
-                <p className="text-xl font-bold text-white">
-                  Nenhuma comanda encontrada para este filtro
+                <Receipt className="w-8 h-8 text-neutral-600 mx-auto" />
+                <p className="text-base font-bold text-white">
+                  Nenhum agendamento ou comanda para esta data
                 </p>
-                <p>Alterne para "Todas" ou crie uma nova comanda de balcão.</p>
+                <p className="text-neutral-400 max-w-sm mx-auto">
+                  Agendamentos criados na Agenda aparecem aqui automaticamente. Você também pode clicar em "+ Nova Comanda Balcão" ou navegar pelas datas acima.
+                </p>
+                <div className="pt-2 flex justify-center gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={handleSetToday}
+                    className="text-xs"
+                  >
+                    Ver Hoje
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setViewAllDates(true)}
+                    className="text-xs"
+                  >
+                    Ver Todas as Datas
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -611,6 +922,12 @@ export default function CashierPosView({
                   onAddToCart={handleQuickAddProduct}
                 />
               ))}
+
+              {products.length === 0 && (
+                <p className="text-xs text-neutral-500 italic text-center py-2">
+                  Nenhum produto cadastrado no catálogo.
+                </p>
+              )}
             </div>
           </div>
 
@@ -672,11 +989,17 @@ export default function CashierPosView({
             <PaymentMethodSelector
               totalAmount={
                 (comandaToPay.services || []).reduce(
-                  (a, s) => a + Number(s.price),
+                  (a, s) => a + Number(s.price || 0),
                   0,
                 ) +
                 (comandaToPay.products || []).reduce(
-                  (a, p) => a + Number(p.total),
+                  (a, p) =>
+                    a +
+                    Number(
+                      p.total ||
+                        Number(p.quantity || 1) *
+                          Number(p.unitPrice || p.price || 0),
+                    ),
                   0,
                 )
               }
@@ -693,7 +1016,7 @@ export default function CashierPosView({
       </Modal>
 
       {/* ======================================================== */}
-      {/* MODAL 2: PAGAMENTO VIA MERCADO PAGO API (FEAT 1.2)       */}
+      {/* MODAL 2: PAGAMENTO VIA MERCADO PAGO API                  */}
       {/* ======================================================== */}
       {mercadoPagoTarget && (
         <MercadoPagoCheckoutModal
@@ -712,7 +1035,13 @@ export default function CashierPosView({
                 0,
               ) +
               (mercadoPagoTarget.products || []).reduce(
-                (sum, p) => sum + Number(p.total || 0),
+                (sum, p) =>
+                  sum +
+                  Number(
+                    p.total ||
+                      Number(p.quantity || 1) *
+                        Number(p.unitPrice || p.price || 0),
+                  ),
                 0,
               ),
           }}
@@ -766,10 +1095,10 @@ export default function CashierPosView({
             value={selectedComandaIdForAdd}
             onChange={(e) => setSelectedComandaIdForAdd(e.target.value)}
             options={comandas
-              .filter((c) => c.status !== "paid")
+              .filter((c) => c.status !== "paid" && c.status !== "cancelled")
               .map((c) => ({
                 value: c.id,
-                label: `#${c.id} - ${c.clientName} (Barbeiro: ${c.barberName})`,
+                label: `#${c.id} - ${c.clientName} (${c.barberName})`,
               }))}
           />
         </div>

@@ -94,8 +94,15 @@ export default function ComandaCard({
       {/* 1. CABEÇALHO DA COMANDA COM CONTROLE MANUAL DE STATUS */}
       <div className={comandaStyles.header}>
         <div className={comandaStyles.identityWrapper}>
-          {/* [Exibição do identificador real da comanda] */}
-          <span className={comandaStyles.comandaBadge}>#{comandaId}</span>
+          {/* [Exibição do identificador real da comanda e badge de origem da agenda] */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={comandaStyles.comandaBadge}>#{comandaId}</span>
+            {comanda.source === "agenda" && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono">
+                Agenda {openedAt ? `· ${openedAt}` : ""}
+              </span>
+            )}
+          </div>
           <div>
             <h3 className={comandaStyles.clientName}>
               {/* [Nome e telefone reais vinculados ao cliente da comanda] */}
@@ -140,7 +147,7 @@ export default function ComandaCard({
         <div className={comandaStyles.sectionTitle}>
           <span className="flex items-center gap-1.5">
             <ProjectIcon name="Scissors" size={14} colorVariant="amber" />
-            <span>Serviços Executados ({comanda.services.length})</span>
+            <span>Serviços Executados ({servicesList.length})</span>
           </span>
           <span className="text-neutral-200 font-mono">
             R$ {totalServices.toFixed(2).replace(".", ",")}
@@ -148,19 +155,19 @@ export default function ComandaCard({
         </div>
 
         <div className="space-y-1.5">
-          {comanda.services.map((serv) => (
+          {servicesList.map((serv) => (
             <div key={serv.id} className={comandaStyles.itemRow}>
               <div>
                 <p className={comandaStyles.itemName}>{serv.name}</p>
                 <span className={comandaStyles.itemCommission}>
                   Comissão do barbeiro (50%): R${" "}
-                  {Number(serv.barberCommission).toFixed(2).replace(".", ",")}
+                  {Number(serv.barberCommission || (Number(serv.price || 0) * 0.5)).toFixed(2).replace(".", ",")}
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
                 <span className={comandaStyles.itemPrice}>
-                  R$ {Number(serv.price).toFixed(2).replace(".", ",")}
+                  R$ {Number(serv.price || 0).toFixed(2).replace(".", ",")}
                 </span>
                 {comanda.status !== "paid" && onRemoveService && (
                   <button
@@ -183,7 +190,7 @@ export default function ComandaCard({
         <div className={comandaStyles.sectionTitle}>
           <span className="flex items-center gap-1.5">
             <ProjectIcon name="Beer" size={14} colorVariant="emerald" />
-            <span>Consumo de Bar & Vitrine ({comanda.products.length})</span>
+            <span>Consumo de Bar & Vitrine ({productsList.length})</span>
           </span>
           <span className="text-neutral-200 font-mono">
             R$ {totalProducts.toFixed(2).replace(".", ",")}
@@ -191,7 +198,7 @@ export default function ComandaCard({
         </div>
 
         <div className="space-y-1.5">
-          {comanda.products.map((prod) => (
+          {productsList.map((prod) => (
             <div key={prod.id} className={comandaStyles.itemRow}>
               <div>
                 <p className={comandaStyles.itemName}>

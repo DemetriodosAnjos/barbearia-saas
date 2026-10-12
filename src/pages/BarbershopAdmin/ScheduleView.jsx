@@ -516,7 +516,20 @@ export default function ScheduleView({
                 </>
               ) : (
                 <>
-                  {/* CardInfo #06: BOTÃO 'Pagar' (Verde Sucesso, Fonte Branca, ao lado esquerdo do primário) */}
+                  {/* CardInfo #06: BOTÃO 'Pagar' e 'Abrir no Caixa' */}
+                  {onNavigateToCashier && selectedAppointment.status !== "cancelled" && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setSelectedAppointment(null);
+                        onNavigateToCashier();
+                      }}
+                      className="text-xs font-bold"
+                    >
+                      Abrir no Caixa
+                    </Button>
+                  )}
+
                   {!selectedAppointment.isPaid && selectedAppointment.status !== "cancelled" && (
                     <Button
                       variant="success"
