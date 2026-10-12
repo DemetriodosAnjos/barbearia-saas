@@ -18,7 +18,7 @@ import MercadoPagoCheckoutModal from "../../components/payments/MercadoPagoCheck
 import ApiKeysManagement from "../../components/superadmin/ApiKeysManagement";
 import { mercadoPagoConfigStore } from "../../services/mercadoPagoConfigStore";
 import { INITIAL_PLANS } from "./SuperAdminMockNuank";
-import { safeSessionStorage } from "../../utils/safeStorage";
+import { safeStorage, safeSessionStorage } from "../../utils/safeStorage";
 
 export default function SuperAdminDashboard({
   onImpersonateTenant,
@@ -287,37 +287,74 @@ export default function SuperAdminDashboard({
 
     const daysToAdd = parseInt(bonusDaysInput, 10) || 7;
     const newDaysLeft = (bonusModalTenant.trialDaysLeft || 0) + daysToAdd;
+    const targetId = bonusModalTenant.id;
+    const newTrialDate = new Date();
+    newTrialDate.setDate(newTrialDate.getDate() + newDaysLeft);
 
     setTenants((prev) =>
       prev.map((t) =>
-        t.id === bonusModalTenant.id
+        t.id === targetId
           ? {
               ...t,
               status: "trial",
+              plan: "trial",
+              subscription_plan: "Plano de Teste",
               trialDaysLeft: newDaysLeft,
+              trial_days_left: newDaysLeft,
+              trialEndsAt: newTrialDate.toISOString(),
+              trial_ends_at: newTrialDate.toISOString(),
             }
           : t,
       ),
     );
 
-    const targetId = bonusModalTenant.id;
     setBonusModalTenant(null);
 
     try {
-      const newTrialDate = new Date();
-      newTrialDate.setDate(newTrialDate.getDate() + newDaysLeft);
-
-      // Método Supabase: atualiza a data de expiração e os dias restantes
+      // Método Supabase: atualiza a data de expiração, status e plano de teste
       const { error } = await supabase
         .from("tenants")
         .update({
           status: "trial",
+          plan: "trial",
           trial_days_left: newDaysLeft,
           trial_ends_at: newTrialDate.toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", targetId);
 
       if (error) throw error;
+
+      await supabase
+        .from("barbershops")
+        .update({
+          plan: "trial",
+          subscription_plan: "Plano de Teste",
+          trial_ends_at: newTrialDate.toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", targetId);
+
+      try {
+        const cachedRaw = safeStorage.getItem("saas_active_tenant");
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached?.id === targetId) {
+            const updatedCache = {
+              ...cached,
+              plan: "trial",
+              subscription_plan: "Plano de Teste",
+              status: "trial",
+              trial_days_left: newDaysLeft,
+              trialDaysLeft: newDaysLeft,
+              trial_ends_at: newTrialDate.toISOString(),
+              trialEndsAt: newTrialDate.toISOString(),
+            };
+            safeStorage.setItem("saas_active_tenant", JSON.stringify(updatedCache));
+            safeStorage.setItem("barbearia_tenant_cache", JSON.stringify(updatedCache));
+          }
+        }
+      } catch {}
     } catch (err) {
       console.error("Erro ao estender bônus no Supabase:", err);
     }
@@ -336,8 +373,30 @@ export default function SuperAdminDashboard({
   const handleSaveTenantChanges = async () => {
     if (!selectedTenantForEdit) return;
 
+    const isChangingToTrial = editPlan === "trial" || editStatus === "trial";
     const newMrr =
-      editPlan === "starter" ? 69.9 : editPlan === "pro" ? 149.9 : 279.9;
+      editPlan === "starter"
+        ? 69.9
+        : editPlan === "pro"
+        ? 149.9
+        : editPlan === "trial"
+        ? 0
+        : 279.9;
+
+    const newSubscriptionPlan =
+      editPlan === "trial"
+        ? "Plano de Teste"
+        : editPlan === "starter"
+        ? "Starter"
+        : editPlan === "pro"
+        ? "Pro"
+        : "Entreprise";
+
+    const newStatus = isChangingToTrial ? "trial" : editStatus;
+    const newTrialDaysLeft = isChangingToTrial ? 7 : 0;
+    const newTrialEndsAt = isChangingToTrial
+      ? new Date(Date.now() + 7 * 86400000).toISOString()
+      : null;
 
     setTenants((prev) =>
       prev.map((t) =>
@@ -345,8 +404,13 @@ export default function SuperAdminDashboard({
           ? {
               ...t,
               plan: editPlan,
-              status: editStatus,
+              status: newStatus,
               mrr: newMrr,
+              subscription_plan: newSubscriptionPlan,
+              trialDaysLeft: newTrialDaysLeft,
+              trial_days_left: newTrialDaysLeft,
+              trialEndsAt: newTrialEndsAt,
+              trial_ends_at: newTrialEndsAt,
             }
           : t,
       ),
@@ -360,12 +424,46 @@ export default function SuperAdminDashboard({
         .from("tenants")
         .update({
           plan: editPlan,
-          status: editStatus,
+          status: newStatus,
           mrr: newMrr,
+          trial_days_left: newTrialDaysLeft,
+          trial_ends_at: newTrialEndsAt,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", targetId);
 
       if (error) throw error;
+
+      await supabase
+        .from("barbershops")
+        .update({
+          plan: editPlan,
+          subscription_plan: newSubscriptionPlan,
+          trial_ends_at: newTrialEndsAt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", targetId);
+
+      try {
+        const cachedRaw = safeStorage.getItem("saas_active_tenant");
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached?.id === targetId) {
+            const updatedCache = {
+              ...cached,
+              plan: editPlan,
+              subscription_plan: newSubscriptionPlan,
+              status: newStatus,
+              trial_days_left: newTrialDaysLeft,
+              trialDaysLeft: newTrialDaysLeft,
+              trial_ends_at: newTrialEndsAt,
+              trialEndsAt: newTrialEndsAt,
+            };
+            safeStorage.setItem("saas_active_tenant", JSON.stringify(updatedCache));
+            safeStorage.setItem("barbearia_tenant_cache", JSON.stringify(updatedCache));
+          }
+        }
+      } catch {}
     } catch (err) {
       console.error(
         "Erro ao salvar alterações de assinatura no Supabase:",
@@ -1448,11 +1546,15 @@ export default function SuperAdminDashboard({
             value={editPlan}
             onChange={(e) => setEditPlan(e.target.value)}
             options={[
-              { value: "starter", label: "Plano Solo (R$ 69,90/mês)" },
+              { value: "starter", label: "Plano Solo / Starter (R$ 69,90/mês)" },
               { value: "pro", label: "Plano Pro (R$ 149,90/mês)" },
               {
                 value: "enterprise",
-                label: "Redes & Franquias (R$ 279,90/mês)",
+                label: "Redes & Franquias / Entreprise (R$ 279,90/mês)",
+              },
+              {
+                value: "trial",
+                label: "Plano de Teste (Trial Grátis 7 Dias - Exclusivo SuperAdmin)",
               },
             ]}
           />

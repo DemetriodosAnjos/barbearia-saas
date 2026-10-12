@@ -105,45 +105,45 @@ export const BarbershopProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [services, setServices] = useState<Service[]>(() => {
     try {
       const saved = safeStorage.getItem(`${STORAGE_KEY}_services`);
-      return saved ? JSON.parse(saved) : INITIAL_SERVICES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_SERVICES;
+      return [];
     }
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = safeStorage.getItem(`${STORAGE_KEY}_products`);
-      return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_PRODUCTS;
+      return [];
     }
   });
 
   const [barbers, setBarbers] = useState<Barber[]>(() => {
     try {
       const saved = safeStorage.getItem(`${STORAGE_KEY}_barbers`);
-      return saved ? JSON.parse(saved) : INITIAL_BARBERS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_BARBERS;
+      return [];
     }
   });
 
   const [clients, setClients] = useState<Client[]>(() => {
     try {
       const saved = safeStorage.getItem(`${STORAGE_KEY}_clients`);
-      return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_CLIENTS;
+      return [];
     }
   });
 
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     try {
       const saved = safeStorage.getItem(`${STORAGE_KEY}_appointments`);
-      return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_APPOINTMENTS;
+      return [];
     }
   });
 

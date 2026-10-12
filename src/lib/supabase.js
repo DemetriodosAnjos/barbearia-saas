@@ -323,11 +323,28 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
   const phone =
     raw.phone || raw.ownerPhone || userMeta.phone || "";
 
+  const planCandidate = String(raw.subscription_plan || raw.plan || userMeta.plan || "").toLowerCase();
+  const isPaid =
+    planCandidate.includes("starter") ||
+    planCandidate.includes("pro") ||
+    planCandidate.includes("enterprise") ||
+    planCandidate.includes("entreprise") ||
+    planCandidate.includes("solo") ||
+    planCandidate.includes("franquia");
+
+  const resolvedStatus = isPaid ? "active" : (raw.status || userMeta.status || "active");
+  const resolvedPaymentStatus = isPaid
+    ? "paid"
+    : (raw.payment_status || raw.paymentStatus || (resolvedStatus === "trial" ? "trial" : "paid"));
+  const resolvedTrialDays = isPaid
+    ? 0
+    : Number(raw.trial_days_left ?? raw.trialDaysLeft ?? computedDaysLeft);
+
   return {
     ...raw,
-    id: raw.id || userMeta.barbershop_id || "a0000000-0000-0000-0000-000000000001",
-    name: raw.name || userMeta.barbershop_name || "Minha Barbearia",
-    slug: raw.slug || userMeta.slug || "minha-barbearia",
+    id: raw.id || userMeta.barbershop_id || "788299e3-a26c-4a0b-bc71-c7ae81ed40d3",
+    name: raw.name || userMeta.barbershop_name || "Barbearia",
+    slug: raw.slug || userMeta.slug || "barbearia",
     created_at: raw.created_at || raw.createdAt || new Date().toISOString(),
     updated_at: raw.updated_at || raw.updatedAt || new Date().toISOString(),
     owner_name: ownerName,
@@ -337,15 +354,15 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
     phone: phone,
     ownerPhone: phone,
     plan: plan,
-    subscription_plan: raw.subscription_plan || (raw.status === "trial" ? "trial" : plan),
-    status: raw.status || userMeta.status || "active",
+    subscription_plan: raw.subscription_plan || (resolvedStatus === "trial" ? "trial" : plan),
+    status: resolvedStatus,
     barbers_count: Number(raw.barbers_count ?? raw.barbersCount ?? 1),
     barbersCount: Number(raw.barbers_count ?? raw.barbersCount ?? 1),
     mrr: resolvedMrr,
-    trial_days_left: Number(raw.trial_days_left ?? raw.trialDaysLeft ?? computedDaysLeft),
-    trialDaysLeft: Number(raw.trialDaysLeft ?? raw.trial_days_left ?? computedDaysLeft),
-    trial_ends_at: trialEndsAt,
-    trialEndsAt: trialEndsAt,
+    trial_days_left: resolvedTrialDays,
+    trialDaysLeft: resolvedTrialDays,
+    trial_ends_at: isPaid ? null : trialEndsAt,
+    trialEndsAt: isPaid ? null : trialEndsAt,
     has_white_label: Boolean(raw.has_white_label ?? raw.hasWhiteLabel ?? false),
     hasWhiteLabel: Boolean(raw.hasWhiteLabel ?? raw.has_white_label ?? false),
     brand_primary: raw.brand_primary || raw.brandPrimary || "#ea580c",
@@ -354,8 +371,8 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
     brandSecondary: raw.brandSecondary || raw.brand_secondary || "#16a34a",
     logo_url: raw.logo_url ?? raw.logoUrl ?? "",
     logoUrl: raw.logoUrl ?? raw.logo_url ?? "",
-    payment_status: raw.payment_status || raw.paymentStatus || (raw.status === "trial" ? "trial" : "paid"),
-    paymentStatus: raw.payment_status || raw.paymentStatus || (raw.status === "trial" ? "trial" : "paid"),
+    payment_status: resolvedPaymentStatus,
+    paymentStatus: resolvedPaymentStatus,
     last_payment_id: raw.last_payment_id || raw.lastPaymentId || null,
     lastPaymentId: raw.last_payment_id || raw.lastPaymentId || null,
     last_payment_date: raw.last_payment_date || raw.lastPaymentDate || null,
@@ -365,31 +382,3 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
   };
 }
 
-export async function ensureDefaultBarbershop() {
-  try {
-    const { data: existing } = await supabase
-      .from("barbershops")
-      .select("id")
-      .eq("id", "a0000000-0000-0000-0000-000000000001")
-      .maybeSingle();
-
-    if (!existing) {
-      await supabase.from("barbershops").insert([
-        {
-          id: "a0000000-0000-0000-0000-000000000001",
-          name: "Barbearia Matriz",
-          slug: "matriz",
-          phone: "(11) 99999-9999",
-          plan: "pro",
-          subscription_plan: "trial",
-        },
-      ]);
-    }
-  } catch (_e) {
-    // Non-blocking fallback
-  }
-}
-
-if (typeof window !== "undefined") {
-  ensureDefaultBarbershop();
-}

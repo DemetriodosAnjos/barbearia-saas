@@ -3,7 +3,7 @@ import DOMPurify from "dompurify";
 import { barbershopStyles } from "./BarbershopDashboard.styles";
 import Sidebar from "../../components/ui/Sidebar";
 import Navbar from "../../components/ui/Navbar";
-import TrialBanner from "../../components/dashboard/TrialBanner";
+import TrialBanner, { isTenantTrial } from "../../components/dashboard/TrialBanner";
 import ProfileCompletionBanner from "../../components/dashboard/ProfileCompletionBanner";
 import ErrorBoundary from "../../components/ui/ErrorBoundary";
 import { SafeHtml } from "../../components/ui/SafeHtml";
@@ -57,17 +57,20 @@ export default function BarbershopDashboard({
   // [Lazy Initializer: captura o timestamp de referência de forma idempotente na montagem]
   const [referenceDate] = useState(() => new Date());
 
-  // [Cálculo derivado puro: cálculo determinístico sem efeitos colaterais ou cascatas]
+  // [Cálculo derivado: dias restantes calculado apenas se a conta estiver no modo TRIAL]
+  const isCurrentTrial = isTenantTrial(tenant);
   const trialEnds = tenant?.trial_ends_at || tenant?.trialEndsAt;
-  const realDaysLeft = trialEnds
-    ? Math.max(
-        0,
-        Math.ceil(
-          (new Date(trialEnds).getTime() - referenceDate.getTime()) /
-            (1000 * 60 * 60 * 24),
-        ),
-      )
-    : (tenant?.trialDaysLeft ?? null);
+  const realDaysLeft = isCurrentTrial
+    ? (trialEnds
+        ? Math.max(
+            0,
+            Math.ceil(
+              (new Date(trialEnds).getTime() - referenceDate.getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          )
+        : (tenant?.trialDaysLeft ?? 7))
+    : 0;
 
   // Sincroniza o status ativo do plano da barbearia a partir do Supabase na inicialização
   useEffect(() => {
@@ -76,23 +79,71 @@ export default function BarbershopDashboard({
 
     async function syncTenantPlanFromSupabase() {
       try {
-        const { data: bData } = await supabase
-          .from("barbershops")
-          .select("subscription_plan, plan")
-          .eq("id", tenantId)
-          .maybeSingle();
+        const [bRes, tRes] = await Promise.all([
+          supabase
+            .from("barbershops")
+            .select("subscription_plan, plan, trial_ends_at")
+            .eq("id", tenantId)
+            .maybeSingle(),
+          supabase
+            .from("tenants")
+            .select("plan, status, trial_days_left, trial_ends_at, mrr")
+            .eq("id", tenantId)
+            .maybeSingle(),
+        ]);
 
-        if (
-          bData?.subscription_plan &&
-          bData.subscription_plan.toLowerCase() !== "trial"
-        ) {
-          if (isMounted && onUpdateTenant) {
+        const bData = bRes?.data;
+        const tData = tRes?.data;
+
+        // Avalia se o registro no banco indica trial ou plano pago
+        const rawSubPlan = bData?.subscription_plan || tenant?.subscription_plan || "";
+        const rawPlan = tData?.plan || bData?.plan || tenant?.plan || "";
+        const combinedPlanStr = `${rawSubPlan} ${rawPlan}`.toLowerCase().trim();
+
+        const isPaidPlan =
+          combinedPlanStr.includes("starter") ||
+          combinedPlanStr.includes("pro") ||
+          combinedPlanStr.includes("enterprise") ||
+          combinedPlanStr.includes("entreprise") ||
+          combinedPlanStr.includes("solo") ||
+          combinedPlanStr.includes("franquia");
+
+        const isDbTrial = !isPaidPlan && (
+          tData?.status === "trial" ||
+          combinedPlanStr.includes("trial") ||
+          combinedPlanStr.includes("teste")
+        );
+
+        if (isMounted && onUpdateTenant) {
+          if (isPaidPlan) {
+            const resolvedPlanName =
+              bData?.subscription_plan ||
+              (rawPlan.includes("starter") || rawPlan.includes("solo")
+                ? "Starter"
+                : rawPlan.includes("enterprise")
+                  ? "Entreprise"
+                  : "Pro");
+
             onUpdateTenant({
               ...tenant,
-              subscription_plan: bData.subscription_plan,
+              plan: tData?.plan || bData?.plan || "starter",
+              subscription_plan: resolvedPlanName,
               status: "active",
-              trialDaysLeft: 30,
-              trial_days_left: 30,
+              trialDaysLeft: 0,
+              trial_days_left: 0,
+              trial_ends_at: null,
+              trialEndsAt: null,
+            });
+          } else if (isDbTrial) {
+            onUpdateTenant({
+              ...tenant,
+              plan: "trial",
+              subscription_plan: "Plano de Teste",
+              status: "trial",
+              trialDaysLeft: Number(tData?.trial_days_left ?? 7),
+              trial_days_left: Number(tData?.trial_days_left ?? 7),
+              trial_ends_at: tData?.trial_ends_at || bData?.trial_ends_at,
+              trialEndsAt: tData?.trial_ends_at || bData?.trial_ends_at,
             });
           }
         }
@@ -163,15 +214,19 @@ export default function BarbershopDashboard({
             ? "enterprise"
             : String(planObj?.id || planId).toLowerCase().includes("starter")
             ? "starter"
+            : String(planObj?.id || planId).toLowerCase().includes("teste") || String(planObj?.id || planId).toLowerCase().includes("trial")
+            ? "trial"
             : "pro";
+
+          const isNowTrial = sqlValidPlan === "trial";
 
           const updatedTenant = {
             ...tenant,
             subscription_plan: planName,
             plan: sqlValidPlan,
-            status: "active",
-            trial_days_left: 30,
-            trialDaysLeft: 30,
+            status: isNowTrial ? "trial" : "active",
+            trial_days_left: isNowTrial ? 7 : 0,
+            trialDaysLeft: isNowTrial ? 7 : 0,
           };
 
           if (onUpdateTenant) {
@@ -190,6 +245,7 @@ export default function BarbershopDashboard({
               .from("barbershops")
               .update({
                 subscription_plan: planName,
+                plan: sqlValidPlan,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", tenantId);
@@ -201,9 +257,9 @@ export default function BarbershopDashboard({
             await supabase
               .from("tenants")
               .update({
-                status: "active",
+                status: isNowTrial ? "trial" : "active",
                 plan: sqlValidPlan,
-                trial_days_left: 30,
+                trial_days_left: isNowTrial ? 7 : 0,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", tenantId);

@@ -47,12 +47,14 @@ Plataforma SaaS Multi-tenant completa para gestão de barbearias, atendendo trê
    - Identidade visual, horários de funcionamento, regras de agendamento e dados da empresa.
 8. **Controle Global SaaS (`SuperAdminDashboard`):**
    - Visão consolidada de todas as barbearias, planos de assinatura e integração Mercado Pago.
-9. **Planos & Assinaturas SaaS (`TrialBanner` / Modal de Planos):**
+9. **Planos & Assinaturas SaaS (`TrialBanner` / Modal de Planos - `docs/module-planos-e-trial-ux.md`):**
    - Modal oficial *"Escolha o plano ideal para sua barbearia"* com 4 opções padronizadas:
      - **Plano de Teste:** 7 dias gratuitos com agenda, comissões e caixa liberados.
      - **Starter:** Individual (1 cadeira/barbeiro), PDV e suporte.
      - **Pro:** Até 6 cadeiras, comissões automáticas, lembretes via WhatsApp e Checkout Pro em até 12x.
      - **Entreprise:** Cadeiras ilimitadas, multi-filiais, pacote white-label e suporte prioritário VIP.
+   - **Regra de UX de Visibilidade do Topo:** A faixa de contagem de dias restantes de teste grátis e o botão *"Fazer Upgrade / Assinar"* são exibidos **exclusivamente** no Plano de Teste (Trial). Quando o usuário migra para planos pagos (Starter, Pro, Entreprise), essa faixa do topo fica 100% oculta.
+   - **Exclusividade do SuperAdmin para Retorno ao Trial:** Usuários pagantes não podem auto-selecionar o Plano de Teste. Somente o SuperAdmin oficial (`atendmentor@gmail.com`) possui permissão no painel para reativar o modo Trial para barbearias com planos pagos; ao reativar, a faixa e o botão voltam a aparecer na UI dinamicamente.
    - Botões dos cards conectados dinamicamente à API do Mercado Pago (`/api/mercadopago/preference`) gerando links de Checkout Pro em tempo real.
    - Botão de confirmação no rodapé: *"Continuar para pagamento seguro"*.
 10. **Quiz de Onboarding & Direcionamento de Persona (`OnboardingQuiz` - `docs/onboarding-quiz-e-perfis.md`):**

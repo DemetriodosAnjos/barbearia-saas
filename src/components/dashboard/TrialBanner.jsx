@@ -21,6 +21,59 @@ import {
   checkPaymentEndpoint,
 } from "../../api/mercadoPagoEndpoints";
 
+/**
+ * Determina se o tenant está no plano Trial gratuito ou se já migrou para um plano pago.
+ * Usuários em planos pagos (Starter, Pro, Enterprise) retornam false.
+ */
+export function isTenantTrial(tenant) {
+  if (!tenant) return false;
+
+  const planCandidate = String(tenant.plan || "").toLowerCase().trim();
+  const subPlanCandidate = String(tenant.subscription_plan || "").toLowerCase().trim();
+
+  // Se o plano for starter, pro ou enterprise (ou solo, franquia) -> É PLANO PAGO ATIVO!
+  if (
+    planCandidate.includes("starter") ||
+    planCandidate.includes("pro") ||
+    planCandidate.includes("enterprise") ||
+    planCandidate.includes("entreprise") ||
+    planCandidate.includes("solo") ||
+    planCandidate.includes("franquia") ||
+    subPlanCandidate.includes("starter") ||
+    subPlanCandidate.includes("pro") ||
+    subPlanCandidate.includes("enterprise") ||
+    subPlanCandidate.includes("entreprise") ||
+    subPlanCandidate.includes("solo") ||
+    subPlanCandidate.includes("franquia")
+  ) {
+    return false;
+  }
+
+  // Se o status for ativo e não houver sinal de trial -> não é trial
+  if (
+    tenant.status === "active" &&
+    !planCandidate.includes("trial") &&
+    !planCandidate.includes("teste") &&
+    !subPlanCandidate.includes("trial") &&
+    !subPlanCandidate.includes("teste")
+  ) {
+    return false;
+  }
+
+  // Se for explicitamente trial ou plano de teste
+  if (
+    tenant.status === "trial" ||
+    planCandidate.includes("trial") ||
+    planCandidate.includes("teste") ||
+    subPlanCandidate.includes("trial") ||
+    subPlanCandidate.includes("teste")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export default function TrialBanner({
   trialDaysLeft,
   onSubscribePlan,
@@ -61,8 +114,10 @@ export default function TrialBanner({
   const [isVerifying, setIsVerifying] = useState(false);
   const [approvedPlanTitle, setApprovedPlanTitle] = useState("");
 
-  const showBanner = trialDaysLeft !== undefined && trialDaysLeft !== null;
-  const isExpired = typeof trialDaysLeft === "number" ? trialDaysLeft <= 0 : false;
+  // Condição estrita de negócio: exibe a barra no topo apenas quando a barbearia estiver no modo TRIAL
+  const isCurrentTrial = isTenantTrial(tenant);
+  const showBanner = isCurrentTrial && trialDaysLeft !== undefined && trialDaysLeft !== null;
+  const isExpired = isCurrentTrial && typeof trialDaysLeft === "number" ? trialDaysLeft <= 0 : false;
 
   // Busca dinâmica dos planos sincronizados com "Planos e Preços" do SuperAdmin
   useEffect(() => {
@@ -133,7 +188,7 @@ export default function TrialBanner({
     };
   }, [isModalOpen, propPlans]);
 
-  // Ordena os 4 planos requisitados: Plano de Teste -> Starter -> Pro -> Entreprise
+  // Ordena os planos: para usuários pagantes, oculta completamente a opção do Plano de Teste (Trial)
   const displayPlans = useMemo(() => {
     const active = plans.filter((p) => p.active !== false);
     const baseList = active.length > 0 ? active : plans;
@@ -148,7 +203,17 @@ export default function TrialBanner({
       return 5;
     };
 
-    return [...baseList].sort((a, b) => getRank(a) - getRank(b));
+    const sorted = [...baseList].sort((a, b) => getRank(a) - getRank(b));
+
+    // A opção de atribuir o plano Trial (teste) é exclusiva do Painel do SuperAdmin.
+    // Oculta o plano Trial para todos os usuários pagantes (Starter / Pro / Enterprise) e da contratação pelos tenants.
+    return sorted.filter(
+      (p) =>
+        !p.isTrial &&
+        p.id !== "trial" &&
+        p.id !== "plano-de-teste" &&
+        !String(p.name || "").toLowerCase().includes("teste")
+    );
   }, [plans]);
 
   // Seleciona automaticamente o plano em destaque ou o primeiro da lista
@@ -240,14 +305,27 @@ export default function TrialBanner({
       }
     }
   }, [isModalOpen, selectedPlan, displayPlans]);
-
-  // Defesa: se trialDaysLeft for null/undefined e o modal não estiver aberto, não renderiza
-  if (!showBanner && !isModalOpen && !isRedirectModalOpen) return null;
+  // Se não houver banners nem modais ativos, os elementos renderizam fragmentos vazios no JSX final sem quebrar as regras de Hooks do React
 
   const handleSelectPlan = (planKey) => {
+    const plan = displayPlans.find((p) => p.id === planKey);
+    const isPlanTrial =
+      plan?.isTrial ||
+      plan?.id === "trial" ||
+      plan?.id === "plano-de-teste" ||
+      String(plan?.name || "").toLowerCase().includes("teste");
+
+    if (isPlanTrial && !isCurrentTrial) {
+      setErrorMessage(
+        "Sua barbearia já possui um plano pago ativo (" +
+          (tenant?.subscription_plan || tenant?.plan || "Starter") +
+          "). O retorno ao Plano de Teste é restrito e só pode ser ativado pelo SuperAdmin oficial (atendmentor@gmail.com)."
+      );
+      return;
+    }
+
     setSelectedPlan(planKey);
     setErrorMessage("");
-    const plan = displayPlans.find((p) => p.id === planKey);
     if (plan && Number(plan.price) > 0) {
       generateMercadoPagoLink(plan);
     }
@@ -256,6 +334,21 @@ export default function TrialBanner({
   // Ação ao clicar no botão individual de cada card de plano
   const handleCardButtonClick = async (plan, e) => {
     if (e) e.stopPropagation();
+    const isPlanTrial =
+      plan?.isTrial ||
+      plan?.id === "trial" ||
+      plan?.id === "plano-de-teste" ||
+      String(plan?.name || "").toLowerCase().includes("teste");
+
+    if (isPlanTrial && !isCurrentTrial) {
+      setErrorMessage(
+        "Sua barbearia já possui um plano pago ativo (" +
+          (tenant?.subscription_plan || tenant?.plan || "Starter") +
+          "). O retorno ao Plano de Teste é restrito e só pode ser ativado pelo SuperAdmin oficial (atendmentor@gmail.com)."
+      );
+      return;
+    }
+
     handleSelectPlan(plan.id);
 
     // Se já estiver selecionado ou for clicado para pagar diretamente
@@ -277,6 +370,13 @@ export default function TrialBanner({
 
     // Caso o plano seja 100% gratuito (R$ 0,00)
     if (Number(chosenPlan.price) <= 0) {
+      if (!isCurrentTrial) {
+        setErrorMessage(
+          "Sua barbearia já possui um plano contratado ativo. O retorno ao período de teste só pode ser autorizado pelo SuperAdmin oficial (atendmentor@gmail.com)."
+        );
+        return;
+      }
+
       setSuccessNotice("Plano de Teste ativado com sucesso! Aproveite seus 7 dias de avaliação gratuita.");
       if (onSubscribePlan) {
         onSubscribePlan(chosenPlan.id, "", chosenPlan);
@@ -656,15 +756,32 @@ export default function TrialBanner({
               </p>
             </div>
           ) : (
-            /* GRADE DOS 4 PLANOS: Plano de Teste, Starter, Pro, Entreprise */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
+            /* GRADE DOS PLANOS CONTRATÁVEIS: Starter, Pro, Entreprise */
+            <div
+              className={`grid grid-cols-1 ${
+                displayPlans.length === 3
+                  ? "md:grid-cols-3"
+                  : "md:grid-cols-2 lg:grid-cols-4"
+              } gap-4 items-stretch`}
+            >
               {displayPlans.map((plan) => {
                 const isSelected = selectedPlan === plan.id;
-                const isTrial =
+                const isPlanTrial =
                   plan.isTrial ||
                   plan.id === "trial" ||
                   plan.id === "plano-de-teste" ||
                   plan.name.toLowerCase().includes("teste");
+                const isTrialRestricted = isPlanTrial && !isCurrentTrial;
+
+                const currentPlanNormalized = String(tenant?.subscription_plan || tenant?.plan || "").toLowerCase();
+                const isThisCurrentActivePlan =
+                  !isCurrentTrial &&
+                  (plan.id.toLowerCase() === currentPlanNormalized ||
+                    plan.name.toLowerCase() === currentPlanNormalized ||
+                    (plan.id === "starter" && currentPlanNormalized.includes("starter")) ||
+                    (plan.id === "pro" && currentPlanNormalized.includes("pro")) ||
+                    (plan.id === "enterprise" && (currentPlanNormalized.includes("enterprise") || currentPlanNormalized.includes("entreprise"))));
+
                 const isHighlighted =
                   (plan.tag || "").toLowerCase().includes("popular") ||
                   (plan.tag || "").toLowerCase().includes("escolhido") ||
@@ -680,23 +797,45 @@ export default function TrialBanner({
                 return (
                   <div
                     key={plan.id}
-                    onClick={() => handleSelectPlan(plan.id)}
+                    onClick={() => {
+                      if (!isTrialRestricted) {
+                        handleSelectPlan(plan.id);
+                      } else {
+                        setErrorMessage(
+                          "O retorno ao Plano de Teste é restrito. Somente o SuperAdmin oficial (atendmentor@gmail.com) pode reativar o modo de testes para contas pagantes."
+                        );
+                      }
+                    }}
                     className={`
-                      p-4.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-4 text-left relative
+                      p-4.5 rounded-2xl border transition-all flex flex-col justify-between space-y-4 text-left relative
                       ${
-                        isSelected
-                          ? "bg-amber-950/25 border-amber-500 shadow-xl ring-2 ring-amber-500/50 scale-[1.01]"
-                          : "bg-neutral-950/70 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-950"
+                        isTrialRestricted
+                          ? "bg-neutral-950/40 border-neutral-800/60 opacity-75 cursor-not-allowed"
+                          : isSelected
+                            ? "bg-amber-950/25 border-amber-500 shadow-xl ring-2 ring-amber-500/50 scale-[1.01] cursor-pointer"
+                            : isThisCurrentActivePlan
+                              ? "bg-emerald-950/20 border-emerald-500/50 shadow-md cursor-pointer"
+                              : "bg-neutral-950/70 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-950 cursor-pointer"
                       }
                     `}
                   >
                     {/* Badge / Tag superior */}
-                    {plan.tag && (
+                    {isThisCurrentActivePlan ? (
+                      <span className="text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 w-fit bg-emerald-500 text-neutral-950 absolute -top-2.5 right-4 font-black">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        <span>Seu Plano Atual</span>
+                      </span>
+                    ) : isTrialRestricted ? (
+                      <span className="text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 w-fit bg-neutral-800 text-neutral-400 border border-neutral-700 absolute -top-2.5 right-4 font-black">
+                        <Lock className="w-2.5 h-2.5 text-neutral-400" />
+                        <span>Exclusivo SuperAdmin</span>
+                      </span>
+                    ) : plan.tag ? (
                       <span
                         className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 w-fit ${
                           isHighlighted
                             ? "bg-amber-500 text-neutral-950 absolute -top-2.5 right-4 font-black"
-                            : isTrial
+                            : isPlanTrial
                               ? "bg-blue-600 text-white absolute -top-2.5 right-4 font-black"
                               : "bg-neutral-800 text-neutral-300 font-bold"
                         }`}
@@ -705,11 +844,11 @@ export default function TrialBanner({
                         {isHighlighted && (
                           <Star className="w-2.5 h-2.5 fill-neutral-950 text-neutral-950" />
                         )}
-                        {isTrial && (
+                        {isPlanTrial && (
                           <Sparkles className="w-2.5 h-2.5 fill-white text-white" />
                         )}
                       </span>
-                    )}
+                    ) : null}
 
                     <div className="space-y-1.5 pt-1">
                       <h4 className="text-base font-bold text-white flex items-center gap-1.5">
@@ -735,13 +874,15 @@ export default function TrialBanner({
                       </div>
 
                       <p className="text-[11px] text-neutral-400 leading-tight">
-                        {isTrial
-                          ? "Período de avaliação para testar todas as funcionalidades do sistema."
-                          : plan.maxBarbers >= 999
-                            ? "Barbeiros ilimitados para grandes redes e franquias."
-                            : plan.maxBarbers === 1
-                              ? "Para barbeiros autônomos ou cadeira individual."
-                              : `Para equipes de até ${plan.maxBarbers} profissionais.`}
+                        {isTrialRestricted
+                          ? "Reativação exclusiva pelo SuperAdmin oficial (atendmentor@gmail.com)."
+                          : isPlanTrial
+                            ? "Período de avaliação para testar todas as funcionalidades do sistema."
+                            : plan.maxBarbers >= 999
+                              ? "Barbeiros ilimitados para grandes redes e franquias."
+                              : plan.maxBarbers === 1
+                                ? "Para barbeiros autônomos ou cadeira individual."
+                                : `Para equipes de até ${plan.maxBarbers} profissionais.`}
                       </p>
                     </div>
 
@@ -816,14 +957,28 @@ export default function TrialBanner({
                     <button
                       type="button"
                       onClick={(e) => handleCardButtonClick(plan, e)}
-                      disabled={isFetchingThisLink}
-                      className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                        isSelected
-                          ? "bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/30"
-                          : "bg-neutral-900 text-neutral-300 hover:text-white hover:bg-neutral-800 border border-neutral-800"
+                      disabled={isFetchingThisLink || isTrialRestricted}
+                      className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        isTrialRestricted
+                          ? "bg-neutral-900/80 text-neutral-500 border border-neutral-800 cursor-not-allowed"
+                          : isThisCurrentActivePlan
+                            ? "bg-emerald-900/40 text-emerald-300 border border-emerald-700/50 cursor-default"
+                            : isSelected
+                              ? "bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/30 cursor-pointer"
+                              : "bg-neutral-900 text-neutral-300 hover:text-white hover:bg-neutral-800 border border-neutral-800 cursor-pointer"
                       }`}
                     >
-                      {isFetchingThisLink ? (
+                      {isTrialRestricted ? (
+                        <>
+                          <Lock className="w-3.5 h-3.5 text-neutral-500" />
+                          <span>Restrito ao SuperAdmin</span>
+                        </>
+                      ) : isThisCurrentActivePlan ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Plano Ativo</span>
+                        </>
+                      ) : isFetchingThisLink ? (
                         <>
                           <Spinner size="xs" color="white" />
                           <span>Obtendo link da API...</span>
@@ -834,7 +989,7 @@ export default function TrialBanner({
                           <span>
                             {hasMpLink
                               ? "Selecionado (Link Pronto)"
-                              : isTrial
+                              : isPlanTrial
                                 ? "Selecionado"
                                 : "Selecionado"}
                           </span>
@@ -842,7 +997,7 @@ export default function TrialBanner({
                       ) : (
                         <>
                           <span>
-                            {isTrial
+                            {isPlanTrial
                               ? "Escolher Plano de Teste"
                               : `Escolher ${plan.name}`}
                           </span>

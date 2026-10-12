@@ -112,70 +112,15 @@ export default function CashierPosView({
     };
   }, [initialProducts, onUpdateProducts]);
 
-  // 1. SINCRONIZAÇÃO UNIFICADA: Garante que os atendimentos da agenda (incluindo #apt-179138762174)
-  // estejam visíveis e integrados no Caixa com as comandas de balcão
+  // 1. SINCRONIZAÇÃO UNIFICADA: Comandas de balcão e atendimentos vindos da agenda
   const [comandas, setComandas] = useState(() => {
-    const list = [...sharedComandas];
-
-    // Garante que o atendimento específico #apt-179138762174 esteja sempre mapeado
-    const hasApt179 = list.some((c) => c.id === "apt-179138762174" || c.id === "#apt-179138762174");
-    if (!hasApt179) {
-      list.unshift({
-        id: "apt-179138762174",
-        clientName: "Marcos Oliveira",
-        clientPhone: "(11) 98765-4321",
-        barberName: "Carlos Silva",
-        status: "pending_payment", // Concluído com Status: Pendente no Caixa
-        openedAt: "10:00",
-        isAppointment: true,
-        services: [
-          {
-            id: "serv-4",
-            name: "Acabamento / Pezinho",
-            price: 20,
-            barberCommission: 10,
-          },
-        ],
-        products: [],
-      });
-    }
-
-    return list;
+    return Array.isArray(sharedComandas) ? [...sharedComandas] : [];
   });
 
   // Sincroniza com as comandas do dashboard global ou alterações nos appointments
   useEffect(() => {
-    if (!sharedComandas || sharedComandas.length === 0) return;
-
-    setComandas((prev) => {
-      const mergedMap = new Map();
-      prev.forEach((c) => mergedMap.set(c.id, c));
-      sharedComandas.forEach((c) => mergedMap.set(c.id, { ...mergedMap.get(c.id), ...c }));
-
-      // Garante presença de #apt-179138762174
-      if (!mergedMap.has("apt-179138762174")) {
-        mergedMap.set("apt-179138762174", {
-          id: "apt-179138762174",
-          clientName: "Marcos Oliveira",
-          clientPhone: "(11) 98765-4321",
-          barberName: "Carlos Silva",
-          status: "pending_payment",
-          openedAt: "10:00",
-          isAppointment: true,
-          services: [
-            {
-              id: "serv-4",
-              name: "Acabamento / Pezinho",
-              price: 20,
-              barberCommission: 10,
-            },
-          ],
-          products: [],
-        });
-      }
-
-      return Array.from(mergedMap.values());
-    });
+    if (!sharedComandas) return;
+    setComandas(Array.isArray(sharedComandas) ? [...sharedComandas] : []);
   }, [sharedComandas]);
 
   // Sincroniza status vindo de appointments (ex: se ScheduleView alterou o status)
@@ -394,7 +339,7 @@ export default function CashierPosView({
       id: newCmdId,
       clientName: ticket.clientName,
       clientPhone: ticket.phone,
-      barberName: barbers[0]?.name || "Carlos Silva",
+      barberName: barbers[0]?.name || "Barbeiro",
       status: "open",
       openedAt: new Date().toLocaleTimeString("pt-BR", {
         hour: "2-digit",

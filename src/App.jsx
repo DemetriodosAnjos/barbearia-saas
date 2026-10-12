@@ -82,14 +82,18 @@ export default function App() {
     return USER_ROLES.ANON;
   });
 
-  // Estados Centrais do SaaS
+  // Estados Centrais do SaaS (Carregado com dados reais do banco de dados)
   const [tenant, setTenant] = useState(() =>
     normalizeTenantRecord({
-      id: "a0000000-0000-0000-0000-000000000001",
-      name: "Vintage Club Barber Shop",
-      slug: "vintage-club",
-      plan: "pro",
+      id: "788299e3-a26c-4a0b-bc71-c7ae81ed40d3",
+      name: "Barbearia Dos Anjos",
+      slug: "barbearia-dos-anjos",
+      plan: "starter",
+      subscription_plan: "Starter",
       status: "active",
+      owner_email: "ddoanjos@gmail.com",
+      owner_name: "Demetrio A L dos Anjos",
+      phone: "(41) 99788-4424",
     })
   );
 
@@ -442,64 +446,12 @@ export default function App() {
     return `${y}-${m}-${d}`;
   };
 
-  // Atendimento especificado: #apt-179138762174 concluído de R$ 20,00 com status Pendente
-  const DEFAULT_APPOINTMENT_179138762174 = {
-    id: "apt-179138762174",
-    barberId: "barber-carlos",
-    barberName: "Carlos Silva",
-    clientName: "Marcos Oliveira",
-    clientPhone: "(11) 98765-4321",
-    serviceName: "Acabamento / Pezinho",
-    date: getTodayLocalYMD(),
-    startTime: "10:00",
-    endTime: "10:20",
-    durationMinutes: 20,
-    price: 20,
-    status: "completed", // Atendimento Concluído
-    isPaid: false,       // Pagamento Pendente
-    isVip: false,
-    notes: "Acabamento navalhado. Atendimento concluído pelo barbeiro, pagamento pendente no caixa.",
-  };
-
   const [services, setServices] = useState([]);
   const [products, setProducts] = useState([]);
   const [barbers, setBarbers] = useState([]);
   const [clients, setClients] = useState([]);
-  const [appointments, setAppointments] = useState([DEFAULT_APPOINTMENT_179138762174]);
-  const [comandas, setComandas] = useState([
-    {
-      id: "apt-179138762174",
-      clientName: "Marcos Oliveira",
-      clientPhone: "(11) 98765-4321",
-      barberName: "Carlos Silva",
-      status: "pending_payment",
-      openedAt: "10:00",
-      isAppointment: true,
-      services: [
-        {
-          id: "serv-4",
-          name: "Acabamento / Pezinho",
-          price: 20,
-          barberCommission: 10,
-        },
-      ],
-      products: [],
-    },
-    {
-      id: "CMD-1042",
-      clientName: "Ricardo Almeida",
-      clientPhone: "(11) 99881-2233",
-      barberName: "Lucas Rocha",
-      status: "open",
-      openedAt: "10:15",
-      services: [
-        { id: "s-1", name: "Corte Degradê", price: 50, barberCommission: 25 },
-      ],
-      products: [
-        { id: "p-3", name: "Cerveja Heineken Long Neck 330ml", quantity: 2, unitPrice: 12, total: 24, sellerCommission: 2.4 },
-      ],
-    },
-  ]);
+  const [appointments, setAppointments] = useState([]);
+  const [comandas, setComandas] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [connectionError, setConnectionError] = useState(null);
   const [contractNotice, setContractNotice] = useState(null);
@@ -578,78 +530,18 @@ export default function App() {
       if (clientsRes?.data) {
         setClients(clientsRes.data);
       }
-      const rawAppts = appointmentsResult.data || [];
-      const hasTarget = rawAppts.some((a) => a.id === "apt-179138762174" || a.id === "#apt-179138762174");
-      const mergedAppts = hasTarget ? rawAppts : [DEFAULT_APPOINTMENT_179138762174, ...rawAppts];
-      setAppointments(mergedAppts);
+      setServices(servicesResult.data || []);
+      setBarbers(barbersResult.data || []);
+      if (clientsRes?.data) {
+        setClients(clientsRes.data);
+      }
+      setAppointments(appointmentsResult.data || []);
 
       if (productsRes?.data && productsRes.data.length > 0) {
         const productsResult = validateProductsContract(productsRes.data);
-        setProducts(productsResult.data);
+        setProducts(productsResult.data || []);
       } else {
-        const fallbackProducts = [
-          {
-            id: "prod-1",
-            barbershop_id: "a0000000-0000-0000-0000-000000000001",
-            name: "Pomada Modeladora Efeito Matte 150g",
-            category: "Vitrine",
-            icon: "product",
-            costPrice: 22,
-            price: 45,
-            stock: 24,
-            commissionPercent: 10,
-            active: true,
-          },
-          {
-            id: "prod-2",
-            barbershop_id: "a0000000-0000-0000-0000-000000000001",
-            name: "Óleo Hidratante para Barba 30ml",
-            category: "Vitrine",
-            icon: "product",
-            costPrice: 18,
-            price: 38,
-            stock: 15,
-            commissionPercent: 10,
-            active: true,
-          },
-          {
-            id: "prod-3",
-            barbershop_id: "a0000000-0000-0000-0000-000000000001",
-            name: "Cerveja Heineken Long Neck 330ml",
-            category: "Bar",
-            icon: "beer",
-            costPrice: 6,
-            price: 12,
-            stock: 48,
-            commissionPercent: 5,
-            active: true,
-          },
-          {
-            id: "prod-4",
-            barbershop_id: "a0000000-0000-0000-0000-000000000001",
-            name: "Água Mineral com Gás 500ml",
-            category: "Bar",
-            icon: "beer",
-            costPrice: 2,
-            price: 5,
-            stock: 60,
-            commissionPercent: 5,
-            active: true,
-          },
-          {
-            id: "prod-5",
-            barbershop_id: "a0000000-0000-0000-0000-000000000001",
-            name: "Refrigerante Coca-Cola Lata 350ml",
-            category: "Bar",
-            icon: "beer",
-            costPrice: 3.5,
-            price: 7,
-            stock: 36,
-            commissionPercent: 5,
-            active: true,
-          },
-        ];
-        setProducts(fallbackProducts);
+        setProducts([]);
       }
 
       if (servicesResult.isPartial || barbersResult.isPartial || appointmentsResult.isPartial) {
@@ -659,38 +551,12 @@ export default function App() {
         );
       }
     } catch (error) {
-      console.warn("Supabase não acessível ou em modo offline, aplicando fallback tolerante:", error);
-      const fallbackServices = [
-        { id: "serv-1", name: "Corte Tradicional / Degradê", category: "Cabelo", durationMinutes: 40, price: 45, active: true },
-        { id: "serv-2", name: "Barba Completa com Toalha Quente", category: "Barba", durationMinutes: 30, price: 35, active: true },
-        { id: "serv-3", name: "Combo Cabelo + Barba Premium", category: "Combo", durationMinutes: 60, price: 70, active: true },
-        { id: "serv-4", name: "Acabamento / Pezinho", category: "Cabelo", durationMinutes: 20, price: 20, active: true },
-        { id: "serv-5", name: "Sobrancelha Navalhada", category: "Estética", durationMinutes: 15, price: 15, active: true },
-      ];
-      const fallbackProducts = [
-        { id: "prod-1", barbershop_id: "a0000000-0000-0000-0000-000000000001", name: "Pomada Modeladora Efeito Matte 150g", category: "Vitrine", icon: "product", costPrice: 22, price: 45, stock: 24, commissionPercent: 10, active: true },
-        { id: "prod-2", barbershop_id: "a0000000-0000-0000-0000-000000000001", name: "Óleo Hidratante para Barba 30ml", category: "Vitrine", icon: "product", costPrice: 18, price: 38, stock: 15, commissionPercent: 10, active: true },
-        { id: "prod-3", barbershop_id: "a0000000-0000-0000-0000-000000000001", name: "Cerveja Heineken Long Neck 330ml", category: "Bar", icon: "beer", costPrice: 6, price: 12, stock: 48, commissionPercent: 5, active: true },
-        { id: "prod-4", barbershop_id: "a0000000-0000-0000-0000-000000000001", name: "Água Mineral com Gás 500ml", category: "Bar", icon: "beer", costPrice: 2, price: 5, stock: 60, commissionPercent: 5, active: true },
-        { id: "prod-5", barbershop_id: "a0000000-0000-0000-0000-000000000001", name: "Refrigerante Coca-Cola Lata 350ml", category: "Bar", icon: "beer", costPrice: 3.5, price: 7, stock: 36, commissionPercent: 5, active: true },
-      ];
-      const fallbackBarbers = [
-        { id: "barber-carlos", name: "Carlos Silva", displayName: "Carlos", role: "Master Barber", avatar: "CS", rating: 4.9, reviewCount: 88, status: "active", specialties: ["Degradê", "Barba Terapia"] },
-        { id: "barber-lucas", name: "Lucas Rocha", displayName: "Lucas", role: "Barbeiro Sênior", avatar: "LR", rating: 4.8, reviewCount: 64, status: "active", specialties: ["Corte Social", "Pigmentação"] },
-        { id: "barber-andre", name: "André Santos", displayName: "André", role: "Especialista em Barba", avatar: "AS", rating: 4.7, reviewCount: 42, status: "active", specialties: ["Navalhado", "Toalha Quente"] },
-      ];
-      const fallbackAppointments = [
-        DEFAULT_APPOINTMENT_179138762174,
-        { id: "apt-1", barberId: "barber-carlos", barberName: "Carlos Silva", clientName: "João Pedro", clientPhone: "(11) 98765-4321", serviceName: "Corte Tradicional", date: getTodayLocalYMD(), startTime: "09:00", endTime: "09:40", durationMinutes: 40, price: 45, status: "confirmed", isPaid: true, isVip: false },
-        { id: "apt-2", barberId: "barber-lucas", barberName: "Lucas Rocha", clientName: "Mateus Costa", clientPhone: "(11) 91234-5678", serviceName: "Barba Completa", date: getTodayLocalYMD(), startTime: "10:00", endTime: "10:30", durationMinutes: 30, price: 35, status: "confirmed", isPaid: false, isVip: true },
-      ];
-
-      setServices(fallbackServices);
-      setProducts(fallbackProducts);
-      setBarbers(fallbackBarbers);
-      setAppointments(fallbackAppointments);
+      console.warn("Aviso ao carregar dados do Supabase:", error);
+      setServices([]);
+      setProducts([]);
+      setBarbers([]);
+      setAppointments([]);
       setConnectionError(null);
-      setContractNotice("Modo Resiliente: Catálogo de contingência carregado com sucesso.");
     } finally {
       setLoadingData(false);
     }
@@ -704,7 +570,7 @@ export default function App() {
   const handleClientBookingFinished = (bookingData) => {
     const createdAppointment = {
       id: `apt-${Date.now()}`,
-      barberId: bookingData.barberId || "barber-carlos",
+      barberId: bookingData.barberId || "",
       barberName: bookingData.barberName,
       clientName: bookingData.clientName,
       clientPhone: bookingData.clientPhone,
@@ -851,7 +717,7 @@ export default function App() {
                     user_metadata: {
                       name: "Carlos Gestor",
                       role: USER_ROLES.ADMIN,
-                      barbershop_name: tenant?.name || "Vintage Club Barber Shop",
+                      barbershop_name: tenant?.name || "Barbearia",
                     },
                   });
                 }

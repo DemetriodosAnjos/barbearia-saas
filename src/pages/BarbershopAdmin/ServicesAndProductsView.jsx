@@ -148,18 +148,12 @@ export default function ServicesAndProductsView({
           if (onUpdateProducts) {
             onUpdateProducts(mapped);
           }
-        } else if (isMounted && (!initialProducts || initialProducts.length === 0)) {
-          // Fallback resiliente com produtos essenciais se o banco estiver vazio
-          const fallback = [
-            { id: "prod-1", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Pomada Modeladora Efeito Matte 150g", category: "Vitrine", icon: "product", costPrice: 22, price: 45, stock: 24, commissionPercent: 10, active: true },
-            { id: "prod-2", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Óleo Hidratante para Barba 30ml", category: "Vitrine", icon: "product", costPrice: 18, price: 38, stock: 15, commissionPercent: 10, active: true },
-            { id: "prod-3", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Cerveja Heineken Long Neck 330ml", category: "Bar", icon: "beer", costPrice: 6, price: 12, stock: 48, commissionPercent: 5, active: true },
-            { id: "prod-4", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Água Mineral com Gás 500ml", category: "Bar", icon: "beer", costPrice: 2, price: 5, stock: 60, commissionPercent: 5, active: true },
-            { id: "prod-5", barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001", name: "Refrigerante Coca-Cola Lata 350ml", category: "Bar", icon: "beer", costPrice: 3.5, price: 7, stock: 36, commissionPercent: 5, active: true },
-          ];
-          setLocalProducts(fallback);
+        } else if (isMounted) {
+          // Quando não há produtos no banco, mantém lista limpa real (sem mocks falsos)
+          const realList = initialProducts && initialProducts.length > 0 ? initialProducts : [];
+          setLocalProducts(realList);
           if (onUpdateProducts) {
-            onUpdateProducts(fallback);
+            onUpdateProducts(realList);
           }
         }
       } catch (err) {

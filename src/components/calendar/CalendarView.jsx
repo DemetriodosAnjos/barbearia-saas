@@ -811,7 +811,7 @@ export default function CalendarView({
                   const clientPhone =
                     appt.clientPhone || appt.client_phone || "";
                   const serviceName =
-                    appt.serviceName || appt.service_name || "Corte Tradicional";
+                    appt.serviceName || appt.service_name || "Serviço";
                   const startTime =
                     appt.startTime || appt.start_time || "09:00";
                   const endTime = appt.endTime || appt.end_time || "09:30";
