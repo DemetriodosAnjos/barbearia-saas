@@ -34,6 +34,12 @@ import {
   User,
   Check,
   ExternalLink,
+  Scissors,
+  Crown,
+  Smartphone,
+  ClipboardList,
+  Palette,
+  ShieldCheck,
 } from "lucide-react";
 
 import {
@@ -49,6 +55,12 @@ export { GOOGLE_SSO_MESSAGES };
 export default function Login({
   onLoginSuccess,
   onGoToSignup, // Redireciona para o Onboarding
+  onGoToBarbershop,
+  onGoToSuperAdmin,
+  onGoToClientApp,
+  onGoToQuiz,
+  onGoToDesignSystem,
+  onGoToQAPanel,
 }) {
   // 1. Campos de Login
   const [email, setEmail] = useState("");
@@ -836,6 +848,128 @@ export default function Login({
             Criar conta grátis
           </span>
         </p>
+
+        {/* 4. ACESSO AOS MÓDULOS DO SAAS (A partir da tela de login, navegação aos módulos) */}
+        {(onGoToBarbershop || onGoToSuperAdmin || onGoToClientApp || onGoToQuiz) && (
+          <div className="pt-2 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-neutral-800" />
+              <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
+                Acesso aos Módulos
+              </span>
+              <div className="h-px flex-1 bg-neutral-800" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {/* Painel da Barbearia */}
+              {onGoToBarbershop && (
+                <button
+                  type="button"
+                  onClick={onGoToBarbershop}
+                  className="p-2.5 rounded-xl bg-neutral-900/90 hover:bg-neutral-850 border border-neutral-800 hover:border-amber-500/40 text-neutral-200 transition-all flex items-center gap-2.5 text-left group cursor-pointer shadow-sm"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-amber-500/20">
+                    <Scissors className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white group-hover:text-amber-400 transition-colors flex items-center justify-between">
+                      <span>Painel Barbearia</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-amber-400 transition-colors" />
+                    </div>
+                    <p className="text-[10px] text-neutral-400 truncate">Gestão, agenda e comandas</p>
+                  </div>
+                </button>
+              )}
+
+              {/* Painel SuperAdmin */}
+              {onGoToSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={onGoToSuperAdmin}
+                  className="p-2.5 rounded-xl bg-neutral-900/90 hover:bg-neutral-850 border border-neutral-800 hover:border-amber-500/40 text-neutral-200 transition-all flex items-center gap-2.5 text-left group cursor-pointer shadow-sm"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-amber-500/20">
+                    <Crown className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white group-hover:text-amber-400 transition-colors flex items-center justify-between">
+                      <span>SuperAdmin</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-amber-400 transition-colors" />
+                    </div>
+                    <p className="text-[10px] text-neutral-400 truncate">Planos, barbearias e métricas</p>
+                  </div>
+                </button>
+              )}
+
+              {/* App do Cliente */}
+              {onGoToClientApp && (
+                <button
+                  type="button"
+                  onClick={onGoToClientApp}
+                  className="p-2.5 rounded-xl bg-neutral-900/90 hover:bg-neutral-850 border border-neutral-800 hover:border-amber-500/40 text-neutral-200 transition-all flex items-center gap-2.5 text-left group cursor-pointer shadow-sm"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-amber-500/20">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white group-hover:text-amber-400 transition-colors flex items-center justify-between">
+                      <span>App do Cliente</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-amber-400 transition-colors" />
+                    </div>
+                    <p className="text-[10px] text-neutral-400 truncate">Agendar corte e serviços</p>
+                  </div>
+                </button>
+              )}
+
+              {/* Quiz Onboarding */}
+              {onGoToQuiz && (
+                <button
+                  type="button"
+                  onClick={onGoToQuiz}
+                  className="p-2.5 rounded-xl bg-neutral-900/90 hover:bg-neutral-850 border border-neutral-800 hover:border-amber-500/40 text-neutral-200 transition-all flex items-center gap-2.5 text-left group cursor-pointer shadow-sm"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-amber-500/20">
+                    <ClipboardList className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white group-hover:text-amber-400 transition-colors flex items-center justify-between">
+                      <span>Quiz Onboarding</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-amber-400 transition-colors" />
+                    </div>
+                    <p className="text-[10px] text-neutral-400 truncate">Dono com equipe vs. Solo</p>
+                  </div>
+                </button>
+              )}
+            </div>
+
+            {/* Links para ferramentas adicionais (UI Kit e QA) */}
+            <div className="flex items-center justify-center gap-4 pt-1 text-[11px] text-neutral-400">
+              {onGoToDesignSystem && (
+                <button
+                  type="button"
+                  onClick={onGoToDesignSystem}
+                  className="hover:text-neutral-200 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Palette className="w-3 h-3" />
+                  <span>UI Kit / Design System</span>
+                </button>
+              )}
+              {onGoToDesignSystem && onGoToQAPanel && (
+                <span className="text-neutral-700">•</span>
+              )}
+              {onGoToQAPanel && (
+                <button
+                  type="button"
+                  onClick={onGoToQAPanel}
+                  className="hover:text-neutral-200 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>QA & DevSecOps</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ======================================================== */}

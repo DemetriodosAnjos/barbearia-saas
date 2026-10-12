@@ -52,7 +52,7 @@ import Divider from "../components/ui/Divider";
 import Table from "../components/ui/Table";
 import ProjectIcon, { ICON_MAP, PROJECT_ICON_CATALOG } from "../components/ui/ProjectIcon";
 
-export default function DesignSystem() {
+export default function DesignSystem({ onGoToLogin }) {
   // Estados da Galeria de Ícones Oficiais (SVG lucide-react com Paleta Âmbar Nobre)
   const [iconCategory, setIconCategory] = useState("ALL");
   const [iconSearch, setIconSearch] = useState("");
@@ -965,11 +965,24 @@ export default function DesignSystem() {
       <div className={designSystemStyles.container}>
         {/* Cabeçalho da Documentação */}
         <header className={designSystemStyles.header}>
-          <h1 className={designSystemStyles.title}>Design System & UI Kit</h1>
-          <p className={designSystemStyles.subtitle}>
-            Catálogo de componentes reutilizáveis para o SaaS de Barbearias e
-            Salões.
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className={designSystemStyles.title}>Design System & UI Kit</h1>
+              <p className={designSystemStyles.subtitle}>
+                Catálogo de componentes reutilizáveis para o SaaS de Barbearias e
+                Salões.
+              </p>
+            </div>
+            {onGoToLogin && (
+              <button
+                type="button"
+                onClick={onGoToLogin}
+                className="self-start sm:self-auto px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold flex items-center gap-2 cursor-pointer border border-neutral-700 hover:border-amber-500/50 transition-all"
+              >
+                <span>← Voltar ao Login</span>
+              </button>
+            )}
+          </div>
         </header>
 
         {/* ======================================================== */}

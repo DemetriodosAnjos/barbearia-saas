@@ -44,6 +44,7 @@ export default function ClientBookingView({
   initialClientName = "",
   initialClientPhone = "",
   onFinishBooking,
+  onGoToLogin,
 }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
@@ -265,6 +266,23 @@ export default function ClientBookingView({
 
   return (
     <div className={clientBookingStyles.pageWrapper}>
+      {onGoToLogin && (
+        <div className="bg-neutral-950/95 border-b border-neutral-800 px-4 py-2 flex items-center justify-between text-xs text-neutral-400">
+          <div className="flex items-center gap-1.5 font-medium text-neutral-300">
+            <ProjectIcon name="Scissors" size={14} colorVariant="amber" />
+            <span>{tenant?.name || "Barbearia"}</span>
+            <span className="text-neutral-500 hidden sm:inline">• Agendamento Online</span>
+          </div>
+          <button
+            type="button"
+            onClick={onGoToLogin}
+            className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <span>Área da Barbearia / Login</span>
+            <span>→</span>
+          </button>
+        </div>
+      )}
       <Navbar
         variant="client"
         user={{

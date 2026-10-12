@@ -1,6 +1,5 @@
 import ProjectIcon from "./components/ui/ProjectIcon";
 import { useState, useEffect, useCallback } from "react";
-import { LogIn, Crown } from "lucide-react";
 import {
   supabase,
   buildTenantRecordPayload,
@@ -55,19 +54,6 @@ export default function App() {
   })();
 
   const [currentScreen, setCurrentScreen] = useState(initialScreen);
-  const [activeNavButton, setActiveNavButton] = useState(() =>
-    initialScreen === "superadmin" ? "superadmin" : "login"
-  );
-
-  useEffect(() => {
-    if (currentScreen === "superadmin") {
-      setActiveNavButton("superadmin");
-    } else if (currentScreen === "login") {
-      setActiveNavButton("login");
-    } else if (currentScreen === "onboarding-quiz") {
-      setActiveNavButton("quiz");
-    }
-  }, [currentScreen]);
 
   const handleNavigate = useCallback((screenId) => {
     setCurrentScreen(screenId);
@@ -598,104 +584,70 @@ export default function App() {
     setAppointments((prev) => [...prev, createdAppointment]);
   };
 
-  const showDevNav = urlParams.get("dev") !== "false";
+  // Handlers para navegação limpa a partir da tela de login para os outros módulos
+  const handleGoToBarbershop = useCallback(() => {
+    setActiveUserRole(USER_ROLES.ADMIN);
+    if (!currentUser) {
+      setCurrentUser({
+        id: "owner-usr-01",
+        email: tenant?.owner_email || "ddoanjos@gmail.com",
+        user_metadata: {
+          name: tenant?.owner_name || "Demetrio A L dos Anjos",
+          role: USER_ROLES.ADMIN,
+          barbershop_name: tenant?.name || "Barbearia Dos Anjos",
+        },
+      });
+    }
+    setCurrentScreen("barbershop");
+  }, [currentUser, tenant]);
+
+  const handleGoToSuperAdmin = useCallback(() => {
+    setActiveUserRole(USER_ROLES.SUPERADMIN);
+    if (!currentUser) {
+      setCurrentUser({
+        id: "superadmin-usr-01",
+        email: "atendmentor@gmail.com",
+        user_metadata: {
+          name: "SuperAdmin Master",
+          role: USER_ROLES.SUPERADMIN,
+        },
+      });
+    }
+    setCurrentScreen("superadmin");
+  }, [currentUser]);
+
+  const handleGoToClientApp = useCallback(() => {
+    setCurrentScreen("client-app");
+  }, []);
+
+  const handleGoToQuiz = useCallback(() => {
+    setCurrentScreen("onboarding-quiz");
+  }, []);
+
+  const handleGoToOnboarding = useCallback(() => {
+    setCurrentScreen("onboarding");
+  }, []);
+
+  const handleGoToDesignSystem = useCallback(() => {
+    setActiveUserRole(USER_ROLES.ADMIN);
+    setCurrentScreen("design-system");
+  }, []);
+
+  const handleGoToQAPanel = useCallback(() => {
+    setActiveUserRole(USER_ROLES.SUPERADMIN);
+    setCurrentScreen("qa-panel");
+  }, []);
+
+  const handleGoToLogin = useCallback(() => {
+    setCurrentScreen("login");
+  }, []);
+
+  // Barra de ferramentas Dev apenas quando explicitamente requisitada via ?dev=true na URL
+  const showDevNav = urlParams.get("dev") === "true";
 
   return (
     <div className="min-h-screen bg-neutral-900 text-neutral-100 flex flex-col">
-      {/* Barra de Navegação Principal do SaaS */}
-      <header className="bg-neutral-950/95 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 px-4 py-3 sm:px-6 shadow-lg select-none">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          {/* Identidade Visual / Marca */}
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 shadow-xs">
-              <ProjectIcon name="Scissors" size={20} colorVariant="inherit" />
-            </div>
-            <div>
-              <div className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Barbearia SaaS</span>
-                <span className="text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                  v1.5.2.0
-                </span>
-              </div>
-              <p className="text-[11px] text-neutral-400 hidden sm:block">
-                Sistema de Gestão & Agendamentos
-              </p>
-            </div>
-          </div>
-
-          {/* Botões de Navegação Solicitados (Quiz Onboarding, Login & SuperAdmin) */}
-          <nav className="flex items-center gap-2 sm:gap-3">
-            {/* BOTÃO: Quiz Onboarding (Fluxo de Definição de Personas) */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveNavButton("quiz");
-                setCurrentScreen("onboarding-quiz");
-              }}
-              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-200 cursor-pointer ${
-                activeNavButton === "quiz"
-                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/25"
-                  : "bg-transparent hover:bg-amber-500/10 text-amber-500 border-[1.5px] border-amber-500"
-              }`}
-            >
-              <ProjectIcon
-                name="ClipboardList"
-                size={16}
-                colorVariant={activeNavButton === "quiz" ? "inherit" : "amber"}
-              />
-              <span className={activeNavButton === "quiz" ? "text-white" : "text-amber-500"}>
-                Quiz Onboarding
-              </span>
-            </button>
-
-            {/* BOTÃO: Login (carrega a tela de Login) */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveNavButton("login");
-                setActiveUserRole(USER_ROLES.ANON);
-                setCurrentScreen("login");
-              }}
-              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-200 cursor-pointer ${
-                activeNavButton === "login"
-                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/25"
-                  : "bg-transparent hover:bg-amber-500/10 text-amber-500 border-[1.5px] border-amber-500"
-              }`}
-            >
-              <LogIn
-                className={`w-4 h-4 shrink-0 transition-colors ${
-                  activeNavButton === "login" ? "text-white" : "text-amber-500"
-                }`}
-              />
-              <span className={activeNavButton === "login" ? "text-white" : "text-amber-500"}>Login</span>
-            </button>
-
-            {/* BOTÃO: SuperAdmin (Carrega a tela SuperAdmin) */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveNavButton("superadmin");
-                setActiveUserRole(USER_ROLES.SUPERADMIN);
-                setCurrentScreen("superadmin");
-              }}
-              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-200 cursor-pointer ${
-                activeNavButton === "superadmin"
-                  ? "bg-amber-500 hover:bg-amber-600 text-white border-[1.5px] border-amber-500 shadow-md shadow-amber-500/25"
-                  : "bg-transparent hover:bg-amber-500/10 text-amber-500 border-[1.5px] border-amber-500"
-              }`}
-            >
-              <Crown
-                className={`w-4 h-4 shrink-0 transition-colors ${
-                  activeNavButton === "superadmin" ? "text-white" : "text-amber-500"
-                }`}
-              />
-              <span className={activeNavButton === "superadmin" ? "text-white" : "text-amber-500"}>SuperAdmin</span>
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Barra de Navegação Central do SaaS (Sempre visível para alternância fluida entre módulos) */}
+      {/* Barra de Navegação Central do SaaS (Ativada apenas em modo de desenvolvimento explícito ?dev=true) */}
       {showDevNav && (
       <div className="bg-neutral-900 border-b border-neutral-800 p-2.5 flex flex-wrap items-center justify-between gap-3 text-xs z-50 sticky top-0 shadow-lg select-none">
         <div className="flex flex-wrap items-center gap-2">
@@ -871,6 +823,7 @@ export default function App() {
               services={services}
               barbers={barbers}
               onFinishBooking={handleClientBookingFinished}
+              onGoToLogin={handleGoToLogin}
             />
           </ErrorBoundary>
         )}
@@ -997,11 +950,17 @@ export default function App() {
           </ErrorBoundary>
         )}
 
-        {/* 5. LOGIN: Autenticação de usuários */}
+        {/* 5. LOGIN: Autenticação de usuários e hub de acesso aos módulos */}
         {currentScreen === "login" && (
           <ErrorBoundary componentName="Tela de Login">
             <Login
-              onGoToSignup={() => setCurrentScreen("onboarding")}
+              onGoToSignup={handleGoToOnboarding}
+              onGoToBarbershop={handleGoToBarbershop}
+              onGoToSuperAdmin={handleGoToSuperAdmin}
+              onGoToClientApp={handleGoToClientApp}
+              onGoToQuiz={handleGoToQuiz}
+              onGoToDesignSystem={handleGoToDesignSystem}
+              onGoToQAPanel={handleGoToQAPanel}
               onLoginSuccess={async (loggedUser) => {
                 const userEmail = (
                   loggedUser?.email ||
@@ -1025,7 +984,7 @@ export default function App() {
                   setCurrentUser(superAdminUser);
                   setActiveUserRole(USER_ROLES.SUPERADMIN);
                   await resolveAndSyncUserTenant(superAdminUser);
-                  setCurrentScreen("barbershop");
+                  setCurrentScreen("superadmin");
                   return;
                 }
 
@@ -1064,7 +1023,7 @@ export default function App() {
         {/* 6. DESIGN SYSTEM: Catálogo de componentes UI e tokens de design */}
         {currentScreen === "design-system" && (
           <ErrorBoundary componentName="Design System / UI Kit">
-            <DesignSystem />
+            <DesignSystem onGoToLogin={handleGoToLogin} />
           </ErrorBoundary>
         )}
 

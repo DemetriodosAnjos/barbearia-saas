@@ -24,6 +24,7 @@ export const loginStyles = {
   // Card do Formulário
   cardForm:
     "bg-neutral-900/90 border border-neutral-800 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl backdrop-blur-md",
+  cardHeaderCentered: "flex flex-col items-center text-center space-y-1 mb-2",
   formHeader: "space-y-1",
   formTitle: "text-lg font-black text-white",
   formSubtitle: "text-xs text-neutral-300 leading-relaxed",
