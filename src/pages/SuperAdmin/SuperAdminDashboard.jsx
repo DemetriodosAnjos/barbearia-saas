@@ -343,12 +343,27 @@ export default function SuperAdminDashboard({
       await supabase
         .from("barbershops")
         .update({
-          plan: "trial",
-          subscription_plan: "Plano de Teste",
+          subscription_plan: "trial",
+          payment_status: "trial",
           trial_ends_at: newTrialDate.toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", targetId);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("saas:tenant-plan-updated", {
+            detail: {
+              tenantId: targetId,
+              plan: "trial",
+              subscription_plan: "Plano de Teste",
+              status: "trial",
+              trial_days_left: newDaysLeft,
+              trial_ends_at: newTrialDate.toISOString(),
+            },
+          })
+        );
+      }
 
       try {
         const cachedRaw = safeStorage.getItem("saas_active_tenant");
@@ -467,35 +482,65 @@ export default function SuperAdminDashboard({
     );
 
     try {
+      const tenantPayload = {
+        plan: chosenPlan,
+        status: newStatus,
+        payment_status: isChangingToTrial ? "trial" : "paid",
+        mrr: newMrr,
+        trial_days_left: newTrialDaysLeft,
+        trial_ends_at: newTrialEndsAt,
+        updated_at: new Date().toISOString(),
+      };
+
       const { error: tenantError } = await supabase
         .from("tenants")
-        .update({
-          plan: chosenPlan,
-          status: newStatus,
-          mrr: newMrr,
-          trial_days_left: newTrialDaysLeft,
-          trial_ends_at: newTrialEndsAt,
-          updated_at: new Date().toISOString(),
-        })
+        .update(tenantPayload)
         .eq("id", targetId);
 
       if (tenantError) {
         console.warn("Aviso ao atualizar tabela tenants no Supabase:", tenantError);
       }
 
+      // ATENÇÃO: a coluna 'plan' em barbershops possui check constraint ('starter', 'pro', 'enterprise').
+      // Para o plano Trial, gravamos subscription_plan: 'trial' e payment_status: 'trial'.
+      const barbershopPayload = isChangingToTrial
+        ? {
+            subscription_plan: "trial",
+            payment_status: "trial",
+            trial_ends_at: newTrialEndsAt,
+            updated_at: new Date().toISOString(),
+          }
+        : {
+            plan: chosenPlan,
+            subscription_plan: newSubscriptionPlan,
+            payment_status: "paid",
+            trial_ends_at: null,
+            updated_at: new Date().toISOString(),
+          };
+
       const { error: shopError } = await supabase
         .from("barbershops")
-        .update({
-          plan: chosenPlan,
-          subscription_plan: newSubscriptionPlan,
-          status: newStatus,
-          trial_ends_at: newTrialEndsAt,
-          updated_at: new Date().toISOString(),
-        })
+        .update(barbershopPayload)
         .eq("id", targetId);
 
       if (shopError) {
         console.warn("Aviso ao atualizar tabela barbershops no Supabase:", shopError);
+      }
+
+      // Dispara evento global para componentes locais (BarbershopDashboard e Sidebar) atualizarem instantaneamente
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("saas:tenant-plan-updated", {
+            detail: {
+              tenantId: targetId,
+              plan: chosenPlan,
+              subscription_plan: newSubscriptionPlan,
+              status: newStatus,
+              trial_days_left: newTrialDaysLeft,
+              trial_ends_at: newTrialEndsAt,
+            },
+          })
+        );
       }
 
       try {
@@ -508,6 +553,7 @@ export default function SuperAdminDashboard({
               plan: chosenPlan,
               subscription_plan: newSubscriptionPlan,
               status: newStatus,
+              payment_status: isChangingToTrial ? "trial" : "paid",
               trial_days_left: newTrialDaysLeft,
               trialDaysLeft: newTrialDaysLeft,
               trial_ends_at: newTrialEndsAt,

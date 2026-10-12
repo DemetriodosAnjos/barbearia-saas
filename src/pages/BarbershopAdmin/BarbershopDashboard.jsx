@@ -72,22 +72,22 @@ export default function BarbershopDashboard({
         : (tenant?.trialDaysLeft ?? 7))
     : 0;
 
-  // Sincroniza o status ativo do plano da barbearia a partir do Supabase na inicialização
+  // Sincroniza o status ativo do plano da barbearia a partir do Supabase e escuta alterações em tempo real
   useEffect(() => {
     let isMounted = true;
-    const tenantId = tenant?.id || "a0000000-0000-0000-0000-000000000001";
+    const tenantId = tenant?.id || "788299e3-a26c-4a0b-bc71-c7ae81ed40d3";
 
     async function syncTenantPlanFromSupabase() {
       try {
         const [bRes, tRes] = await Promise.all([
           supabase
             .from("barbershops")
-            .select("subscription_plan, plan, trial_ends_at")
+            .select("subscription_plan, plan, trial_ends_at, payment_status")
             .eq("id", tenantId)
             .maybeSingle(),
           supabase
             .from("tenants")
-            .select("plan, status, trial_days_left, trial_ends_at, mrr")
+            .select("plan, status, trial_days_left, trial_ends_at, mrr, payment_status")
             .eq("id", tenantId)
             .maybeSingle(),
         ]);
@@ -95,56 +95,77 @@ export default function BarbershopDashboard({
         const bData = bRes?.data;
         const tData = tRes?.data;
 
-        // Avalia se o registro no banco indica trial ou plano pago
-        const rawSubPlan = bData?.subscription_plan || tenant?.subscription_plan || "";
-        const rawPlan = tData?.plan || bData?.plan || tenant?.plan || "";
-        const combinedPlanStr = `${rawSubPlan} ${rawPlan}`.toLowerCase().trim();
+        const bSubPlan = String(bData?.subscription_plan || "").toLowerCase().trim();
+        const tPlan = String(tData?.plan || "").toLowerCase().trim();
+        const tStatus = String(tData?.status || "").toLowerCase().trim();
+        const bPaymentStatus = String(bData?.payment_status || "").toLowerCase().trim();
+        const tPaymentStatus = String(tData?.payment_status || "").toLowerCase().trim();
 
-        const isPaidPlan =
-          combinedPlanStr.includes("starter") ||
-          combinedPlanStr.includes("pro") ||
-          combinedPlanStr.includes("enterprise") ||
-          combinedPlanStr.includes("entreprise") ||
-          combinedPlanStr.includes("solo") ||
-          combinedPlanStr.includes("franquia");
-
-        const isDbTrial = !isPaidPlan && (
-          tData?.status === "trial" ||
-          combinedPlanStr.includes("trial") ||
-          combinedPlanStr.includes("teste")
-        );
+        // Se barbershops ou tenants indicarem modo trial, a prioridade absoluta é TRIAL
+        const isDbTrial =
+          bSubPlan === "trial" ||
+          bSubPlan.includes("teste") ||
+          tPlan === "trial" ||
+          tPlan.includes("teste") ||
+          tStatus === "trial" ||
+          bPaymentStatus === "trial" ||
+          tPaymentStatus === "trial";
 
         if (isMounted && onUpdateTenant) {
-          if (isPaidPlan) {
-            const resolvedPlanName =
-              bData?.subscription_plan ||
-              (rawPlan.includes("starter") || rawPlan.includes("solo")
-                ? "Starter"
-                : rawPlan.includes("enterprise")
-                  ? "Entreprise"
-                  : "Pro");
+          if (isDbTrial) {
+            const trialDays = Number(tData?.trial_days_left ?? 7);
+            const trialEnds = tData?.trial_ends_at || bData?.trial_ends_at;
 
-            onUpdateTenant({
-              ...tenant,
-              plan: tData?.plan || bData?.plan || "starter",
-              subscription_plan: resolvedPlanName,
-              status: "active",
-              trialDaysLeft: 0,
-              trial_days_left: 0,
-              trial_ends_at: null,
-              trialEndsAt: null,
-            });
-          } else if (isDbTrial) {
-            onUpdateTenant({
+            const updated = {
               ...tenant,
               plan: "trial",
               subscription_plan: "Plano de Teste",
               status: "trial",
-              trialDaysLeft: Number(tData?.trial_days_left ?? 7),
-              trial_days_left: Number(tData?.trial_days_left ?? 7),
-              trial_ends_at: tData?.trial_ends_at || bData?.trial_ends_at,
-              trialEndsAt: tData?.trial_ends_at || bData?.trial_ends_at,
-            });
+              payment_status: "trial",
+              paymentStatus: "trial",
+              trialDaysLeft: trialDays,
+              trial_days_left: trialDays,
+              trial_ends_at: trialEnds,
+              trialEndsAt: trialEnds,
+            };
+
+            onUpdateTenant(updated);
+
+            try {
+              safeStorage.setItem("saas_active_tenant", JSON.stringify(updated));
+              safeStorage.setItem("barbearia_tenant_cache", JSON.stringify(updated));
+            } catch {}
+          } else {
+            // Conta pagante (Starter, Pro ou Entreprise)
+            const targetPlanCandidate = bSubPlan || tPlan || String(bData?.plan || "").toLowerCase();
+            const resolvedPlanName =
+              targetPlanCandidate.includes("starter") || targetPlanCandidate.includes("solo")
+                ? "Starter"
+                : targetPlanCandidate.includes("enterprise") || targetPlanCandidate.includes("entreprise")
+                ? "Entreprise"
+                : "Pro";
+
+            const resolvedPlanId = resolvedPlanName.toLowerCase();
+
+            const updated = {
+              ...tenant,
+              plan: resolvedPlanId,
+              subscription_plan: resolvedPlanName,
+              status: "active",
+              payment_status: "paid",
+              paymentStatus: "paid",
+              trialDaysLeft: 0,
+              trial_days_left: 0,
+              trial_ends_at: null,
+              trialEndsAt: null,
+            };
+
+            onUpdateTenant(updated);
+
+            try {
+              safeStorage.setItem("saas_active_tenant", JSON.stringify(updated));
+              safeStorage.setItem("barbearia_tenant_cache", JSON.stringify(updated));
+            } catch {}
           }
         }
       } catch (err) {
@@ -152,10 +173,55 @@ export default function BarbershopDashboard({
       }
     }
 
+    // Executa sincronização inicial
     syncTenantPlanFromSupabase();
+
+    // 1. Canal Supabase Realtime para escutar UPDATE em tempo real nas tabelas barbershops e tenants
+    const realtimeChannel = supabase
+      .channel(`realtime-plan-sync-${tenantId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "barbershops",
+          filter: `id=eq.${tenantId}`,
+        },
+        () => {
+          if (isMounted) syncTenantPlanFromSupabase();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "tenants",
+          filter: `id=eq.${tenantId}`,
+        },
+        () => {
+          if (isMounted) syncTenantPlanFromSupabase();
+        }
+      )
+      .subscribe();
+
+    // 2. Ouvinte de evento local customizado para sincronização imediata na mesma janela
+    const handlePlanChanged = (event) => {
+      if (isMounted) {
+        if (!event?.detail?.tenantId || event.detail.tenantId === tenantId) {
+          syncTenantPlanFromSupabase();
+        }
+      }
+    };
+
+    window.addEventListener("saas:tenant-plan-updated", handlePlanChanged);
+    window.addEventListener("storage", handlePlanChanged);
 
     return () => {
       isMounted = false;
+      supabase.removeChannel(realtimeChannel);
+      window.removeEventListener("saas:tenant-plan-updated", handlePlanChanged);
+      window.removeEventListener("storage", handlePlanChanged);
     };
   }, [tenant?.id]);
 
@@ -241,13 +307,24 @@ export default function BarbershopDashboard({
           const tenantId = tenant?.id || "a0000000-0000-0000-0000-000000000001";
 
           try {
+            const barbershopPayload = isNowTrial
+              ? {
+                  subscription_plan: "trial",
+                  payment_status: "trial",
+                  trial_ends_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+                  updated_at: new Date().toISOString(),
+                }
+              : {
+                  plan: sqlValidPlan,
+                  subscription_plan: planName,
+                  payment_status: "paid",
+                  trial_ends_at: null,
+                  updated_at: new Date().toISOString(),
+                };
+
             await supabase
               .from("barbershops")
-              .update({
-                subscription_plan: planName,
-                plan: sqlValidPlan,
-                updated_at: new Date().toISOString(),
-              })
+              .update(barbershopPayload)
               .eq("id", tenantId);
           } catch (e) {
             console.warn("Aviso ao atualizar barbershops:", e);
@@ -259,12 +336,28 @@ export default function BarbershopDashboard({
               .update({
                 status: isNowTrial ? "trial" : "active",
                 plan: sqlValidPlan,
+                payment_status: isNowTrial ? "trial" : "paid",
                 trial_days_left: isNowTrial ? 7 : 0,
+                trial_ends_at: isNowTrial ? new Date(Date.now() + 7 * 86400000).toISOString() : null,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", tenantId);
           } catch (e) {
             console.warn("Aviso ao atualizar tenants:", e);
+          }
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("saas:tenant-plan-updated", {
+                detail: {
+                  tenantId,
+                  plan: sqlValidPlan,
+                  subscription_plan: planName,
+                  status: isNowTrial ? "trial" : "active",
+                  trial_days_left: isNowTrial ? 7 : 0,
+                },
+              })
+            );
           }
         }}
       />
@@ -281,9 +374,11 @@ export default function BarbershopDashboard({
         <Sidebar
           tenantName={DOMPurify.sanitize(tenant?.name || "Minha Barbearia")}
           tenantPlan={DOMPurify.sanitize(
-            (tenant?.subscription_plan || tenant?.plan || "trial").toLowerCase() === "trial"
+            isTenantTrial(tenant) ||
+            (tenant?.subscription_plan || tenant?.plan || "trial").toLowerCase() === "trial" ||
+            String(tenant?.subscription_plan || "").toLowerCase().includes("teste")
               ? "TRIAL"
-              : tenant?.subscription_plan || tenant?.plan || "TRIAL"
+              : String(tenant?.subscription_plan || tenant?.plan || "TRIAL").toUpperCase()
           )}
           items={barbershopMenuItems}
           activeItem={activeMenuTab}

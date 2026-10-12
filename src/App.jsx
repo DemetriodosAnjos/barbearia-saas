@@ -206,8 +206,18 @@ export default function App() {
         userMeta.phone ||
         "";
 
-      const resolvedPlan =
-        tenantRow?.plan || barbershopRow?.plan || userMeta.plan || "pro";
+      const isShopTrial =
+        String(tenantRow?.plan || "").toLowerCase() === "trial" ||
+        String(tenantRow?.status || "").toLowerCase() === "trial" ||
+        String(barbershopRow?.subscription_plan || "").toLowerCase() === "trial" ||
+        String(barbershopRow?.subscription_plan || "").toLowerCase().includes("teste") ||
+        String(barbershopRow?.payment_status || "").toLowerCase() === "trial";
+
+      const resolvedPlan = isShopTrial
+        ? "trial"
+        : (barbershopRow?.subscription_plan && barbershopRow.subscription_plan !== "trial"
+            ? String(barbershopRow.subscription_plan).toLowerCase()
+            : tenantRow?.plan || barbershopRow?.plan || userMeta.plan || "pro");
 
       const resolvedTrialEndsAt =
         tenantRow?.trial_ends_at ||
@@ -909,7 +919,12 @@ export default function App() {
         {currentScreen === "superadmin" && (
           <ErrorBoundary componentName="Painel SuperAdmin">
             <SuperAdminDashboard
-              onNavigateBarbershop={() => setCurrentScreen("barbershop")}
+              onNavigateBarbershop={() => {
+                if (currentUser) {
+                  resolveAuthenticatedTenant(currentUser).catch(() => {});
+                }
+                setCurrentScreen("barbershop");
+              }}
               onImpersonateTenant={(selectedTenant) => {
                 if (selectedTenant) {
                   setTenant(normalizeTenantRecord(selectedTenant, currentUser));

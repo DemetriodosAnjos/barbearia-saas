@@ -60,6 +60,17 @@ O componente visual do topo (`TrialBanner`):
 - **Tabelas Oficiais Consultadas:** `barbershops`, `tenants`, `services`, `products`, `barbers`, `appointments`, `clients`.
 - **Estados Vazios Autênticos:** Se a barbearia não possuir produtos cadastrados, o painel exibe um estado vazio autêntico e limpo com botão para cadastro, sem injetar itens ou preços simulados.
 
+### G. Arquitetura de Tabelas no Supabase & Sincronização em Tempo Real (Realtime)
+- **Não é necessário criar novas tabelas no Supabase:** As tabelas existentes `tenants` e `barbershops` atendem 100% dos fluxos do sistema.
+- **Check Constraint de `barbershops` (`barbershops_plan_check`):**
+  - No banco PostgreSQL, a coluna `barbershops.plan` possui uma restrição do tipo `CHECK (plan IN ('starter', 'pro', 'enterprise'))`.
+  - Portanto, o status e nome do plano de testes são persistidos oficialmente na coluna `barbershops.subscription_plan` (`'trial'` ou `'Plano de Teste'`) e `payment_status: 'trial'`.
+  - Na tabela `tenants`, os campos oficiais são `plan: 'trial'`, `status: 'trial'`, `trial_days_left: 7` e `trial_ends_at`.
+- **Gatilho e Sincronização em Tempo Real (Realtime & Window Events):**
+  - **Canal Supabase Realtime:** `BarbershopDashboard` assina o canal `postgres_changes` escutando atualizações (`UPDATE`) em tempo real nas tabelas `barbershops` e `tenants`. Quando o SuperAdmin altera o plano no painel, a alteração é transmitida instantaneamente para a interface da barbearia.
+  - **Evento Local (`saas:tenant-plan-updated`):** Garante latência zero para alterações realizadas na mesma janela do navegador ao salvar pelo SuperAdmin ou ao contratar novo plano pelo Checkout Mercado Pago.
+  - **Atualização na Transição de Telas:** Ao clicar em *"Acessar Painel da Barbearia"*, o sistema revalida o registro no Supabase garantindo que os dados em cache reflitam o estado mais recente do banco.
+
 ---
 
 ## 3. Matriz Técnica de Implementação

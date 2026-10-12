@@ -30,8 +30,22 @@ export function isTenantTrial(tenant) {
 
   const planCandidate = String(tenant.plan || "").toLowerCase().trim();
   const subPlanCandidate = String(tenant.subscription_plan || "").toLowerCase().trim();
+  const statusCandidate = String(tenant.status || "").toLowerCase().trim();
+  const paymentStatusCandidate = String(tenant.payment_status || tenant.paymentStatus || "").toLowerCase().trim();
 
-  // Se o plano for starter, pro ou enterprise (ou solo, franquia) -> É PLANO PAGO ATIVO!
+  // 1. Prioridade absoluta: Se for explicitamente trial ou plano de teste
+  if (
+    statusCandidate === "trial" ||
+    planCandidate === "trial" ||
+    planCandidate.includes("teste") ||
+    subPlanCandidate === "trial" ||
+    subPlanCandidate.includes("teste") ||
+    paymentStatusCandidate === "trial"
+  ) {
+    return true;
+  }
+
+  // 2. Se o plano for starter, pro ou enterprise (ou solo, franquia) -> É PLANO PAGO ATIVO!
   if (
     planCandidate.includes("starter") ||
     planCandidate.includes("pro") ||
@@ -49,26 +63,9 @@ export function isTenantTrial(tenant) {
     return false;
   }
 
-  // Se o status for ativo e não houver sinal de trial -> não é trial
-  if (
-    tenant.status === "active" &&
-    !planCandidate.includes("trial") &&
-    !planCandidate.includes("teste") &&
-    !subPlanCandidate.includes("trial") &&
-    !subPlanCandidate.includes("teste")
-  ) {
+  // 3. Se o status for ativo e não houver sinal de trial -> não é trial
+  if (statusCandidate === "active") {
     return false;
-  }
-
-  // Se for explicitamente trial ou plano de teste
-  if (
-    tenant.status === "trial" ||
-    planCandidate.includes("trial") ||
-    planCandidate.includes("teste") ||
-    subPlanCandidate.includes("trial") ||
-    subPlanCandidate.includes("teste")
-  ) {
-    return true;
   }
 
   return false;

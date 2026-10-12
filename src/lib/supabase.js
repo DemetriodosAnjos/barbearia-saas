@@ -292,11 +292,6 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
   if (!raw || typeof raw !== "object") return null;
 
   const userMeta = fallbackUser?.user_metadata || {};
-  const plan = raw.plan || userMeta.plan || "pro";
-  const resolvedMrr = Number(
-    raw.mrr ??
-      (plan === "enterprise" ? 279.9 : plan === "starter" ? 69.9 : 149.9)
-  );
   const trialEndsAt =
     raw.trial_ends_at || raw.trialEndsAt || userMeta.trial_ends_at || null;
   const computedDaysLeft = trialEndsAt
@@ -323,22 +318,57 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
   const phone =
     raw.phone || raw.ownerPhone || userMeta.phone || "";
 
-  const planCandidate = String(raw.subscription_plan || raw.plan || userMeta.plan || "").toLowerCase();
-  const isPaid =
-    planCandidate.includes("starter") ||
-    planCandidate.includes("pro") ||
-    planCandidate.includes("enterprise") ||
-    planCandidate.includes("entreprise") ||
-    planCandidate.includes("solo") ||
-    planCandidate.includes("franquia");
+  const subPlanStr = String(raw.subscription_plan || "").toLowerCase().trim();
+  const rawPlanStr = String(raw.plan || "").toLowerCase().trim();
+  const rawStatusStr = String(raw.status || "").toLowerCase().trim();
+  const rawPaymentStatusStr = String(raw.payment_status || raw.paymentStatus || "").toLowerCase().trim();
 
-  const resolvedStatus = isPaid ? "active" : (raw.status || userMeta.status || "active");
-  const resolvedPaymentStatus = isPaid
-    ? "paid"
-    : (raw.payment_status || raw.paymentStatus || (resolvedStatus === "trial" ? "trial" : "paid"));
-  const resolvedTrialDays = isPaid
-    ? 0
-    : Number(raw.trial_days_left ?? raw.trialDaysLeft ?? computedDaysLeft);
+  // 1. Identificação prioritária de Trial (se qualquer campo indicar trial explicitamente)
+  const isTrial =
+    subPlanStr === "trial" ||
+    subPlanStr.includes("teste") ||
+    rawPlanStr === "trial" ||
+    rawPlanStr.includes("teste") ||
+    rawStatusStr === "trial" ||
+    rawPaymentStatusStr === "trial";
+
+  const isPaid = !isTrial && (
+    subPlanStr.includes("starter") ||
+    subPlanStr.includes("pro") ||
+    subPlanStr.includes("enterprise") ||
+    subPlanStr.includes("entreprise") ||
+    subPlanStr.includes("solo") ||
+    subPlanStr.includes("franquia") ||
+    rawPlanStr.includes("starter") ||
+    rawPlanStr.includes("pro") ||
+    rawPlanStr.includes("enterprise") ||
+    rawPlanStr.includes("entreprise") ||
+    rawPlanStr.includes("solo") ||
+    rawPlanStr.includes("franquia")
+  );
+
+  const resolvedPlan = isTrial
+    ? "trial"
+    : (subPlanStr.includes("starter") || rawPlanStr.includes("starter") || subPlanStr.includes("solo")
+        ? "starter"
+        : subPlanStr.includes("enterprise") || rawPlanStr.includes("enterprise") || subPlanStr.includes("entreprise")
+        ? "enterprise"
+        : "pro");
+
+  const resolvedSubscriptionPlan = isTrial
+    ? "Plano de Teste"
+    : (resolvedPlan === "enterprise" ? "Entreprise" : resolvedPlan === "starter" ? "Starter" : "Pro");
+
+  const resolvedStatus = isTrial ? "trial" : "active";
+  const resolvedPaymentStatus = isTrial ? "trial" : "paid";
+  const resolvedTrialDays = isTrial
+    ? Number(raw.trial_days_left ?? raw.trialDaysLeft ?? computedDaysLeft ?? 7)
+    : 0;
+
+  const resolvedMrr = Number(
+    raw.mrr ??
+      (resolvedPlan === "enterprise" ? 279.9 : resolvedPlan === "starter" ? 69.9 : resolvedPlan === "trial" ? 0 : 149.9)
+  );
 
   return {
     ...raw,
@@ -353,16 +383,18 @@ export function normalizeTenantRecord(raw = {}, fallbackUser = null) {
     ownerEmail: ownerEmail,
     phone: phone,
     ownerPhone: phone,
-    plan: plan,
-    subscription_plan: raw.subscription_plan || (resolvedStatus === "trial" ? "trial" : plan),
+    plan: resolvedPlan,
+    subscription_plan: resolvedSubscriptionPlan,
     status: resolvedStatus,
+    payment_status: resolvedPaymentStatus,
+    paymentStatus: resolvedPaymentStatus,
     barbers_count: Number(raw.barbers_count ?? raw.barbersCount ?? 1),
     barbersCount: Number(raw.barbers_count ?? raw.barbersCount ?? 1),
     mrr: resolvedMrr,
     trial_days_left: resolvedTrialDays,
     trialDaysLeft: resolvedTrialDays,
-    trial_ends_at: isPaid ? null : trialEndsAt,
-    trialEndsAt: isPaid ? null : trialEndsAt,
+    trial_ends_at: isTrial ? trialEndsAt : null,
+    trialEndsAt: isTrial ? trialEndsAt : null,
     has_white_label: Boolean(raw.has_white_label ?? raw.hasWhiteLabel ?? false),
     hasWhiteLabel: Boolean(raw.hasWhiteLabel ?? raw.has_white_label ?? false),
     brand_primary: raw.brand_primary || raw.brandPrimary || "#ea580c",
