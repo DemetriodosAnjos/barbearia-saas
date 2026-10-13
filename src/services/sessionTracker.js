@@ -35,14 +35,25 @@ export function toSafeUuid(identifier) {
  */
 export function getNormalizedSessionUser(user, tenant) {
   const userId = user?.id ? String(user.id) : "owner-usr-01";
-  const userEmail = (user?.email || "").toLowerCase().trim();
+  const userEmail = (
+    user?.email ||
+    user?.user_metadata?.email ||
+    user?.user_metadata?.owner_email ||
+    tenant?.owner_email ||
+    tenant?.ownerEmail ||
+    ""
+  ).toLowerCase().trim();
+
   const tenantId =
     tenant?.id && tenant.id !== "default"
-      ? tenant.id
-      : user?.user_metadata?.barbershop_id || null;
+      ? String(tenant.id).trim()
+      : user?.user_metadata?.barbershop_id ||
+        user?.user_metadata?.tenant_id ||
+        "788299e3-a26c-4a0b-bc71-c7ae81ed40d3";
 
-  // UUID determinístico compartilhado pelo mesmo usuário em qualquer dispositivo
-  const safeUuid = toSafeUuid(user?.id || userEmail || tenantId || "owner-usr-01");
+  // UUID determinístico compartilhado pelo mesmo usuário em qualquer dispositivo.
+  // Prioriza o e-mail e tenantId para que notebook e celular gerem exatamente o mesmo UUID.
+  const safeUuid = toSafeUuid(userEmail || tenantId || user?.id || "owner-usr-01");
 
   return {
     userId,
@@ -148,17 +159,21 @@ export async function registerOrUpdateGlobalSession(user, tenant, force = false)
   const { safeUuid, userEmail, tenantId, userId } = getNormalizedSessionUser(user, tenant);
 
   try {
-    // 1. Busca todas as sessões ativas do usuário para casar e deduplicar
+    // 1. Busca todas as sessões ativas do usuário e da barbearia para casar e deduplicar
     let matchQuery = supabase
       .from("sessions")
-      .select("id, is_active, device_name, user_agent, browser, os")
+      .select("id, is_active, device_name, user_agent, browser, os, tenant_id, user_email, user_id")
       .eq("is_active", true)
       .order("last_activity_at", { ascending: false });
 
-    if (userEmail) {
-      matchQuery = matchQuery.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
-    } else {
-      matchQuery = matchQuery.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
+    const matchConditions = [];
+    if (safeUuid) matchConditions.push(`user_id.eq.${safeUuid}`);
+    if (userId && userId !== safeUuid) matchConditions.push(`user_id.eq.${userId}`);
+    if (userEmail) matchConditions.push(`user_email.eq.${userEmail}`);
+    if (tenantId) matchConditions.push(`tenant_id.eq.${tenantId}`);
+
+    if (matchConditions.length > 0) {
+      matchQuery = matchQuery.or(matchConditions.join(","));
     }
 
     const { data: activeRows, error: searchErr } = await matchQuery;
@@ -183,6 +198,9 @@ export async function registerOrUpdateGlobalSession(user, tenant, force = false)
             browser: clientDevice.browser,
             os: clientDevice.os,
             user_agent: currentUa,
+            tenant_id: tenantId,
+            user_email: userEmail || undefined,
+            user_id: safeUuid,
           })
           .eq("id", matched.id);
 
@@ -260,7 +278,7 @@ export async function fetchUserActiveSessions(user, tenant) {
   const clientDevice = getClientDeviceInfo();
   const currentUa = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const storedSessionId = getStoredSessionId();
-  const { safeUuid, userEmail, userId } = getNormalizedSessionUser(user, tenant);
+  const { safeUuid, userEmail, userId, tenantId } = getNormalizedSessionUser(user, tenant);
 
   try {
     let query = supabase
@@ -268,10 +286,14 @@ export async function fetchUserActiveSessions(user, tenant) {
       .select("*")
       .eq("is_active", true);
 
-    if (userEmail) {
-      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
-    } else {
-      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
+    const conditions = [];
+    if (safeUuid) conditions.push(`user_id.eq.${safeUuid}`);
+    if (userId && userId !== safeUuid) conditions.push(`user_id.eq.${userId}`);
+    if (userEmail) conditions.push(`user_email.eq.${userEmail}`);
+    if (tenantId) conditions.push(`tenant_id.eq.${tenantId}`);
+
+    if (conditions.length > 0) {
+      query = query.or(conditions.join(","));
     }
 
     const { data: dbSessions, error } = await query.order("last_activity_at", { ascending: false });
@@ -423,7 +445,7 @@ export async function revokeUserSession(sessionId, user, tenant, reason = "Revog
  * Desconecta/Revoga todas as sessões exceto a atual
  */
 export async function revokeOtherUserSessions(currentSessionId, user, tenant) {
-  const { safeUuid, userEmail, userId } = getNormalizedSessionUser(user, tenant);
+  const { safeUuid, userEmail, userId, tenantId } = getNormalizedSessionUser(user, tenant);
   try {
     let query = supabase
       .from("sessions")
@@ -434,10 +456,14 @@ export async function revokeOtherUserSessions(currentSessionId, user, tenant) {
       })
       .eq("is_active", true);
 
-    if (userEmail) {
-      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
-    } else {
-      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
+    const conditions = [];
+    if (safeUuid) conditions.push(`user_id.eq.${safeUuid}`);
+    if (userId && userId !== safeUuid) conditions.push(`user_id.eq.${userId}`);
+    if (userEmail) conditions.push(`user_email.eq.${userEmail}`);
+    if (tenantId) conditions.push(`tenant_id.eq.${tenantId}`);
+
+    if (conditions.length > 0) {
+      query = query.or(conditions.join(","));
     }
 
     if (currentSessionId && currentSessionId !== "current-local-session") {
