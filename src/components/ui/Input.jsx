@@ -15,9 +15,11 @@ export default function Input({
   value,
   onChange,
   rightIcon,
+  inputRef: externalInputRef,
   ...props
 }) {
   const internalInputRef = useRef(null);
+  const activeInputRef = externalInputRef || internalInputRef;
   const inputId =
     id || (typeof label === "string" ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
@@ -54,7 +56,7 @@ export default function Input({
 
       <div className="relative w-full flex items-center">
         <input
-          ref={internalInputRef}
+          ref={activeInputRef}
           id={inputId}
           type={type}
           disabled={disabled}
@@ -79,15 +81,15 @@ export default function Input({
         {rightIcon && (
           <div
             onClick={() => {
-              if (internalInputRef.current) {
-                if (typeof internalInputRef.current.showPicker === "function") {
+              if (activeInputRef.current) {
+                if (typeof activeInputRef.current.showPicker === "function") {
                   try {
-                    internalInputRef.current.showPicker();
+                    activeInputRef.current.showPicker();
                   } catch {
-                    internalInputRef.current.focus();
+                    activeInputRef.current.focus();
                   }
                 } else {
-                  internalInputRef.current.focus();
+                  activeInputRef.current.focus();
                 }
               }
             }}

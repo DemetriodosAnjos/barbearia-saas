@@ -199,3 +199,20 @@ A aplicação foi desenvolvida com tolerância a falhas e arquitetura de cinco c
    - Atualiza o registro `saas_auth_user` no `safeStorage`.
    - Propaga imediatamente as mudanças para o estado React via `onUpdateUser` e `onUpdateTenant`.
    - No refresh da página (F5), a função `resolveAndSyncUserTenant` em `App.jsx` lê o registro de `profiles` e enriquece o `currentUser`.
+
+---
+
+## 5. Padronização da Interface: Aba Contato & Endereço Residencial
+
+Na versão 1.5.3.1, a interface da aba **Contato & Endereço** foi refatorada para eliminar poluição visual e redundâncias:
+
+1. **Remoção de Textos Auxiliares Abaixo dos Inputs:**
+   - Removido texto auxiliar de *E-mail de Acesso (Login)*.
+   - Removido texto auxiliar de *WhatsApp / Telefone Celular*.
+   - Removido texto auxiliar de busca de *CEP* para manter a grade alinhada e enxuta.
+
+2. **Eliminação de Duplicidade (Número / Complemento / Bairro):**
+   - Removida a linha duplicada de inputs que renderizava `Número`, `Complemento` e `Bairro` duas vezes consecutivas.
+   - Unificada em uma única linha no grid com 3 colunas, utilizando exclusivamente o componente de design system `Input` padronizado.
+   - O campo `Número *` recebe a propriedade `inputRef={numberInputRef}`, mantendo o foco automático imediato no campo assim que o preenchimento automático pelo ViaCEP é concluído com sucesso.
+

@@ -28,6 +28,57 @@ import {
 } from "../../utils/inputValidator";
 import { safeStorage } from "../../utils/safeStorage";
 
+function getClientDeviceInfo() {
+  if (typeof window === "undefined" || !navigator) {
+    return {
+      deviceName: "Navegador Web",
+      browser: "Navegador Web",
+      os: "Sistema Operacional",
+      isMobile: false,
+    };
+  }
+  const ua = navigator.userAgent;
+  let os = "Sistema Operacional";
+  if (/windows phone/i.test(ua)) os = "Windows Phone";
+  else if (/win/i.test(ua)) os = "Windows";
+  else if (/iphone|ipad|ipod/i.test(ua)) os = "iOS";
+  else if (/android/i.test(ua)) os = "Android";
+  else if (/mac/i.test(ua)) os = "macOS";
+  else if (/linux/i.test(ua)) os = "Linux";
+
+  let browser = "Navegador Web";
+  if (/edg/i.test(ua)) browser = "Microsoft Edge";
+  else if (/chrome|crios/i.test(ua) && !/opr|opera/i.test(ua)) browser = "Google Chrome";
+  else if (/firefox|fxios/i.test(ua)) browser = "Mozilla Firefox";
+  else if (/safari/i.test(ua) && !/chrome|crios/i.test(ua)) browser = "Apple Safari";
+  else if (/opr|opera/i.test(ua)) browser = "Opera";
+
+  const isMobile = /mobile|android|iphone|ipad|ipod/i.test(ua);
+
+  return {
+    deviceName: `${browser} no ${os}`,
+    browser,
+    os,
+    isMobile,
+  };
+}
+
+function formatSessionActivity(isoDate) {
+  if (!isoDate) return "Atividade recente";
+  try {
+    const diffMs = Date.now() - new Date(isoDate).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "Ativo agora";
+    if (diffMins < 60) return `Há ${diffMins} min`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `Há ${diffHours} h`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `Há ${diffDays} dia${diffDays > 1 ? "s" : ""}`;
+  } catch {
+    return "Atividade recente";
+  }
+}
+
 // [Função componente: consome o usuário e barbearia reais autenticados]
 export default function UserProfileView({
   user,
@@ -227,6 +278,25 @@ export default function UserProfileView({
         avatarSrc:
           user?.user_metadata?.avatar_url || user?.avatar || prev.avatarSrc || "",
       }));
+
+      setContactData((prev) => ({
+        email: user?.email || prev.email || "",
+        phone:
+          user?.user_metadata?.phone ||
+          user?.phone ||
+          tenant?.phone ||
+          tenant?.ownerPhone ||
+          getRegisteredUserPhone(user, tenant) ||
+          prev.phone ||
+          "",
+        cep: tenant?.cep || user?.user_metadata?.cep || prev.cep || "",
+        street: tenant?.street || user?.user_metadata?.street || prev.street || "",
+        number: tenant?.number || user?.user_metadata?.number || prev.number || "",
+        complement: tenant?.complement || user?.user_metadata?.complement || prev.complement || "",
+        neighborhood: tenant?.neighborhood || user?.user_metadata?.neighborhood || prev.neighborhood || "",
+        city: tenant?.city || user?.user_metadata?.city || prev.city || "",
+        state: tenant?.state || user?.user_metadata?.state || prev.state || "",
+      }));
     }
   }, [user, tenant]);
 
@@ -240,13 +310,13 @@ export default function UserProfileView({
       tenant?.ownerPhone ||
       getRegisteredUserPhone(user, tenant) ||
       "",
-    cep: tenant?.cep || "",
-    street: tenant?.street || "",
-    number: tenant?.number || "",
-    complement: tenant?.complement || "",
-    neighborhood: tenant?.neighborhood || "",
-    city: tenant?.city || "",
-    state: tenant?.state || "",
+    cep: tenant?.cep || user?.user_metadata?.cep || "",
+    street: tenant?.street || user?.user_metadata?.street || "",
+    number: tenant?.number || user?.user_metadata?.number || "",
+    complement: tenant?.complement || user?.user_metadata?.complement || "",
+    neighborhood: tenant?.neighborhood || user?.user_metadata?.neighborhood || "",
+    city: tenant?.city || user?.user_metadata?.city || "",
+    state: tenant?.state || user?.user_metadata?.state || "",
   });
 
   // 4. ATUAÇÃO PROFISSIONAL & CHAVE PIX
@@ -262,13 +332,35 @@ export default function UserProfileView({
   });
 
   useEffect(() => {
-    const resolvedPix = getRegisteredUserPixKey(user, tenant);
+    const resolvedPix =
+      getRegisteredUserPixKey(user, tenant) ||
+      user?.user_metadata?.pix_key ||
+      user?.pix_key ||
+      tenant?.pix_key ||
+      "";
+
     if (resolvedPix) {
-      setProfessionalData((prev) =>
-        prev.pixKey ? prev : { ...prev, pixKey: resolvedPix }
-      );
       saveRegisteredUserPixKey(resolvedPix);
     }
+
+    setProfessionalData((prev) => ({
+      bio: user?.user_metadata?.bio || user?.bio || prev.bio || "",
+      pixKey: resolvedPix || prev.pixKey || "",
+      pixType: "Chave Geral",
+      instagram:
+        user?.user_metadata?.instagram ||
+        user?.instagram ||
+        tenant?.instagram ||
+        prev.instagram ||
+        "",
+      specialties:
+        user?.user_metadata?.specialties ||
+        user?.specialties ||
+        prev.specialties || [
+          "Corte Tradicional",
+          "Barba",
+        ],
+    }));
   }, [user, tenant]);
 
   // 4. SEGURANÇA & SESSÕES
@@ -278,6 +370,262 @@ export default function UserProfileView({
     confirmPassword: "",
     twoFactorAuth: false,
   });
+
+  // Estados para Gestão de Sessões e Dispositivos Conectados Reais
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [sessionFeedback, setSessionFeedback] = useState("");
+  const [isDisconnectingSessions, setIsDisconnectingSessions] = useState(false);
+
+  // Efeito que sincroniza os dispositivos conectados reais com o Supabase
+  useEffect(() => {
+    let isMounted = true;
+    async function syncRealUserSessions() {
+      const clientDevice = getClientDeviceInfo();
+      const currentUa = typeof navigator !== "undefined" ? navigator.userAgent : "";
+
+      if (!user?.id || user.id === "owner-usr-01") {
+        if (isMounted) {
+          setActiveSessions([
+            {
+              id: "current-local-session",
+              device_name: clientDevice.deviceName,
+              browser: clientDevice.browser,
+              os: clientDevice.os,
+              user_agent: currentUa,
+              is_current: true,
+              is_active: true,
+              last_activity_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              isMobile: clientDevice.isMobile,
+            },
+          ]);
+        }
+        return;
+      }
+
+      setIsLoadingSessions(true);
+      try {
+        const { data: dbSessions, error } = await supabase
+          .from("sessions")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .order("last_activity_at", { ascending: false });
+
+        if (!isMounted) return;
+
+        if (!error && dbSessions && dbSessions.length > 0) {
+          let hasCurrent = false;
+          const mapped = dbSessions.map((s) => {
+            const isCurrent =
+              s.user_agent === currentUa ||
+              s.device_name === clientDevice.deviceName;
+            if (isCurrent) hasCurrent = true;
+            return {
+              ...s,
+              is_current: isCurrent,
+              isMobile: /mobile|android|iphone|ipad/i.test(
+                s.user_agent || s.device_name || ""
+              ),
+            };
+          });
+
+          if (!hasCurrent) {
+            try {
+              const { data: inserted } = await supabase
+                .from("sessions")
+                .insert([
+                  {
+                    user_id: user.id,
+                    tenant_id:
+                      tenant?.id || user?.user_metadata?.barbershop_id || "default",
+                    device_name: clientDevice.deviceName,
+                    browser: clientDevice.browser,
+                    os: clientDevice.os,
+                    user_agent: currentUa,
+                    is_active: true,
+                    last_activity_at: new Date().toISOString(),
+                    expires_at: new Date(
+                      Date.now() + 30 * 24 * 60 * 60 * 1000
+                    ).toISOString(),
+                  },
+                ])
+                .select()
+                .maybeSingle();
+
+              if (inserted && isMounted) {
+                mapped.unshift({
+                  ...inserted,
+                  is_current: true,
+                  isMobile: clientDevice.isMobile,
+                });
+              }
+            } catch {
+              // Tabela pode ter restrição ou não existir ainda
+            }
+          }
+
+          if (isMounted) {
+            if (!mapped.some((s) => s.is_current) && mapped.length > 0) {
+              mapped[0].is_current = true;
+            }
+            setActiveSessions(mapped);
+          }
+        } else {
+          // Tabela vazia ou ainda não criada no Supabase: registra a sessão atual
+          try {
+            const { data: inserted } = await supabase
+              .from("sessions")
+              .insert([
+                {
+                  user_id: user.id,
+                  tenant_id:
+                    tenant?.id || user?.user_metadata?.barbershop_id || "default",
+                  device_name: clientDevice.deviceName,
+                  browser: clientDevice.browser,
+                  os: clientDevice.os,
+                  user_agent: currentUa,
+                  is_active: true,
+                  last_activity_at: new Date().toISOString(),
+                  expires_at: new Date(
+                    Date.now() + 30 * 24 * 60 * 60 * 1000
+                  ).toISOString(),
+                },
+              ])
+              .select()
+              .maybeSingle();
+
+            if (inserted && isMounted) {
+              setActiveSessions([
+                {
+                  ...inserted,
+                  is_current: true,
+                  isMobile: clientDevice.isMobile,
+                },
+              ]);
+              return;
+            }
+          } catch {
+            // Silencioso caso a tabela sessions não esteja provisionada ainda
+          }
+
+          if (isMounted) {
+            setActiveSessions([
+              {
+                id: "current-local-session",
+                device_name: clientDevice.deviceName,
+                browser: clientDevice.browser,
+                os: clientDevice.os,
+                user_agent: currentUa,
+                is_current: true,
+                is_active: true,
+                last_activity_at: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                isMobile: clientDevice.isMobile,
+              },
+            ]);
+          }
+        }
+      } catch (err) {
+        console.warn("Aviso ao carregar sessões de public.sessions:", err);
+        if (isMounted) {
+          setActiveSessions([
+            {
+              id: "current-local-session",
+              device_name: clientDevice.deviceName,
+              browser: clientDevice.browser,
+              os: clientDevice.os,
+              user_agent: currentUa,
+              is_current: true,
+              is_active: true,
+              last_activity_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              isMobile: clientDevice.isMobile,
+            },
+          ]);
+        }
+      } finally {
+        if (isMounted) setIsLoadingSessions(false);
+      }
+    }
+
+    if (activeTab === "seguranca") {
+      syncRealUserSessions();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, user?.id, tenant?.id]);
+
+  // Função para desconectar todos os outros dispositivos remotos
+  const handleDisconnectOtherDevices = async () => {
+    setIsDisconnectingSessions(true);
+    setSessionFeedback("");
+    try {
+      if (user?.id && user.id !== "owner-usr-01") {
+        try {
+          if (supabase.auth?.signOut) {
+            await supabase.auth.signOut({ scope: "others" });
+          }
+        } catch {
+          // Ignore se GoTrue não tiver o endpoint scope: others habilitado
+        }
+
+        const currentSession = activeSessions.find((s) => s.is_current);
+        let query = supabase
+          .from("sessions")
+          .update({
+            is_active: false,
+            revoked_at: new Date().toISOString(),
+            revocation_reason: "Desconectado pelo usuário na aba Segurança",
+          })
+          .eq("user_id", user.id);
+
+        if (
+          currentSession?.id &&
+          currentSession.id !== "current-local-session"
+        ) {
+          query = query.neq("id", currentSession.id);
+        }
+
+        await query;
+      }
+
+      setActiveSessions((prev) => prev.filter((s) => s.is_current));
+      setSessionFeedback(
+        "Todas as outras sessões ativas foram desconectadas com sucesso."
+      );
+      setTimeout(() => setSessionFeedback(""), 4000);
+    } catch (err) {
+      console.error("Erro ao desconectar outros dispositivos:", err);
+      setSessionFeedback("Não foi possível desconectar todos os dispositivos remotos.");
+    } finally {
+      setIsDisconnectingSessions(false);
+    }
+  };
+
+  // Função para desconectar uma sessão remota específica
+  const handleRevokeSingleSession = async (sessionId) => {
+    try {
+      if (user?.id && user.id !== "owner-usr-01") {
+        await supabase
+          .from("sessions")
+          .update({
+            is_active: false,
+            revoked_at: new Date().toISOString(),
+            revocation_reason: "Encerrada individualmente pelo usuário",
+          })
+          .eq("id", sessionId)
+          .eq("user_id", user.id);
+      }
+      setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setSessionFeedback("Dispositivo desconectado com sucesso.");
+      setTimeout(() => setSessionFeedback(""), 3000);
+    } catch (err) {
+      console.error("Erro ao encerrar sessão:", err);
+    }
+  };
 
   const [avatarError, setAvatarError] = useState("");
 
@@ -413,6 +761,14 @@ export default function UserProfileView({
 
     try {
       const cleanPhone = contactData.phone.trim();
+      const cleanCep = contactData.cep.trim();
+      const cleanStreet = contactData.street.trim();
+      const cleanNumber = contactData.number.trim();
+      const cleanComplement = contactData.complement.trim();
+      const cleanNeighborhood = contactData.neighborhood.trim();
+      const cleanCity = contactData.city.trim();
+      const cleanState = contactData.state.trim();
+
       saveRegisteredUserPhone(cleanPhone);
 
       const cleanFullName = personalData.fullName.trim();
@@ -433,6 +789,13 @@ export default function UserProfileView({
         birth_date: cleanBirthDate,
         birthDate: cleanBirthDate,
         phone: cleanPhone,
+        cep: cleanCep,
+        street: cleanStreet,
+        number: cleanNumber,
+        complement: cleanComplement,
+        neighborhood: cleanNeighborhood,
+        city: cleanCity,
+        state: cleanState,
         bio: professionalData.bio.trim(),
         pix_key: cleanPixKey,
         pixKey: cleanPixKey,
@@ -460,6 +823,17 @@ export default function UserProfileView({
           cnpj: cleanCnpj || null,
           birth_date: cleanBirthDate,
           phone: cleanPhone,
+          cep: cleanCep || null,
+          street: cleanStreet || null,
+          number: cleanNumber || null,
+          complement: cleanComplement || null,
+          neighborhood: cleanNeighborhood || null,
+          city: cleanCity || null,
+          state: cleanState || null,
+          pix_key: cleanPixKey || null,
+          bio: professionalData.bio.trim() || null,
+          instagram: professionalData.instagram.trim() || null,
+          specialties: professionalData.specialties || [],
           email: user?.email || undefined,
           updated_at: new Date().toISOString(),
         };
@@ -495,6 +869,15 @@ export default function UserProfileView({
             owner_name: cleanFullName,
             phone: cleanPhone,
             cnpj: cleanCnpj || null,
+            cep: cleanCep || null,
+            street: cleanStreet || null,
+            number: cleanNumber || null,
+            complement: cleanComplement || null,
+            neighborhood: cleanNeighborhood || null,
+            city: cleanCity || null,
+            state: cleanState || null,
+            pix_key: cleanPixKey || null,
+            instagram: professionalData.instagram.trim() || null,
             updated_at: new Date().toISOString(),
           };
           const { error: tErr } = await supabase
@@ -503,7 +886,7 @@ export default function UserProfileView({
             .eq("id", tenant.id);
 
           if (tErr) {
-            // Se a coluna cnpj ainda não existir no PostgreSQL, salva campos base
+            // Se as colunas ainda não existirem no PostgreSQL, salva campos base
             await supabase
               .from("tenants")
               .update({
@@ -528,6 +911,9 @@ export default function UserProfileView({
               display_name: cleanDisplayName,
               phone: cleanPhone,
               pix_key: cleanPixKey || undefined,
+              instagram: professionalData.instagram.trim() || undefined,
+              bio: professionalData.bio.trim() || undefined,
+              specialties: professionalData.specialties || undefined,
             })
             .eq("barbershop_id", tenant.id)
             .ilike("email", user.email);
@@ -577,8 +963,16 @@ export default function UserProfileView({
           phone: cleanPhone,
           ownerPhone: cleanPhone,
           cnpj: cleanCnpj,
+          cep: cleanCep,
+          street: cleanStreet,
+          number: cleanNumber,
+          complement: cleanComplement,
+          neighborhood: cleanNeighborhood,
+          city: cleanCity,
+          state: cleanState,
           pix_key: cleanPixKey,
           pixKey: cleanPixKey,
+          instagram: professionalData.instagram.trim(),
         });
       }
     } catch (err) {
@@ -835,7 +1229,6 @@ export default function UserProfileView({
                 type="email"
                 value={contactData.email}
                 disabled
-                helperText="A alteração de e-mail exige confirmação por link de segurança."
               />
 
               <Input
@@ -848,7 +1241,6 @@ export default function UserProfileView({
                     setProfileErrors({ ...profileErrors, phone: null });
                 }}
                 error={profileErrors.phone}
-                helperText="Usado para notificações instantâneas de novos agendamentos."
               />
             </div>
 
@@ -868,11 +1260,6 @@ export default function UserProfileView({
                 }}
                 onBlur={() => handleSearchCep(contactData.cep)}
                 error={profileErrors.cep}
-                helperText={
-                  isSearchingCep
-                    ? "Buscando endereço nos Correios..."
-                    : "Digite o CEP para preencher o endereço automaticamente."
-                }
               />
 
               <div className="sm:col-span-2">
@@ -890,40 +1277,20 @@ export default function UserProfileView({
               </div>
             </div>
 
-            {/* Linha de Endereço: Número + Complemento + Bairro (Sem duplicações) */}
+            {/* Linha de Endereço: Número + Complemento + Bairro */}
             <div className={profileStyles.gridThreeCols}>
-              <div className="w-full flex flex-col gap-1.5 text-left">
-                <label className="text-sm font-medium text-neutral-300">
-                  Número *
-                </label>
-                <input
-                  ref={numberInputRef}
-                  type="text"
-                  placeholder="Ex: 1042"
-                  value={contactData.number}
-                  onChange={(e) => {
-                    setContactData({ ...contactData, number: e.target.value });
-                    if (profileErrors.number)
-                      setProfileErrors({ ...profileErrors, number: null });
-                  }}
-                  className={`
-                    w-full px-3.5 py-2.5 rounded-lg text-sm transition-all duration-200
-                    bg-neutral-900 border text-neutral-100 placeholder-neutral-500
-                    focus:outline-none focus:ring-2
-                    ${
-                      profileErrors.number
-                        ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                        : "border-neutral-700 focus:border-amber-500 focus:ring-amber-500/20"
-                    }
-                  `}
-                />
-                {profileErrors.number && (
-                  <p className="text-xs text-red-500 flex items-center gap-1 mt-0.5">
-                    <ProjectIcon name="AlertTriangle" size={13} colorVariant="danger" />
-                    {profileErrors.number}
-                  </p>
-                )}
-              </div>
+              <Input
+                inputRef={numberInputRef}
+                label="Número *"
+                placeholder="Ex: 1042"
+                value={contactData.number}
+                onChange={(e) => {
+                  setContactData({ ...contactData, number: e.target.value });
+                  if (profileErrors.number)
+                    setProfileErrors({ ...profileErrors, number: null });
+                }}
+                error={profileErrors.number}
+              />
 
               <Input
                 label="Complemento"
@@ -937,44 +1304,6 @@ export default function UserProfileView({
               <Input
                 label="Bairro"
                 placeholder="Centro, Bairro..."
-                value={contactData.neighborhood}
-                onChange={(e) =>
-                  setContactData({
-                    ...contactData,
-                    neighborhood: e.target.value,
-                  })
-                }
-              />
-            </div>
-
-            {/* Linha 2 de Endereço: Número + Complemento + Bairro */}
-            <div className={profileStyles.gridThreeCols}>
-              <Input
-                label="Número"
-                value={contactData.number}
-                onChange={(e) => {
-                  setContactData({ ...contactData, number: e.target.value });
-                  if (profileErrors.number)
-                    setProfileErrors({ ...profileErrors, number: null });
-                }}
-              />
-
-              <Input
-                label="Complemento"
-                placeholder="Apto, Bloco, Sala"
-                value={contactData.complement}
-                onChange={(e) => {
-                  setContactData({
-                    ...contactData,
-                    complement: e.target.value,
-                  });
-                  if (profileErrors.complement)
-                    setProfileErrors({ ...profileErrors, complement: null });
-                }}
-              />
-
-              <Input
-                label="Bairro"
                 value={contactData.neighborhood}
                 onChange={(e) =>
                   setContactData({
@@ -1076,7 +1405,7 @@ export default function UserProfileView({
               <div className={profileStyles.gridTwoCols}>
                 <Input
                   label="Chave PIX Cadastrada"
-                  placeholder="Seu CPF, E-mail ou Telefone"
+                  placeholder="Seu CPF, E-mail, Aleatória ou Telefone"
                   value={professionalData.pixKey}
                   onChange={(e) => {
                     const nextKey = e.target.value;
@@ -1089,7 +1418,6 @@ export default function UserProfileView({
                       setProfileErrors({ ...profileErrors, pixKey: null });
                   }}
                   error={profileErrors.pixKey}
-                  helperText="O gestor utilizará esta chave ao clicar em 'Quitar via PIX'."
                 />
 
                 <Input
@@ -1102,7 +1430,6 @@ export default function UserProfileView({
                       instagram: e.target.value,
                     })
                   }
-                  helperText="Exibido na página pública para os clientes verem seus cortes."
                 />
               </div>
             </div>
@@ -1250,7 +1577,6 @@ export default function UserProfileView({
                     setPasswordErrors((prev) => ({ ...prev, current: null }));
                 }}
                 error={passwordErrors.current}
-                helperText="Dica para teste: digite 'senha123' para validar ou qualquer outra para testar o erro."
               />
 
               {/* 2. Nova Senha e Confirmação */}
@@ -1320,53 +1646,90 @@ export default function UserProfileView({
               />
             </div>
 
-            {/* Dispositivos Conectados (Sessões) */}
+            {/* Dispositivos Conectados (Sessões Ativas Reais) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
                   Dispositivos Conectados (Sessões Ativas)
                 </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    alert("Todas as outras sessões foram desconectadas.")
-                  }
-                  className="text-xs text-red-400 hover:underline cursor-pointer"
+                {activeSessions.filter((s) => !s.is_current).length > 0 && (
+                  <button
+                    type="button"
+                    disabled={isDisconnectingSessions}
+                    onClick={handleDisconnectOtherDevices}
+                    className="text-xs text-red-400 hover:text-red-300 hover:underline cursor-pointer transition-colors"
+                  >
+                    {isDisconnectingSessions
+                      ? "Desconectando..."
+                      : "Desconectar outros dispositivos"}
+                  </button>
+                )}
+              </div>
+
+              {sessionFeedback && (
+                <Alert
+                  variant="success"
+                  title="Sessões de Acesso"
+                  onClose={() => setSessionFeedback("")}
                 >
-                  Desconectar outros dispositivos
-                </button>
-              </div>
+                  {sessionFeedback}
+                </Alert>
+              )}
 
-              <div className="space-y-2">
-                <div className={profileStyles.sessionItem}>
-                  <div className={profileStyles.sessionIcon}>
-                    <ProjectIcon name="Laptop" size={18} className="text-amber-500" />
-                  </div>
-                  <div className={profileStyles.sessionInfo}>
-                    <p className="font-bold text-white">Chrome no Windows 11</p>
-                    <span className="text-[11px] text-neutral-500">
-                      São Paulo, Brasil • IP 177.85.x.x
-                    </span>
-                  </div>
-                  <span className={profileStyles.activeNowBadge}>
-                    Conectado Agora
-                  </span>
+              {isLoadingSessions ? (
+                <div className="p-4 bg-neutral-950/60 border border-neutral-800 rounded-2xl text-center text-xs text-neutral-400">
+                  Carregando sessões ativas...
                 </div>
-
-                <div className={profileStyles.sessionItem}>
-                  <div className={profileStyles.sessionIcon}>
-                    <ProjectIcon name="Smartphone" size={18} className="text-amber-500" />
-                  </div>
-                  <div className={profileStyles.sessionInfo}>
-                    <p className="font-bold text-white">
-                      Safari no iPhone 15 Pro
-                    </p>
-                    <span className="text-[11px] text-neutral-500">
-                      Última atividade: Há 2 horas
-                    </span>
-                  </div>
+              ) : activeSessions.length === 0 ? (
+                <div className="p-4 bg-neutral-950/60 border border-neutral-800 rounded-2xl text-center text-xs text-neutral-400">
+                  Nenhuma sessão ativa encontrada.
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  {activeSessions.map((session) => (
+                    <div
+                      key={session.id || session.device_name}
+                      className={profileStyles.sessionItem}
+                    >
+                      <div className={profileStyles.sessionIcon}>
+                        <ProjectIcon
+                          name={session.isMobile ? "Smartphone" : "Laptop"}
+                          size={18}
+                          className="text-amber-500"
+                        />
+                      </div>
+                      <div className={profileStyles.sessionInfo}>
+                        <p className="font-bold text-white">
+                          {session.device_name ||
+                            (session.isMobile
+                              ? "Dispositivo Móvel"
+                              : "Computador / Desktop")}
+                        </p>
+                        <span className="text-[11px] text-neutral-500">
+                          {session.is_current
+                            ? `Dispositivo Atual • ${session.browser || "Navegador"} no ${session.os || "Sistema"}`
+                            : `Última atividade: ${formatSessionActivity(
+                                session.last_activity_at || session.created_at
+                              )}`}
+                        </span>
+                      </div>
+                      {session.is_current ? (
+                        <span className={profileStyles.activeNowBadge}>
+                          Conectado Agora
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeSingleSession(session.id)}
+                          className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded hover:bg-red-500/10 cursor-pointer transition-colors"
+                        >
+                          Desconectar
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

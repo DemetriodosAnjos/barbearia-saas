@@ -175,3 +175,43 @@ Mapeamento oficial das colunas da tabela `public.profiles` e metadados sincroniz
 | `items` | `jsonb` | Array com lista de itens e comissões. |
 | `created_at` | `timestamp with time zone` | Abertura da comanda. |
 
+---
+
+## 7. Tabela: `sessions` (Dispositivos Conectados e Sessões Ativas)
+
+Mapeamento da tabela `public.sessions` para controle de dispositivos conectados em tempo real, revogação de acessos remotos e auditoria de sessões ativas:
+
+| Nome da Coluna | Tipo de Dado (PostgreSQL) | Obrigatório | Descrição / Regra |
+|---|---|---|---|
+| `id` | `uuid` | Sim | Identificador único da sessão (`gen_random_uuid()`). |
+| `user_id` | `uuid` | Sim | Chave estrangeira referenciando `auth.users(id)` com `ON DELETE CASCADE`. |
+| `tenant_id` | `text` | Não | ID da barbearia / tenant ativo durante a sessão. |
+| `device_name` | `text` | Não | Nome legível do dispositivo (ex: `"Google Chrome no Windows"`, `"Apple Safari no iOS"`). |
+| `browser` | `text` | Não | Nome do navegador identificado (ex: `"Google Chrome"`, `"Apple Safari"`). |
+| `os` | `text` | Não | Sistema operacional identificado (ex: `"Windows"`, `"iOS"`, `"Android"`, `"macOS"`). |
+| `ip_address` | `text` | Não | Endereço IP de origem da requisição / login. |
+| `user_agent` | `text` | Não | String bruta do `User-Agent` HTTP do cliente. |
+| `is_active` | `boolean` | Sim | Flag booleana indicando se a sessão está ativa (`true`) ou revogada (`false`). Padrão: `true`. |
+| `last_activity_at` | `timestamptz` | Sim | Data e hora do último heartbeat ou atividade da sessão. Padrão: `now()`. |
+| `expires_at` | `timestamptz` | Sim | Data e hora limite de expiração da sessão (ex: `now() + interval '30 days'`). |
+| `revoked_at` | `timestamptz` | Não | Data e hora em que a sessão foi revogada ou desconectada. |
+| `revocation_reason` | `text` | Não | Motivo do encerramento (ex: `"Desconectado pelo usuário na aba Segurança"`). |
+| `created_at` | `timestamptz` | Sim | Data e hora de criação da sessão. Padrão: `now()`. |
+| `updated_at` | `timestamptz` | Sim | Data e hora da última atualização de status da sessão. Padrão: `now()`. |
+
+---
+
+## 8. Tabela: `security_audit_events` (Trilha de Auditoria de Segurança)
+
+| Nome da Coluna | Tipo de Dado | Descrição |
+|---|---|---|
+| `id` | `uuid` | Identificador único do evento (`gen_random_uuid()`). |
+| `event_type` | `text` | Tipo de evento (ex: `'PASSWORD_CHANGED'`, `'SESSION_REVOKED'`, `'2FA_TOGGLED'`). |
+| `user_id` | `uuid` | Usuário afetado (`auth.users(id)`). |
+| `actor_id` | `text` | Identificador de quem realizou a ação. |
+| `reason` | `text` | Motivo ou descrição detalhada do evento. |
+| `ip_address` | `text` | Endereço IP do solicitante. |
+| `metadata` | `jsonb` | Metadados extras do evento em formato JSON. |
+| `created_at` | `timestamptz` | Data e hora do registro de auditoria. |
+
+
