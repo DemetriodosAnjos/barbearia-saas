@@ -44,13 +44,64 @@ export default function App() {
     pathname.startsWith("/admin/") ||
     pathname.startsWith("/dashboard/");
 
-  // Determina tela e papel iniciais com base na blindagem contra bypass
+  // Determina usuário e papel iniciais com base na sessão persistida no safeStorage
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const savedUserStr = safeStorage.getItem("saas_auth_user");
+      if (savedUserStr) {
+        const parsed = JSON.parse(savedUserStr);
+        if (parsed?.email) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
+  const [activeUserRole, setActiveUserRole] = useState(() => {
+    if (storageAudit.tamperingDetected) return USER_ROLES.ANON;
+    try {
+      const savedUserStr = safeStorage.getItem("saas_auth_user");
+      if (savedUserStr) {
+        const parsed = JSON.parse(savedUserStr);
+        const r = parsed?.user_metadata?.role || parsed?.role;
+        if (r) return r === "owner" || r === "tenant" ? USER_ROLES.ADMIN : r;
+      }
+    } catch {
+      // ignore
+    }
+    return USER_ROLES.ANON;
+  });
+
+  // Determina tela inicial: restaura tela persistida ou redireciona conforme perfil
   const initialScreen = (() => {
     if (storageAudit.tamperingDetected) return "login";
-    if (isDirectProtectedUrl) return "login";
     if (urlScreen) return urlScreen;
     if (urlBarber) return "login";
-    return "login"; // Revela apenas Login.jsx por padrão para o fluxo de autenticação do dono
+
+    try {
+      const savedUserStr = safeStorage.getItem("saas_auth_user");
+      const savedScreen = safeStorage.getItem("saas_active_screen");
+      if (savedUserStr) {
+        const parsed = JSON.parse(savedUserStr);
+        if (parsed?.email) {
+          const userEmail = (parsed.email || "").toLowerCase().trim();
+          const isSuperAdminEmail =
+            userEmail === "atendmentor@gmail.com" ||
+            (Boolean(import.meta.env?.VITE_SUPERADMIN_EMAIL) &&
+              userEmail === String(import.meta.env.VITE_SUPERADMIN_EMAIL).toLowerCase().trim());
+          if (savedScreen && savedScreen !== "login") {
+            return savedScreen;
+          }
+          return isSuperAdminEmail ? "superadmin" : "barbershop";
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    if (isDirectProtectedUrl) return "login";
+    return "login";
   })();
 
   const [currentScreen, setCurrentScreen] = useState(initialScreen);
@@ -58,17 +109,9 @@ export default function App() {
   const [googleNewUserCandidate, setGoogleNewUserCandidate] = useState(null);
 
   const handleNavigate = useCallback((screenId) => {
+    safeStorage.setItem("saas_active_screen", screenId);
     setCurrentScreen(screenId);
   }, []);
-
-  // Usuário autenticado ativo (Supabase Auth)
-  const [currentUser, setCurrentUser] = useState(null);
-
-  // Perfil RBAC ativo: por segurança Default-Deny, inicia como ANON
-  const [activeUserRole, setActiveUserRole] = useState(() => {
-    if (storageAudit.tamperingDetected || isDirectProtectedUrl) return USER_ROLES.ANON;
-    return USER_ROLES.ANON;
-  });
 
   // Estados Centrais do SaaS (Carregado com dados reais do banco de dados)
   const [tenant, setTenant] = useState(() =>
@@ -298,59 +341,15 @@ export default function App() {
     }
   }, []);
 
-  // Sincronização e validação de sessão real do Supabase ao recarregar a página
+  // Sincronização e validação de sessão real ao recarregar a página (F5)
   useEffect(() => {
     let isMounted = true;
 
     async function syncAuthSession() {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error || !session?.user) {
-          if (!isMounted) return;
-          // Verifica se há sessão ativa via Google SSO em safeStorage antes de forçar logout
-          const savedUserStr = safeStorage.getItem("saas_auth_user");
-          const savedToken = safeStorage.getItem("saas_jwt_access_token");
-          if (savedUserStr && savedToken && savedToken.startsWith("g_sso_")) {
-            try {
-              const savedUser = JSON.parse(savedUserStr);
-              if (savedUser?.email) {
-                const role =
-                  savedUser.user_metadata?.role ||
-                  savedUser.role ||
-                  USER_ROLES.ADMIN;
-                const normalizedRole =
-                  role === "owner" || role === "tenant" ? USER_ROLES.ADMIN : role;
-                const userWithRole = {
-                  ...savedUser,
-                  user_metadata: {
-                    ...(savedUser.user_metadata || {}),
-                    role: normalizedRole,
-                  },
-                };
-                setCurrentUser(userWithRole);
-                setActiveUserRole(normalizedRole);
-                resolveAndSyncUserTenant(userWithRole);
-                if (currentScreen === "login") {
-                  setCurrentScreen(
-                    normalizedRole === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
-                  );
-                }
-                return;
-              }
-            } catch {
-              // segue deslogando se JSON corrompido
-            }
-          }
-
-          // Não reseta usuário nem redireciona se estiver no SuperAdmin, Design System, etc.
-          if (currentScreen !== "superadmin" && currentScreen !== "design-system" && currentScreen !== "client-app" && currentScreen !== "onboarding") {
-            setCurrentUser(null);
-            setActiveUserRole(USER_ROLES.ANON);
-            if (currentScreen === "barbershop") {
-              setCurrentScreen("login");
-            }
-          }
-        } else {
+        // 1. Tenta sessão oficial do Supabase GoTrue
+        const { data: { session } } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        if (session?.user) {
           if (!isMounted) return;
           const rawRole = session.user.user_metadata?.role || session.user.role;
           const normalizedRole =
@@ -367,20 +366,143 @@ export default function App() {
           };
           setCurrentUser(userWithRole);
           setActiveUserRole(normalizedRole);
-          resolveAndSyncUserTenant(userWithRole);
+          safeStorage.setItem("saas_auth_user", JSON.stringify(userWithRole));
+          if (session.access_token) {
+            safeStorage.setItem("saas_jwt_access_token", session.access_token);
+            safeStorage.setItem("access_token", session.access_token);
+          }
+          await resolveAndSyncUserTenant(userWithRole);
 
-          if (currentScreen === "login" && !storageAudit.tamperingDetected && !isDirectProtectedUrl) {
-            setCurrentScreen(
-              normalizedRole === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
-            );
+          const savedScreen = safeStorage.getItem("saas_active_screen");
+          const targetScreen =
+            savedScreen && savedScreen !== "login"
+              ? savedScreen
+              : normalizedRole === USER_ROLES.SUPERADMIN
+                ? "superadmin"
+                : "barbershop";
+          setCurrentScreen(targetScreen);
+          safeStorage.setItem("saas_active_screen", targetScreen);
+          return;
+        }
+
+        // 2. Se o Supabase GoTrue não tiver sessão, recupera a sessão salva no safeStorage (Google SSO, login local ou token)
+        const savedUserStr = safeStorage.getItem("saas_auth_user");
+        if (savedUserStr) {
+          try {
+            const savedUser = JSON.parse(savedUserStr);
+            if (savedUser?.email) {
+              if (!isMounted) return;
+              const userEmail = (savedUser.email || "").toLowerCase().trim();
+              const isSuper =
+                userEmail === "atendmentor@gmail.com" ||
+                (Boolean(import.meta.env?.VITE_SUPERADMIN_EMAIL) &&
+                  userEmail === String(import.meta.env.VITE_SUPERADMIN_EMAIL).toLowerCase().trim());
+              const role = isSuper
+                ? USER_ROLES.SUPERADMIN
+                : savedUser.user_metadata?.role || savedUser.role || USER_ROLES.ADMIN;
+              const normalizedRole =
+                role === "owner" || role === "tenant" ? USER_ROLES.ADMIN : role;
+              const userWithRole = {
+                ...savedUser,
+                role: normalizedRole,
+                user_metadata: {
+                  ...(savedUser.user_metadata || {}),
+                  role: normalizedRole,
+                },
+              };
+              setCurrentUser(userWithRole);
+              setActiveUserRole(normalizedRole);
+              await resolveAndSyncUserTenant(userWithRole);
+
+              const savedScreen = safeStorage.getItem("saas_active_screen");
+              const targetScreen =
+                savedScreen && savedScreen !== "login"
+                  ? savedScreen
+                  : normalizedRole === USER_ROLES.SUPERADMIN
+                    ? "superadmin"
+                    : "barbershop";
+              setCurrentScreen(targetScreen);
+              safeStorage.setItem("saas_active_screen", targetScreen);
+              return;
+            }
+          } catch {
+            // falha ao ler json salvo
+          }
+        }
+
+        // 3. Tenta silent refresh com a API /api/auth/refresh
+        try {
+          const refreshRes = await fetch("/api/auth/refresh", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            if (refreshData?.success && refreshData?.user) {
+              if (!isMounted) return;
+              const rUser = refreshData.user;
+              const userEmail = (rUser.email || "").toLowerCase().trim();
+              const isSuper =
+                userEmail === "atendmentor@gmail.com" ||
+                (Boolean(import.meta.env?.VITE_SUPERADMIN_EMAIL) &&
+                  userEmail === String(import.meta.env.VITE_SUPERADMIN_EMAIL).toLowerCase().trim());
+              const role = isSuper
+                ? USER_ROLES.SUPERADMIN
+                : rUser.role || USER_ROLES.ADMIN;
+              const normalizedRole =
+                role === "owner" || role === "tenant" ? USER_ROLES.ADMIN : role;
+              const userWithRole = {
+                ...rUser,
+                role: normalizedRole,
+                user_metadata: {
+                  role: normalizedRole,
+                },
+              };
+              setCurrentUser(userWithRole);
+              setActiveUserRole(normalizedRole);
+              safeStorage.setItem("saas_auth_user", JSON.stringify(userWithRole));
+              if (refreshData.accessToken) {
+                safeStorage.setItem("saas_jwt_access_token", refreshData.accessToken);
+                safeStorage.setItem("access_token", refreshData.accessToken);
+              }
+              await resolveAndSyncUserTenant(userWithRole);
+
+              const savedScreen = safeStorage.getItem("saas_active_screen");
+              const targetScreen =
+                savedScreen && savedScreen !== "login"
+                  ? savedScreen
+                  : normalizedRole === USER_ROLES.SUPERADMIN
+                    ? "superadmin"
+                    : "barbershop";
+              setCurrentScreen(targetScreen);
+              safeStorage.setItem("saas_active_screen", targetScreen);
+              return;
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        // 4. Se não há sessão válida em nenhuma fonte e tela protegida
+        if (!isMounted) return;
+        const currentSavedUser = safeStorage.getItem("saas_auth_user");
+        if (!currentSavedUser) {
+          if (
+            currentScreen !== "superadmin" &&
+            currentScreen !== "design-system" &&
+            currentScreen !== "client-app" &&
+            currentScreen !== "onboarding" &&
+            currentScreen !== "qa-panel"
+          ) {
+            setCurrentUser(null);
+            setActiveUserRole(USER_ROLES.ANON);
+            if (currentScreen === "barbershop") {
+              setCurrentScreen("login");
+            }
           }
         }
       } catch (err) {
-        console.error("Erro na verificação de sessão Supabase:", err);
-        if (isMounted && currentScreen !== "superadmin") {
-          setCurrentUser(null);
-          setActiveUserRole(USER_ROLES.ANON);
-        }
+        console.error("Erro na verificação de sessão:", err);
       }
     }
 
@@ -404,20 +526,30 @@ export default function App() {
         };
         setCurrentUser(userWithRole);
         setActiveUserRole(normalizedRole);
+        safeStorage.setItem("saas_auth_user", JSON.stringify(userWithRole));
+        if (session.access_token) {
+          safeStorage.setItem("saas_jwt_access_token", session.access_token);
+          safeStorage.setItem("access_token", session.access_token);
+        }
         resolveAndSyncUserTenant(userWithRole);
 
-        if (event === "SIGNED_IN" && currentScreen === "login") {
-          setCurrentScreen(
-            normalizedRole === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
-          );
+        if (event === "SIGNED_IN") {
+          const savedScreen = safeStorage.getItem("saas_active_screen");
+          const nextScreen =
+            savedScreen && savedScreen !== "login"
+              ? savedScreen
+              : normalizedRole === USER_ROLES.SUPERADMIN
+                ? "superadmin"
+                : "barbershop";
+          setCurrentScreen(nextScreen);
+          safeStorage.setItem("saas_active_screen", nextScreen);
         }
-      } else {
-        if (currentScreen !== "superadmin" && currentScreen !== "client-app" && currentScreen !== "design-system") {
+      } else if (event === "SIGNED_OUT") {
+        const savedUserStr = safeStorage.getItem("saas_auth_user");
+        if (!savedUserStr) {
           setCurrentUser(null);
-          if (currentScreen === "barbershop") {
-            setActiveUserRole(USER_ROLES.ANON);
-            setCurrentScreen("login");
-          }
+          setActiveUserRole(USER_ROLES.ANON);
+          setCurrentScreen("login");
         }
       }
     });
@@ -426,7 +558,7 @@ export default function App() {
       isMounted = false;
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [resolveAndSyncUserTenant]);
 
   // Efeito de auditoria contínua a cada alteração de tela
   useEffect(() => {
@@ -494,6 +626,10 @@ export default function App() {
   const { logout: handleSecureLogout } = useSecureLogout({
     defaultReason: "MANUAL_LOGOUT",
     onSuccess: () => {
+      safeStorage.removeItem("saas_auth_user");
+      safeStorage.removeItem("saas_active_screen");
+      safeStorage.removeItem("saas_jwt_access_token");
+      safeStorage.removeItem("access_token");
       setCurrentUser(null);
       setActiveUserRole(USER_ROLES.ANON);
       setCurrentScreen("login");
@@ -861,20 +997,46 @@ export default function App() {
               onGoToLogin={(prefillEmail) => {
                 if (prefillEmail) setLoginPrefillEmail(prefillEmail);
                 setGoogleNewUserCandidate(null);
+                safeStorage.setItem("saas_active_screen", "login");
                 setCurrentScreen("login");
               }}
               onLoginSuccess={async (existingUser) => {
                 setGoogleNewUserCandidate(null);
-                setCurrentUser(existingUser);
-                setActiveUserRole(USER_ROLES.ADMIN);
-                await resolveAndSyncUserTenant(existingUser);
+                const role = USER_ROLES.ADMIN;
+                const userWithRole = {
+                  ...existingUser,
+                  role,
+                  user_metadata: {
+                    ...(existingUser?.user_metadata || {}),
+                    role,
+                  },
+                };
+                safeStorage.setItem("saas_auth_user", JSON.stringify(userWithRole));
+                safeStorage.setItem("saas_active_screen", "barbershop");
+                setCurrentUser(userWithRole);
+                setActiveUserRole(role);
+                await resolveAndSyncUserTenant(userWithRole);
                 setCurrentScreen("barbershop");
               }}
               onCompleteOnboarding={({ user: newUser, tenant: newTenant }) => {
                 setGoogleNewUserCandidate(null);
-                if (newUser) setCurrentUser(newUser);
+                if (newUser) {
+                  const role = USER_ROLES.ADMIN;
+                  const userWithRole = {
+                    ...newUser,
+                    role,
+                    user_metadata: {
+                      ...(newUser?.user_metadata || {}),
+                      role,
+                    },
+                  };
+                  safeStorage.setItem("saas_auth_user", JSON.stringify(userWithRole));
+                  safeStorage.setItem("saas_active_screen", "barbershop");
+                  setCurrentUser(userWithRole);
+                  setActiveUserRole(role);
+                }
                 if (newTenant) setTenant(normalizeTenantRecord(newTenant, newUser));
-                setActiveUserRole(USER_ROLES.ADMIN);
+                safeStorage.setItem("saas_active_screen", "barbershop");
                 setCurrentScreen("barbershop");
               }}
             />
@@ -886,7 +1048,10 @@ export default function App() {
           <ErrorBoundary componentName="Onboarding Quiz">
             <OnboardingQuiz
               user={currentUser}
-              onCancel={() => setCurrentScreen("login")}
+              onCancel={() => {
+                safeStorage.setItem("saas_active_screen", "login");
+                setCurrentScreen("login");
+              }}
               onSelectScenario={async (scenario) => {
                 safeStorage.setItem("barber_saas_persona", scenario);
                 const isSolo = scenario === "solo_barber";
@@ -904,6 +1069,8 @@ export default function App() {
                   },
                 };
 
+                safeStorage.setItem("saas_auth_user", JSON.stringify(updatedUser));
+                safeStorage.setItem("saas_active_screen", "barbershop");
                 setCurrentUser(updatedUser);
                 setActiveUserRole(role);
 
@@ -943,11 +1110,14 @@ export default function App() {
                 if (isSuperAdminEmail) {
                   const superAdminUser = {
                     ...loggedUser,
+                    role: USER_ROLES.SUPERADMIN,
                     user_metadata: {
                       ...(loggedUser?.user_metadata || {}),
                       role: USER_ROLES.SUPERADMIN,
                     },
                   };
+                  safeStorage.setItem("saas_auth_user", JSON.stringify(superAdminUser));
+                  safeStorage.setItem("saas_active_screen", "superadmin");
                   setCurrentUser(superAdminUser);
                   setActiveUserRole(USER_ROLES.SUPERADMIN);
                   await resolveAndSyncUserTenant(superAdminUser);
@@ -962,6 +1132,7 @@ export default function App() {
                 // =====================================================================
                 if (loggedUser?.isNewUser) {
                   setGoogleNewUserCandidate(loggedUser);
+                  safeStorage.setItem("saas_active_screen", "onboarding");
                   setCurrentScreen("onboarding");
                   return;
                 }
@@ -984,12 +1155,14 @@ export default function App() {
                     role: role,
                   },
                 };
+                const nextScreen =
+                  role === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop";
+                safeStorage.setItem("saas_auth_user", JSON.stringify(userWithRole));
+                safeStorage.setItem("saas_active_screen", nextScreen);
                 setCurrentUser(userWithRole);
                 setActiveUserRole(role);
                 await resolveAndSyncUserTenant(userWithRole);
-                setCurrentScreen(
-                  role === USER_ROLES.SUPERADMIN ? "superadmin" : "barbershop"
-                );
+                setCurrentScreen(nextScreen);
               }}
             />
           </ErrorBoundary>

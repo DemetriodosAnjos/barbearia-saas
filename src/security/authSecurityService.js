@@ -20,6 +20,8 @@ import {
 } from "../middleware/authRateLimiter";
 import { validateCaptchaChallenge } from "./captchaValidator";
 
+import { safeStorage } from "../utils/safeStorage";
+
 export const AUTH_SECURITY_CONSTANTS = {
   GENERIC_ERROR_MESSAGE: "Credenciais inválidas",
   PASSWORD_RECOVERY_GENERIC_MESSAGE:
@@ -93,74 +95,118 @@ export async function secureLogin({
     }
   }
 
-  // 3. DELEGAÇÃO CRIPTOGRÁFICA EXCLUSIVA AO SUPABASE AUTH
-  // O frontend NÃO executa MD5, SHA-256 ou hashing local.
-  // A senha é transmitida em texto limpo encapsulada via HTTPS/TLS para a API
-  // GoTrue do Supabase, que aplica Argon2id/bcrypt no banco de dados.
+  // 3. DELEGAÇÃO CRIPTOGRÁFICA EXCLUSIVA AO SUPABASE AUTH / BACKEND
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password: password,
     });
 
-    if (error) {
-      // 4. FALHA: REGISTRA TENTATIVA E ENFORÇA RESPOSTA GENÉRICA ANTI-ENUMERAÇÃO
-      const failRecord = recordFailedAttempt({
+    if (!error && data?.user) {
+      recordSuccessfulAttempt({
         identifier: normalizedEmail,
         ip: clientIp,
       });
 
-      if (failRecord.locked) {
-        return {
-          success: false,
-          error: failRecord.message,
-          isLocked: true,
-          remainingAttempts: 0,
-          retryAfterSeconds: failRecord.retryAfterSeconds,
-          statusCode: 429,
-        };
+      const rawUserRole = data.user?.user_metadata?.role;
+      const normalizedRole =
+        !rawUserRole || rawUserRole === "owner" || rawUserRole === "tenant"
+          ? "admin"
+          : rawUserRole;
+
+      const normalizedUser = {
+        ...data.user,
+        role: normalizedRole,
+        user_metadata: {
+          ...(data.user.user_metadata || {}),
+          role: normalizedRole,
+        },
+      };
+
+      // Persiste sessão segura no safeStorage para resiliência ao F5
+      safeStorage.setItem("saas_auth_user", JSON.stringify(normalizedUser));
+      if (data.session?.access_token) {
+        safeStorage.setItem("saas_jwt_access_token", data.session.access_token);
+        safeStorage.setItem("access_token", data.session.access_token);
       }
 
       return {
-        success: false,
-        // Mensagem estritamente genérica para evitar enumeração de contas
-        error: AUTH_SECURITY_CONSTANTS.GENERIC_ERROR_MESSAGE,
-        remainingAttempts: failRecord.remainingAttempts,
-        isLocked: false,
-        statusCode: 401,
+        success: true,
+        user: normalizedUser,
+        session: data.session,
+        statusCode: 200,
       };
     }
 
-    // 5. SUCESSO: RESETA CONTADORES DE TENTATIVAS INCORRETAS
-    recordSuccessfulAttempt({
+    // 3b. Fallback com endpoint seguro /api/auth/login
+    try {
+      const localApiRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+      if (localApiRes.ok) {
+        const apiData = await localApiRes.json();
+        if (apiData?.success && apiData?.user) {
+          recordSuccessfulAttempt({ identifier: normalizedEmail, ip: clientIp });
+          const rawRole = apiData.user.role;
+          const normalizedRole =
+            !rawRole || rawRole === "owner" || rawRole === "tenant"
+              ? "admin"
+              : rawRole;
+
+          const normalizedUser = {
+            ...apiData.user,
+            role: normalizedRole,
+            user_metadata: {
+              ...(apiData.user.user_metadata || {}),
+              role: normalizedRole,
+            },
+          };
+
+          safeStorage.setItem("saas_auth_user", JSON.stringify(normalizedUser));
+          if (apiData.accessToken) {
+            safeStorage.setItem("saas_jwt_access_token", apiData.accessToken);
+            safeStorage.setItem("access_token", apiData.accessToken);
+          }
+
+          return {
+            success: true,
+            user: normalizedUser,
+            session: { access_token: apiData.accessToken },
+            statusCode: 200,
+          };
+        }
+      }
+    } catch {
+      // continua para registrar tentativa falha
+    }
+
+    // 4. FALHA: REGISTRA TENTATIVA E ENFORÇA RESPOSTA GENÉRICA ANTI-ENUMERAÇÃO
+    const failRecord = recordFailedAttempt({
       identifier: normalizedEmail,
       ip: clientIp,
     });
 
-    const rawUserRole = data.user?.user_metadata?.role;
-    const normalizedRole =
-      !rawUserRole || rawUserRole === "owner" || rawUserRole === "tenant"
-        ? "admin"
-        : rawUserRole;
-
-    const normalizedUser = data.user
-      ? {
-          ...data.user,
-          user_metadata: {
-            ...(data.user.user_metadata || {}),
-            role: normalizedRole,
-          },
-        }
-      : data.user;
+    if (failRecord.locked) {
+      return {
+        success: false,
+        error: failRecord.message,
+        isLocked: true,
+        remainingAttempts: 0,
+        retryAfterSeconds: failRecord.retryAfterSeconds,
+        statusCode: 429,
+      };
+    }
 
     return {
-      success: true,
-      user: normalizedUser,
-      session: data.session,
-      statusCode: 200,
+      success: false,
+      error: AUTH_SECURITY_CONSTANTS.GENERIC_ERROR_MESSAGE,
+      remainingAttempts: failRecord.remainingAttempts,
+      isLocked: false,
+      statusCode: 401,
     };
   } catch {
-    // Erros inesperados tratam falha sem vazar stack trace de infraestrutura
     recordFailedAttempt({ identifier: normalizedEmail, ip: clientIp });
     return {
       success: false,

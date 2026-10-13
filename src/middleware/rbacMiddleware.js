@@ -66,6 +66,32 @@ export function parseAndValidateJwt(token) {
     return { valid: false, error: "Token não fornecido ou tipo inválido." };
   }
 
+  // Suporte a tokens emitidos pelo fluxo Google SSO
+  if (token.startsWith("g_sso_")) {
+    try {
+      const b64 = token.replace(/^g_sso_/, "");
+      let normalizedB64 = b64.replace(/-/g, "+").replace(/_/g, "/");
+      while (normalizedB64.length % 4 !== 0) {
+        normalizedB64 += "=";
+      }
+      const jsonText = atob(normalizedB64);
+      const payload = JSON.parse(jsonText);
+      const nowInSeconds = Math.floor(Date.now() / 1000);
+      if (payload.exp && payload.exp < nowInSeconds) {
+        return { valid: false, error: "Token JWT expirado.", expired: true };
+      }
+      return {
+        valid: true,
+        payload: {
+          ...payload,
+          role: payload.role || USER_ROLES.ADMIN,
+        },
+      };
+    } catch {
+      return { valid: false, error: "Token Google SSO malformado." };
+    }
+  }
+
   const parts = token.trim().split(".");
   if (parts.length !== 3) {
     return { valid: false, error: "Formato de token JWT malformado (deve conter 3 segmentos)." };

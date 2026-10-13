@@ -80,7 +80,7 @@ export function detectAndNeutralizeStorageTampering(): {
   try {
     // 1. Inspeciona chaves diretas de role injetadas
     const rawRole = safeStorage.getItem('role') || safeStorage.getItem('user_role') || safeStorage.getItem('barbearia_role');
-    const rawToken = safeStorage.getItem('access_token') || safeStorage.getItem('jwt_token') || safeStorage.getItem('token');
+    const rawToken = safeStorage.getItem('access_token') || safeStorage.getItem('jwt_token') || safeStorage.getItem('token') || safeStorage.getItem('saas_jwt_access_token');
     const rawUser = safeStorage.getItem('user') || safeStorage.getItem('auth_user');
 
     // Validação cruzada: se o papel alegado for admin/superadmin

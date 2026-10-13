@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { executeLogout, LogoutAuditResult, LogoutOptions } from "../security/logoutService";
 import { supabase } from "../lib/supabase";
+import { safeStorage } from "../utils/safeStorage";
 
 export interface UseSecureLogoutOptions {
   onSuccess?: (audit: LogoutAuditResult) => void;
@@ -106,8 +107,10 @@ export function useSecureLogout(options: UseSecureLogoutOptions = {}) {
         const { data } = supabase.auth.onAuthStateChange((event, session) => {
           if (isLoggingOutRef.current) return;
           if (event === "SIGNED_OUT" || (event === "TOKEN_REFRESHED" && !session)) {
-            // Dispara higienização automática se a sessão caiu
-            logout({ reason: "TOKEN_EXPIRED" }).catch(() => {});
+            const hasLocalSession = Boolean(safeStorage.getItem("saas_auth_user"));
+            if (!hasLocalSession) {
+              logout({ reason: "TOKEN_EXPIRED" }).catch(() => {});
+            }
           }
         });
         authSubscription = data.subscription;
