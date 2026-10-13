@@ -178,6 +178,7 @@ export const SCHEMAS = {
   clientDirectory: {
     name: { type: "string", required: true, minLength: 2, maxLength: 80 },
     phone: { type: "string", required: true, minLength: 10, maxLength: 20 },
+    email: { type: "string", required: false, maxLength: 100 },
     cpf: { type: "string", required: false, maxLength: 20 },
     birth_date: { type: "string", required: false, maxLength: 15 },
     frequency_days: { type: "number", required: false, min: 1, max: 365, default: 18 },

@@ -186,13 +186,15 @@ export default function ScheduleView({
         barbershop_id: tenantId,
         name: cleanName,
         phone: cleanPhone,
-        notes: cleanNotes || cleanTechNotes,
-        technical_notes: cleanTechNotes,
-        frequency_days: 18,
         is_vip: false,
-        total_spent: 0,
-        total_cuts: 0,
-        last_visit: formatDateToYMD(new Date()),
+        total_visits: 0,
+        average_ticket: 0,
+        technical_notes: {
+          notes: cleanNotes || cleanTechNotes,
+          cutSpecs: cleanTechNotes || cleanNotes,
+          frequency_days: 18,
+          last_visit: formatDateToYMD(new Date()),
+        },
       };
 
       const { data, error } = await supabase
@@ -236,12 +238,21 @@ export default function ScheduleView({
       const clientId = selectedClientForRecord.id;
 
       if (clientId && !String(clientId).startsWith("cli-mock")) {
+        const existingTechNotes =
+          typeof selectedClientForRecord?.technical_notes === "object" && selectedClientForRecord.technical_notes
+            ? selectedClientForRecord.technical_notes
+            : typeof selectedClientForRecord?.technicalNotes === "object" && selectedClientForRecord.technicalNotes
+            ? selectedClientForRecord.technicalNotes
+            : {};
+
         await supabase
           .from("clients")
           .update({
-            notes: cleanNotes,
-            technical_notes: cleanNotes,
-            updated_at: new Date().toISOString(),
+            technical_notes: {
+              ...existingTechNotes,
+              notes: cleanNotes,
+              cutSpecs: cleanNotes,
+            },
           })
           .eq("id", clientId);
       }

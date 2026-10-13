@@ -500,6 +500,7 @@ export default function BarbershopDashboard({
                   onUpdateClients={onUpdateClients}
                   onNavigateToBooking={() => setActiveMenuTab("agenda")}
                   onBack={() => setActiveMenuTab("agenda")}
+                  tenant={tenant}
                 />
               </ErrorBoundary>
             )}

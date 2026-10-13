@@ -31,13 +31,34 @@ import {
 export function normalizeClientRecord(c) {
   if (!c || typeof c !== "object") return {};
 
-  const totalSpent = Number(c.totalSpent ?? c.total_spent ?? 0);
-  const totalVisits = Number(c.totalVisits ?? c.total_cuts ?? 0);
-  const frequencyDays = Number(c.frequencyDays ?? c.frequency_days ?? 18);
-  const isVip = Boolean(c.isVip ?? c.is_vip);
-  const rawLastVisit = c.lastVisitDate || c.last_visit || c.lastVisit || "";
+  const techNotes =
+    typeof c.technical_notes === "object" && c.technical_notes !== null
+      ? c.technical_notes
+      : typeof c.technicalNotes === "object" && c.technicalNotes !== null
+      ? c.technicalNotes
+      : {};
 
-  let daysSinceLastVisit = Number(c.daysSinceLastVisit ?? 0);
+  const totalSpent = Number(
+    c.totalSpent ??
+      c.total_spent ??
+      techNotes.total_spent ??
+      (Number(c.average_ticket || 0) * Number(c.total_visits || c.totalVisits || 0))
+  );
+  const totalVisits = Number(
+    c.totalVisits ?? c.total_visits ?? c.total_cuts ?? techNotes.total_visits ?? 0
+  );
+  const frequencyDays = Number(
+    c.frequencyDays ?? c.frequency_days ?? techNotes.frequency_days ?? 18
+  );
+  const isVip = Boolean(c.isVip ?? c.is_vip ?? techNotes.is_vip);
+  const rawLastVisit =
+    c.lastVisitDate ||
+    c.last_visit ||
+    c.lastVisit ||
+    techNotes.last_visit ||
+    "";
+
+  let daysSinceLastVisit = Number(c.daysSinceLastVisit ?? techNotes.days_since_last_visit ?? 0);
   if (!daysSinceLastVisit && rawLastVisit) {
     try {
       const visitDate = new Date(rawLastVisit);
@@ -52,22 +73,40 @@ export function normalizeClientRecord(c) {
 
   const rawStatus =
     c.status ||
+    techNotes.status ||
     (daysSinceLastVisit > 40 ? "at_risk" : isVip ? "vip" : "active");
   const preferredBarber =
-    c.preferredBarber || c.preferred_barber || "Barbeiro Geral";
+    c.preferredBarber ||
+    c.preferred_barber ||
+    techNotes.preferred_barber ||
+    "Barbeiro Geral";
+
+  const cpf = c.cpf || techNotes.cpf || "";
+  const birthDate = c.birthDate || c.birth_date || techNotes.birth_date || "";
+  const notes =
+    c.notes ||
+    techNotes.notes ||
+    (typeof c.technical_notes === "string" ? c.technical_notes : "");
 
   return {
     ...c,
     id: c.id,
+    barbershop_id: c.barbershop_id,
     name: c.name || "Cliente sem Nome",
     phone: c.phone || "",
     email: c.email || "",
-    cpf: c.cpf || "",
+    cpf,
+    birthDate,
+    birth_date: birthDate,
     isVip,
+    is_vip: isVip,
     status: rawStatus,
     frequencyDays: frequencyDays > 0 ? frequencyDays : 18,
+    frequency_days: frequencyDays > 0 ? frequencyDays : 18,
     totalVisits: Number.isFinite(totalVisits) ? totalVisits : 0,
+    total_visits: Number.isFinite(totalVisits) ? totalVisits : 0,
     totalSpent: Number.isFinite(totalSpent) ? totalSpent : 0,
+    average_ticket: Number(c.average_ticket || (totalVisits > 0 ? totalSpent / totalVisits : 0)),
     lastVisitDate: rawLastVisit
       ? typeof rawLastVisit === "string"
         ? rawLastVisit.slice(0, 10)
@@ -75,8 +114,15 @@ export function normalizeClientRecord(c) {
       : "Recém-cadastrado",
     daysSinceLastVisit: Number.isFinite(daysSinceLastVisit) ? daysSinceLastVisit : 0,
     preferredBarber,
-    notes: c.notes || "",
-    technicalNotes: c.technicalNotes || c.technical_notes || c.notes || "",
+    preferred_barber: preferredBarber,
+    notes,
+    technical_notes: techNotes,
+    technicalNotes: {
+      cutSpecs: techNotes.cutSpecs || notes || "Primeiro atendimento na barbearia.",
+      beardSpecs: techNotes.beardSpecs || "",
+      allergyAlert: techNotes.allergyAlert || "",
+      ...techNotes,
+    },
   };
 }
 
@@ -86,6 +132,7 @@ export default function ClientsDirectoryView({
   onUpdateClients,
   onNavigateToBooking,
   onBack,
+  tenant,
 }) {
   // [Estado: inicializado com a lista normalizada da barbearia]
   const [clients, setClients] = useState(() =>
@@ -110,6 +157,7 @@ export default function ClientsDirectoryView({
   const [newClientForm, setNewClientForm] = useState({
     name: "",
     phone: "",
+    email: "",
     cpf: "",
     birthDate: "",
     frequencyDays: "18", // Padrão 18 dias
@@ -181,13 +229,56 @@ export default function ClientsDirectoryView({
     }
 
     try {
-      // Método Supabase: persiste a frequência de retorno na tabela clients
+      const existingClient = clients.find((c) => c.id === clientId);
+      const existingTechNotes =
+        typeof existingClient?.technical_notes === "object" && existingClient?.technical_notes !== null
+          ? existingClient.technical_notes
+          : typeof existingClient?.technicalNotes === "object" && existingClient?.technicalNotes !== null
+          ? existingClient.technicalNotes
+          : {};
+
       await supabase
         .from("clients")
-        .update({ frequency_days: freqNum })
+        .update({
+          technical_notes: {
+            ...existingTechNotes,
+            frequency_days: freqNum,
+          },
+        })
         .eq("id", clientId);
     } catch (err) {
       console.error("Erro ao atualizar frequência do cliente:", err);
+    }
+  };
+
+  // [Função assíncrona: remove um cliente do banco de dados com confirmação]
+  const handleDeleteClient = async (client) => {
+    if (!client?.id) return;
+    if (
+      !window.confirm(
+        `Tem certeza que deseja remover o cliente "${client.name}" do cadastro?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("clients")
+        .delete()
+        .eq("id", client.id);
+
+      if (error) throw error;
+
+      const updated = clients.filter((c) => c.id !== client.id);
+      setClients(updated);
+
+      if (onUpdateClients) {
+        onUpdateClients(updated);
+      }
+    } catch (err) {
+      console.error("Erro ao excluir cliente no Supabase:", err);
+      alert(`Erro ao excluir cliente: ${err?.message || "Tente novamente."}`);
     }
   };
 
@@ -220,6 +311,7 @@ export default function ClientsDirectoryView({
     const rawClientData = {
       name: DOMPurify.sanitize(newClientForm.name.trim(), { ALLOWED_TAGS: [] }),
       phone: DOMPurify.sanitize(newClientForm.phone.trim(), { ALLOWED_TAGS: [] }),
+      email: newClientForm.email?.trim() ? DOMPurify.sanitize(newClientForm.email.trim(), { ALLOWED_TAGS: [] }) : "",
       cpf: DOMPurify.sanitize(newClientForm.cpf?.trim() || "", { ALLOWED_TAGS: [] }),
       birth_date: newClientForm.birthDate || "",
       frequency_days: Number(newClientForm.frequencyDays || 18),
@@ -236,16 +328,32 @@ export default function ClientsDirectoryView({
       return;
     }
 
-    const clientPayload = {
-      name: validation.sanitized.name,
-      phone: validation.sanitized.phone,
+    const techNotes = {
       cpf: validation.sanitized.cpf || null,
       birth_date: validation.sanitized.birth_date || null,
       frequency_days: validation.sanitized.frequency_days,
       status: "active",
-      total_visits: 0,
-      total_spent: 0,
       notes: validation.sanitized.notes || "",
+      cutSpecs: validation.sanitized.notes || "Primeiro atendimento na barbearia.",
+      beardSpecs: "",
+      allergyAlert: "",
+    };
+
+    const resolvedBarbershopId =
+      tenant?.id ||
+      (typeof tenant === "string" ? tenant : null) ||
+      "788299e3-a26c-4a0b-bc71-c7ae81ed40d3";
+
+    // Mapeamento compatível 100% com a tabela public.clients no Supabase
+    const clientPayload = {
+      barbershop_id: resolvedBarbershopId,
+      name: validation.sanitized.name,
+      phone: validation.sanitized.phone,
+      email: validation.sanitized.email || null,
+      is_vip: false,
+      total_visits: 0,
+      average_ticket: 0,
+      technical_notes: techNotes,
     };
 
     try {
@@ -256,30 +364,20 @@ export default function ClientsDirectoryView({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro retornado pelo Supabase na tabela clients:", error);
+        throw error;
+      }
 
       // Normaliza o objeto para o estado React
-      const created = {
-        id: data.id,
+      const created = normalizeClientRecord({
+        ...data,
         name: data.name,
         phone: data.phone,
-        cpf: data.cpf || "Não informado",
-        birthDate: data.birth_date || "",
-        isVip: false,
-        status: "active",
-        lastVisitDate: "Recém-cadastrado",
-        daysSinceLastVisit: 0,
-        frequencyDays: data.frequency_days || 18,
-        totalVisits: 0,
-        totalSpent: 0.0,
-        preferredBarber: "Não definido",
-        technicalNotes: {
-          cutSpecs: data.notes || "Primeiro atendimento na barbearia.",
-          beardSpecs: "",
-          allergyAlert: "",
-        },
-        historyEvents: [],
-      };
+        email: data.email,
+        is_vip: data.is_vip,
+        technical_notes: data.technical_notes,
+      });
 
       const updated = [created, ...clients];
       setClients(updated);
@@ -295,6 +393,7 @@ export default function ClientsDirectoryView({
       setNewClientForm({
         name: "",
         phone: "",
+        email: "",
         cpf: "",
         birthDate: "",
         frequencyDays: "18",
@@ -303,7 +402,7 @@ export default function ClientsDirectoryView({
       setFormErrors({});
     } catch (err) {
       console.error("Erro ao salvar cliente no Supabase:", err);
-      alert("Erro ao cadastrar cliente no banco de dados.");
+      alert(`Erro ao cadastrar cliente no banco de dados: ${err?.message || "Verifique as configurações."}`);
     } finally {
       setIsSavingClient(false);
     }
@@ -621,6 +720,12 @@ export default function ClientsDirectoryView({
                   );
               },
             },
+            {
+              label: "Excluir Cliente",
+              icon: "Trash2",
+              isDanger: true,
+              onClick: (row) => handleDeleteClient(row),
+            },
           ]}
         />
       </div>
@@ -863,6 +968,16 @@ export default function ClientsDirectoryView({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
+              label="E-mail (Opcional)"
+              type="email"
+              placeholder="cliente@email.com"
+              value={newClientForm.email}
+              onChange={(e) =>
+                setNewClientForm({ ...newClientForm, email: e.target.value })
+              }
+            />
+
+            <Input
               label="CPF (Opcional)"
               mask="cpf"
               placeholder="000.000.000-00"
@@ -871,9 +986,11 @@ export default function ClientsDirectoryView({
                 setNewClientForm({ ...newClientForm, cpf: e.target.value })
               }
             />
+          </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
-              label="Data de Nascimento"
+              label="Data de Nascimento (Opcional)"
               type="date"
               value={newClientForm.birthDate}
               onChange={(e) =>
