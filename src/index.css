@@ -191,24 +191,32 @@ html:not(.dark) .shadow-md {
 }
 
 /* ======================================================== */
-/* ÍCONES DE INPUT DATA (CALENDÁRIO / AGENDA EM BRANCO #ffffff) */
+/* REMOVE ÍCONE NATIVO ESCURO DE CALENDÁRIO                 */
+/* Mantém exclusivamente o ícone da biblioteca Lucide em branco #ffffff */
 /* ======================================================== */
 input[type="date"] {
   color-scheme: dark;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) brightness(100%) !important;
-  cursor: pointer;
-  opacity: 1 !important;
-}
-
-html:not(.dark) input[type="date"] {
-  color-scheme: light;
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 html:not(.dark) input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: none !important;
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 /* ======================================================== */

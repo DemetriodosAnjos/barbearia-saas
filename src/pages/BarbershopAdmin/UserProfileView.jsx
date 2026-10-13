@@ -19,6 +19,7 @@ import Select from "../../components/ui/Select";
 import TagInput from "../../components/ui/TagInput";
 import Alert from "../../components/ui/Alert";
 import ProjectIcon from "../../components/ui/ProjectIcon";
+import { Calendar } from "lucide-react";
 import { SafeHtml } from "../../components/ui/SafeHtml";
 import {
   validateAvatarUpload,
@@ -753,7 +754,6 @@ export default function UserProfileView({
                     displayName: e.target.value,
                   })
                 }
-                helperText="Este é o nome que os clientes verão na agenda e no aplicativo."
               />
             </div>
 
@@ -768,11 +768,10 @@ export default function UserProfileView({
                     setProfileErrors({ ...profileErrors, cpf: null });
                 }}
                 error={profileErrors.cpf}
-                helperText="Obrigatório para identificação legal e fiscal."
               />
 
               <Input
-                label="CNPJ / MEI (Opcional se for parceiro PJ)"
+                label="CNPJ / MEI (Opcional)"
                 mask="cnpj"
                 placeholder="00.000.000/0000-00"
                 value={personalData.cnpj}
@@ -782,7 +781,6 @@ export default function UserProfileView({
                     setProfileErrors({ ...profileErrors, cnpj: null });
                 }}
                 error={profileErrors.cnpj}
-                helperText="Opcional. Preencha caso possua MEI ou CNPJ."
               />
 
               <Input
@@ -798,8 +796,15 @@ export default function UserProfileView({
                     setProfileErrors({ ...profileErrors, birthDate: null });
                 }}
                 error={profileErrors.birthDate}
-                helperText="Utilizado para identificação e benefícios."
-                className="[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                rightIcon={
+                  <Calendar
+                    size={18}
+                    className="text-white"
+                    color="#ffffff"
+                    aria-label="Ícone Agenda"
+                  />
+                }
+                className="cursor-pointer text-neutral-100"
               />
             </div>
           </div>
