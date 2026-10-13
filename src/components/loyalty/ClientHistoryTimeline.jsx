@@ -12,9 +12,10 @@ export default function ClientHistoryTimeline({
   const totalVisits = Number(
     metrics.totalVisits || metrics.total_visits || events.length || 0,
   );
-  const averageTicket = Number(
-    metrics.averageTicket || metrics.average_ticket || 0,
+  const averageTicketRaw = Number(
+    metrics.averageTicket ?? metrics.average_ticket ?? 0,
   );
+  const averageTicket = Number.isFinite(averageTicketRaw) ? averageTicketRaw : 0;
   const frequencyDays = metrics.frequencyDays || metrics.frequency_days || null;
   const preferredBarber =
     metrics.preferredBarber || metrics.preferred_barber || "—";
@@ -63,7 +64,7 @@ export default function ClientHistoryTimeline({
 
       {/* 2. FICHA TÉCNICA DO CLIENTE COM SUPORTE A EMPTY STATE */}
       <div className={timelineStyles.notesBox}>
-        <div className={notesHeader}>
+        <div className={timelineStyles.notesHeader}>
           <span className="flex items-center gap-1.5">
             <Scissors className="w-3.5 h-3.5 text-amber-400" />
             <span>Ficha Técnica &amp; Preferências</span>

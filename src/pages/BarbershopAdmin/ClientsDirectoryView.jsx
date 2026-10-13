@@ -27,6 +27,59 @@ import {
   Lightbulb,
 } from "lucide-react";
 
+// Normalização defensiva dos registros da tabela clients (suporta snake_case e camelCase)
+export function normalizeClientRecord(c) {
+  if (!c || typeof c !== "object") return {};
+
+  const totalSpent = Number(c.totalSpent ?? c.total_spent ?? 0);
+  const totalVisits = Number(c.totalVisits ?? c.total_cuts ?? 0);
+  const frequencyDays = Number(c.frequencyDays ?? c.frequency_days ?? 18);
+  const isVip = Boolean(c.isVip ?? c.is_vip);
+  const rawLastVisit = c.lastVisitDate || c.last_visit || c.lastVisit || "";
+
+  let daysSinceLastVisit = Number(c.daysSinceLastVisit ?? 0);
+  if (!daysSinceLastVisit && rawLastVisit) {
+    try {
+      const visitDate = new Date(rawLastVisit);
+      if (!Number.isNaN(visitDate.getTime())) {
+        const diffMs = Date.now() - visitDate.getTime();
+        daysSinceLastVisit = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+      }
+    } catch {
+      daysSinceLastVisit = 0;
+    }
+  }
+
+  const rawStatus =
+    c.status ||
+    (daysSinceLastVisit > 40 ? "at_risk" : isVip ? "vip" : "active");
+  const preferredBarber =
+    c.preferredBarber || c.preferred_barber || "Barbeiro Geral";
+
+  return {
+    ...c,
+    id: c.id,
+    name: c.name || "Cliente sem Nome",
+    phone: c.phone || "",
+    email: c.email || "",
+    cpf: c.cpf || "",
+    isVip,
+    status: rawStatus,
+    frequencyDays: frequencyDays > 0 ? frequencyDays : 18,
+    totalVisits: Number.isFinite(totalVisits) ? totalVisits : 0,
+    totalSpent: Number.isFinite(totalSpent) ? totalSpent : 0,
+    lastVisitDate: rawLastVisit
+      ? typeof rawLastVisit === "string"
+        ? rawLastVisit.slice(0, 10)
+        : "Recém-cadastrado"
+      : "Recém-cadastrado",
+    daysSinceLastVisit: Number.isFinite(daysSinceLastVisit) ? daysSinceLastVisit : 0,
+    preferredBarber,
+    notes: c.notes || "",
+    technicalNotes: c.technicalNotes || c.technical_notes || c.notes || "",
+  };
+}
+
 // [Função componente: recebe clientsList real e callback de atualização do dashboard]
 export default function ClientsDirectoryView({
   clientsList = [],
@@ -34,8 +87,10 @@ export default function ClientsDirectoryView({
   onNavigateToBooking,
   onBack,
 }) {
-  // [Estado: inicializado com a lista oficial da barbearia]
-  const [clients, setClients] = useState(clientsList);
+  // [Estado: inicializado com a lista normalizada da barbearia]
+  const [clients, setClients] = useState(() =>
+    Array.isArray(clientsList) ? clientsList.map(normalizeClientRecord) : []
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isSavingClient, setIsSavingClient] = useState(false);
@@ -43,7 +98,7 @@ export default function ClientsDirectoryView({
   // [Efeito de sincronização: atualiza a lista interna sempre que a prop clientsList mudar]
   useEffect(() => {
     if (clientsList) {
-      setClients(clientsList);
+      setClients(clientsList.map(normalizeClientRecord));
     }
   }, [clientsList]);
 
@@ -254,19 +309,39 @@ export default function ClientsDirectoryView({
     }
   };
 
-  // Filtros
+  // Filtros e Métricas Robustas da Carteira
   const totalClients = clients.length;
   const vipClientsCount = clients.filter((c) => c.isVip).length;
   const atRiskCount = clients.filter((c) => c.status === "at_risk").length;
+
+  const totalSpentGlobal = clients.reduce((acc, c) => {
+    const val = Number(c.totalSpent ?? c.total_spent ?? 0);
+    return acc + (Number.isFinite(val) ? val : 0);
+  }, 0);
+
+  const totalVisitsGlobal = clients.reduce((acc, c) => {
+    const val = Number(c.totalVisits ?? c.total_cuts ?? 0);
+    return acc + (Number.isFinite(val) ? val : 0);
+  }, 0);
+
+  // Ticket médio: total faturado dividido por atendimentos realizados (ou por cliente)
   const averageTicketGlobal =
-    clients.reduce((acc, c) => acc + c.totalSpent / (c.totalVisits || 1), 0) /
-    (totalClients || 1);
+    totalVisitsGlobal > 0
+      ? totalSpentGlobal / totalVisitsGlobal
+      : totalClients > 0
+        ? totalSpentGlobal / totalClients
+        : 0;
 
   const filteredClients = clients.filter((client) => {
+    const nameStr = (client.name || "").toLowerCase();
+    const phoneStr = client.phone || "";
+    const cpfStr = client.cpf || "";
+    const searchLower = searchTerm.toLowerCase();
+
     const matchesSearch =
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.phone.includes(searchTerm) ||
-      client.cpf.includes(searchTerm);
+      nameStr.includes(searchLower) ||
+      phoneStr.includes(searchTerm) ||
+      cpfStr.includes(searchTerm);
 
     const matchesStatus =
       statusFilter === "all"
@@ -503,11 +578,15 @@ export default function ClientsDirectoryView({
               key: "totalSpent",
               label: "Total Gasto",
               sortable: true,
-              render: (row) => (
-                <span className="font-mono font-bold text-emerald-400 text-xs">
-                  R$ {Number(row.totalSpent).toFixed(2).replace(".", ",")}
-                </span>
-              ),
+              render: (row) => {
+                const spent = Number(row.totalSpent ?? row.total_spent ?? 0);
+                const safeSpent = Number.isFinite(spent) ? spent : 0;
+                return (
+                  <span className="font-mono font-bold text-emerald-400 text-xs">
+                    R$ {safeSpent.toFixed(2).replace(".", ",")}
+                  </span>
+                );
+              },
             },
             {
               key: "notes",
@@ -684,15 +763,22 @@ export default function ClientsDirectoryView({
           <div className="space-y-4">
             <ClientHistoryTimeline
               metrics={{
-                totalVisits: selectedClientForRecord.totalVisits,
-                averageTicket:
-                  selectedClientForRecord.totalSpent /
-                  (selectedClientForRecord.totalVisits || 1),
-                frequencyDays: selectedClientForRecord.frequencyDays,
-                preferredBarber: selectedClientForRecord.preferredBarber,
+                totalVisits: Number(selectedClientForRecord.totalVisits ?? selectedClientForRecord.total_cuts ?? 0),
+                averageTicket: (() => {
+                  const spent = Number(selectedClientForRecord.totalSpent ?? selectedClientForRecord.total_spent ?? 0);
+                  const visits = Number(selectedClientForRecord.totalVisits ?? selectedClientForRecord.total_cuts ?? 0);
+                  const avg = visits > 0 ? spent / visits : spent;
+                  return Number.isFinite(avg) ? avg : 0;
+                })(),
+                frequencyDays: Number(selectedClientForRecord.frequencyDays ?? selectedClientForRecord.frequency_days ?? 18),
+                preferredBarber: selectedClientForRecord.preferredBarber || selectedClientForRecord.preferred_barber || "Barbeiro Geral",
               }}
-              technicalNotes={selectedClientForRecord.technicalNotes}
-              events={selectedClientForRecord.historyEvents}
+              technicalNotes={
+                typeof selectedClientForRecord.technicalNotes === "object"
+                  ? selectedClientForRecord.technicalNotes
+                  : { cutSpecs: String(selectedClientForRecord.technicalNotes || selectedClientForRecord.notes || "Sem observações registradas.") }
+              }
+              events={selectedClientForRecord.historyEvents || []}
               onAddTechnicalNote={() =>
                 alert(
                   `Adicionar nota técnica para ${selectedClientForRecord.name}`,
