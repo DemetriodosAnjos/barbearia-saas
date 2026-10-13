@@ -148,15 +148,33 @@ export async function registerOrUpdateGlobalSession(user, tenant, force = false)
   const { safeUuid, userEmail, tenantId, userId } = getNormalizedSessionUser(user, tenant);
 
   try {
-    // 1. Se já temos um ID de sessão salvo no navegador, atualiza a última atividade
-    if (storedSessionId && storedSessionId !== "current-local-session") {
-      const { data: existingSession, error: checkErr } = await supabase
-        .from("sessions")
-        .select("id, is_active")
-        .eq("id", storedSessionId)
-        .maybeSingle();
+    // 1. Busca todas as sessões ativas do usuário para casar e deduplicar
+    let matchQuery = supabase
+      .from("sessions")
+      .select("id, is_active, device_name, user_agent, browser, os")
+      .eq("is_active", true)
+      .order("last_activity_at", { ascending: false });
 
-      if (!checkErr && existingSession && existingSession.is_active) {
+    if (userEmail) {
+      matchQuery = matchQuery.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
+    } else {
+      matchQuery = matchQuery.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
+    }
+
+    const { data: activeRows, error: searchErr } = await matchQuery;
+
+    if (!searchErr && activeRows && activeRows.length > 0) {
+      // Prioridade:
+      // 1) Sessão com ID armazenado neste navegador
+      // 2) Sessão com mesmo User-Agent
+      // 3) Sessão com mesmo nome legível do dispositivo (ex: "Google Chrome no Android")
+      const matched =
+        (storedSessionId && activeRows.find((r) => r.id === storedSessionId)) ||
+        activeRows.find((r) => r.user_agent === currentUa) ||
+        activeRows.find((r) => r.device_name === clientDevice.deviceName);
+
+      if (matched) {
+        setStoredSessionId(matched.id);
         await supabase
           .from("sessions")
           .update({
@@ -166,44 +184,33 @@ export async function registerOrUpdateGlobalSession(user, tenant, force = false)
             os: clientDevice.os,
             user_agent: currentUa,
           })
-          .eq("id", storedSessionId);
-        return existingSession;
+          .eq("id", matched.id);
+
+        // Desativa automaticamente quaisquer duplicatas antigas acumuladas deste mesmo aparelho
+        const duplicateIds = activeRows
+          .filter(
+            (r) =>
+              r.id !== matched.id &&
+              (r.device_name === clientDevice.deviceName || r.user_agent === currentUa)
+          )
+          .map((r) => r.id);
+
+        if (duplicateIds.length > 0) {
+          await supabase
+            .from("sessions")
+            .update({
+              is_active: false,
+              revoked_at: new Date().toISOString(),
+              revocation_reason: "Deduplicação automática de sessão repetida",
+            })
+            .in("id", duplicateIds);
+        }
+
+        return matched;
       }
     }
 
-    // 2. Busca se já existe uma sessão ativa deste mesmo user_agent/aparelho para o usuário
-    let matchQuery = supabase
-      .from("sessions")
-      .select("id, is_active")
-      .eq("user_agent", currentUa)
-      .eq("is_active", true)
-      .order("last_activity_at", { ascending: false })
-      .limit(1);
-
-    if (userEmail) {
-      matchQuery = matchQuery.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
-    } else {
-      matchQuery = matchQuery.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
-    }
-
-    const { data: matchSession } = await matchQuery.maybeSingle();
-
-    if (matchSession?.id) {
-      setStoredSessionId(matchSession.id);
-      await supabase
-        .from("sessions")
-        .update({
-          last_activity_at: new Date().toISOString(),
-          device_name: clientDevice.deviceName,
-          browser: clientDevice.browser,
-          os: clientDevice.os,
-          user_agent: currentUa,
-        })
-        .eq("id", matchSession.id);
-      return matchSession;
-    }
-
-    // 3. Cria um novo registro para esta nova sessão/dispositivo conectado
+    // 2. Cria um único novo registro para este novo aparelho
     const payload = {
       user_id: safeUuid,
       user_email: userEmail || null,
@@ -231,7 +238,7 @@ export async function registerOrUpdateGlobalSession(user, tenant, force = false)
     if (insertErr) {
       if (insertErr.code === "42501") {
         console.warn(
-          "[Supabase Sessions] Erro 42501 (RLS): Para sincronizar múltiplos dispositivos (notebook e celular), aplique o script SQL em Supabase Editor.",
+          "[Supabase Sessions] Erro 42501 (RLS): Para sincronizar múltiplos dispositivos, aplique o script SQL em Supabase Editor.",
           insertErr.message
         );
       } else {
@@ -247,6 +254,7 @@ export async function registerOrUpdateGlobalSession(user, tenant, force = false)
 
 /**
  * Busca todas as sessões ativas do usuário e identifica qual é o dispositivo atual
+ * Aplica deduplicação estrita: cada aparelho aparece apenas UMA VEZ na lista.
  */
 export async function fetchUserActiveSessions(user, tenant) {
   const clientDevice = getClientDeviceInfo();
@@ -269,9 +277,41 @@ export async function fetchUserActiveSessions(user, tenant) {
     const { data: dbSessions, error } = await query.order("last_activity_at", { ascending: false });
 
     if (!error && dbSessions && dbSessions.length > 0) {
+      // 1. DEDUPLICAÇÃO ESTREITA POR DISPOSITIVO
+      // Cada aparelho único (ex: "Google Chrome no Android", "Google Chrome no Windows")
+      // deve aparecer exatamente UMA VEZ, preservando o registro mais recente.
+      const uniqueDeviceMap = new Map();
+      const duplicateIdsToDeactivate = [];
+
+      for (const s of dbSessions) {
+        const deviceKey = (s.device_name || `${s.browser || "Navegador"} no ${s.os || "SO"}`).trim();
+
+        if (!uniqueDeviceMap.has(deviceKey)) {
+          uniqueDeviceMap.set(deviceKey, s);
+        } else {
+          // Identifica linhas duplicadas para faxina no banco
+          duplicateIdsToDeactivate.push(s.id);
+        }
+      }
+
+      // Faxina assíncrona no Supabase das duplicatas antigas
+      if (duplicateIdsToDeactivate.length > 0) {
+        supabase
+          .from("sessions")
+          .update({
+            is_active: false,
+            revoked_at: new Date().toISOString(),
+            revocation_reason: "Deduplicação automática de sessão repetida",
+          })
+          .in("id", duplicateIdsToDeactivate)
+          .then(() => {})
+          .catch(() => {});
+      }
+
+      const deduplicatedList = Array.from(uniqueDeviceMap.values());
       let hasCurrent = false;
 
-      const mapped = dbSessions.map((s) => {
+      const mapped = deduplicatedList.map((s) => {
         const isCurrent =
           (storedSessionId && s.id === storedSessionId) ||
           (!storedSessionId && (s.user_agent === currentUa || s.device_name === clientDevice.deviceName));
@@ -328,19 +368,31 @@ export async function fetchUserActiveSessions(user, tenant) {
 }
 
 /**
- * Desconecta/Revoga uma sessão específica
+ * Desconecta/Revoga uma sessão específica (e quaisquer duplicatas do mesmo aparelho)
  */
 export async function revokeUserSession(sessionId, user, tenant, reason = "Revogado pelo usuário no perfil") {
   const { safeUuid, userEmail, userId } = getNormalizedSessionUser(user, tenant);
   try {
+    // 1. Busca os dados do aparelho alvo para revogar em cascata quaisquer duplicatas
+    const { data: targetSession } = await supabase
+      .from("sessions")
+      .select("id, device_name")
+      .eq("id", sessionId)
+      .maybeSingle();
+
     let query = supabase
       .from("sessions")
       .update({
         is_active: false,
         revoked_at: new Date().toISOString(),
         revocation_reason: reason,
-      })
-      .eq("id", sessionId);
+      });
+
+    if (targetSession?.device_name) {
+      query = query.or(`id.eq.${sessionId},device_name.eq."${targetSession.device_name}"`);
+    } else {
+      query = query.eq("id", sessionId);
+    }
 
     if (userEmail) {
       query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
@@ -356,7 +408,7 @@ export async function revokeUserSession(sessionId, user, tenant, reason = "Revog
         user_id: safeUuid,
         event_type: "session_revoked",
         reason: reason,
-        metadata: { revoked_session_id: sessionId },
+        metadata: { revoked_session_id: sessionId, device_name: targetSession?.device_name },
       },
     ]).catch(() => {});
 

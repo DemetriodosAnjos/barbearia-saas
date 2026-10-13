@@ -438,8 +438,15 @@ export default function UserProfileView({
   // Função para desconectar uma sessão remota específica
   const handleRevokeSingleSession = async (sessionId) => {
     try {
+      const targetSession = activeSessions.find((s) => s.id === sessionId);
       await revokeUserSession(sessionId, user, tenant);
-      setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setActiveSessions((prev) =>
+        prev.filter(
+          (s) =>
+            s.id !== sessionId &&
+            (!targetSession?.device_name || s.device_name !== targetSession.device_name)
+        )
+      );
       setSessionFeedback("Dispositivo desconectado com sucesso.");
       setTimeout(() => setSessionFeedback(""), 3000);
     } catch (err) {
