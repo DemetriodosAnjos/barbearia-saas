@@ -27,57 +27,14 @@ import {
   isValidCnpj,
 } from "../../utils/inputValidator";
 import { safeStorage } from "../../utils/safeStorage";
-
-function getClientDeviceInfo() {
-  if (typeof window === "undefined" || !navigator) {
-    return {
-      deviceName: "Navegador Web",
-      browser: "Navegador Web",
-      os: "Sistema Operacional",
-      isMobile: false,
-    };
-  }
-  const ua = navigator.userAgent;
-  let os = "Sistema Operacional";
-  if (/windows phone/i.test(ua)) os = "Windows Phone";
-  else if (/win/i.test(ua)) os = "Windows";
-  else if (/iphone|ipad|ipod/i.test(ua)) os = "iOS";
-  else if (/android/i.test(ua)) os = "Android";
-  else if (/mac/i.test(ua)) os = "macOS";
-  else if (/linux/i.test(ua)) os = "Linux";
-
-  let browser = "Navegador Web";
-  if (/edg/i.test(ua)) browser = "Microsoft Edge";
-  else if (/chrome|crios/i.test(ua) && !/opr|opera/i.test(ua)) browser = "Google Chrome";
-  else if (/firefox|fxios/i.test(ua)) browser = "Mozilla Firefox";
-  else if (/safari/i.test(ua) && !/chrome|crios/i.test(ua)) browser = "Apple Safari";
-  else if (/opr|opera/i.test(ua)) browser = "Opera";
-
-  const isMobile = /mobile|android|iphone|ipad|ipod/i.test(ua);
-
-  return {
-    deviceName: `${browser} no ${os}`,
-    browser,
-    os,
-    isMobile,
-  };
-}
-
-function formatSessionActivity(isoDate) {
-  if (!isoDate) return "Atividade recente";
-  try {
-    const diffMs = Date.now() - new Date(isoDate).getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return "Ativo agora";
-    if (diffMins < 60) return `Há ${diffMins} min`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `Há ${diffHours} h`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `Há ${diffDays} dia${diffDays > 1 ? "s" : ""}`;
-  } catch {
-    return "Atividade recente";
-  }
-}
+import {
+  getClientDeviceInfo,
+  formatSessionActivity,
+  fetchUserActiveSessions,
+  registerOrUpdateGlobalSession,
+  revokeUserSession,
+  revokeOtherUserSessions,
+} from "../../services/sessionTracker";
 
 // [Função componente: consome o usuário e barbearia reais autenticados]
 export default function UserProfileView({
@@ -377,185 +334,27 @@ export default function UserProfileView({
   const [sessionFeedback, setSessionFeedback] = useState("");
   const [isDisconnectingSessions, setIsDisconnectingSessions] = useState(false);
 
-  // Efeito que sincroniza os dispositivos conectados reais com o Supabase
+  // Função para carregar e atualizar sessões ativas de todos os dispositivos
+  const loadActiveSessions = async () => {
+    setIsLoadingSessions(true);
+    try {
+      // 1. Assegura que o dispositivo atual está registrado e atualizado no banco
+      await registerOrUpdateGlobalSession(user, tenant);
+      // 2. Busca todas as sessões ativas do usuário
+      const sessions = await fetchUserActiveSessions(user);
+      setActiveSessions(sessions);
+    } catch (err) {
+      console.warn("Aviso ao carregar sessões ativas:", err);
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
+  // Efeito que sincroniza os dispositivos conectados reais com o Supabase ao abrir a aba
   useEffect(() => {
-    let isMounted = true;
-    async function syncRealUserSessions() {
-      const clientDevice = getClientDeviceInfo();
-      const currentUa = typeof navigator !== "undefined" ? navigator.userAgent : "";
-
-      if (!user?.id || user.id === "owner-usr-01") {
-        if (isMounted) {
-          setActiveSessions([
-            {
-              id: "current-local-session",
-              device_name: clientDevice.deviceName,
-              browser: clientDevice.browser,
-              os: clientDevice.os,
-              user_agent: currentUa,
-              is_current: true,
-              is_active: true,
-              last_activity_at: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-              isMobile: clientDevice.isMobile,
-            },
-          ]);
-        }
-        return;
-      }
-
-      setIsLoadingSessions(true);
-      try {
-        const { data: dbSessions, error } = await supabase
-          .from("sessions")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("is_active", true)
-          .order("last_activity_at", { ascending: false });
-
-        if (!isMounted) return;
-
-        if (!error && dbSessions && dbSessions.length > 0) {
-          let hasCurrent = false;
-          const mapped = dbSessions.map((s) => {
-            const isCurrent =
-              s.user_agent === currentUa ||
-              s.device_name === clientDevice.deviceName;
-            if (isCurrent) hasCurrent = true;
-            return {
-              ...s,
-              is_current: isCurrent,
-              isMobile: /mobile|android|iphone|ipad/i.test(
-                s.user_agent || s.device_name || ""
-              ),
-            };
-          });
-
-          if (!hasCurrent) {
-            try {
-              const { data: inserted } = await supabase
-                .from("sessions")
-                .insert([
-                  {
-                    user_id: user.id,
-                    tenant_id:
-                      tenant?.id || user?.user_metadata?.barbershop_id || "default",
-                    device_name: clientDevice.deviceName,
-                    browser: clientDevice.browser,
-                    os: clientDevice.os,
-                    user_agent: currentUa,
-                    is_active: true,
-                    last_activity_at: new Date().toISOString(),
-                    expires_at: new Date(
-                      Date.now() + 30 * 24 * 60 * 60 * 1000
-                    ).toISOString(),
-                  },
-                ])
-                .select()
-                .maybeSingle();
-
-              if (inserted && isMounted) {
-                mapped.unshift({
-                  ...inserted,
-                  is_current: true,
-                  isMobile: clientDevice.isMobile,
-                });
-              }
-            } catch {
-              // Tabela pode ter restrição ou não existir ainda
-            }
-          }
-
-          if (isMounted) {
-            if (!mapped.some((s) => s.is_current) && mapped.length > 0) {
-              mapped[0].is_current = true;
-            }
-            setActiveSessions(mapped);
-          }
-        } else {
-          // Tabela vazia ou ainda não criada no Supabase: registra a sessão atual
-          try {
-            const { data: inserted } = await supabase
-              .from("sessions")
-              .insert([
-                {
-                  user_id: user.id,
-                  tenant_id:
-                    tenant?.id || user?.user_metadata?.barbershop_id || "default",
-                  device_name: clientDevice.deviceName,
-                  browser: clientDevice.browser,
-                  os: clientDevice.os,
-                  user_agent: currentUa,
-                  is_active: true,
-                  last_activity_at: new Date().toISOString(),
-                  expires_at: new Date(
-                    Date.now() + 30 * 24 * 60 * 60 * 1000
-                  ).toISOString(),
-                },
-              ])
-              .select()
-              .maybeSingle();
-
-            if (inserted && isMounted) {
-              setActiveSessions([
-                {
-                  ...inserted,
-                  is_current: true,
-                  isMobile: clientDevice.isMobile,
-                },
-              ]);
-              return;
-            }
-          } catch {
-            // Silencioso caso a tabela sessions não esteja provisionada ainda
-          }
-
-          if (isMounted) {
-            setActiveSessions([
-              {
-                id: "current-local-session",
-                device_name: clientDevice.deviceName,
-                browser: clientDevice.browser,
-                os: clientDevice.os,
-                user_agent: currentUa,
-                is_current: true,
-                is_active: true,
-                last_activity_at: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-                isMobile: clientDevice.isMobile,
-              },
-            ]);
-          }
-        }
-      } catch (err) {
-        console.warn("Aviso ao carregar sessões de public.sessions:", err);
-        if (isMounted) {
-          setActiveSessions([
-            {
-              id: "current-local-session",
-              device_name: clientDevice.deviceName,
-              browser: clientDevice.browser,
-              os: clientDevice.os,
-              user_agent: currentUa,
-              is_current: true,
-              is_active: true,
-              last_activity_at: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-              isMobile: clientDevice.isMobile,
-            },
-          ]);
-        }
-      } finally {
-        if (isMounted) setIsLoadingSessions(false);
-      }
-    }
-
     if (activeTab === "seguranca") {
-      syncRealUserSessions();
+      loadActiveSessions();
     }
-    return () => {
-      isMounted = false;
-    };
   }, [activeTab, user?.id, tenant?.id]);
 
   // Função para desconectar todos os outros dispositivos remotos
@@ -569,27 +368,10 @@ export default function UserProfileView({
             await supabase.auth.signOut({ scope: "others" });
           }
         } catch {
-          // Ignore se GoTrue não tiver o endpoint scope: others habilitado
+          // Ignore
         }
-
         const currentSession = activeSessions.find((s) => s.is_current);
-        let query = supabase
-          .from("sessions")
-          .update({
-            is_active: false,
-            revoked_at: new Date().toISOString(),
-            revocation_reason: "Desconectado pelo usuário na aba Segurança",
-          })
-          .eq("user_id", user.id);
-
-        if (
-          currentSession?.id &&
-          currentSession.id !== "current-local-session"
-        ) {
-          query = query.neq("id", currentSession.id);
-        }
-
-        await query;
+        await revokeOtherUserSessions(currentSession?.id, user.id);
       }
 
       setActiveSessions((prev) => prev.filter((s) => s.is_current));
@@ -609,15 +391,7 @@ export default function UserProfileView({
   const handleRevokeSingleSession = async (sessionId) => {
     try {
       if (user?.id && user.id !== "owner-usr-01") {
-        await supabase
-          .from("sessions")
-          .update({
-            is_active: false,
-            revoked_at: new Date().toISOString(),
-            revocation_reason: "Encerrada individualmente pelo usuário",
-          })
-          .eq("id", sessionId)
-          .eq("user_id", user.id);
+        await revokeUserSession(sessionId, user.id);
       }
       setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
       setSessionFeedback("Dispositivo desconectado com sucesso.");
@@ -1649,9 +1423,24 @@ export default function UserProfileView({
             {/* Dispositivos Conectados (Sessões Ativas Reais) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                  Dispositivos Conectados (Sessões Ativas)
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                    Dispositivos Conectados (Sessões Ativas)
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isLoadingSessions}
+                    onClick={loadActiveSessions}
+                    title="Atualizar lista de dispositivos conectados"
+                    className="p-1 rounded text-neutral-400 hover:text-amber-400 hover:bg-neutral-900 transition-colors cursor-pointer"
+                  >
+                    <ProjectIcon
+                      name="RefreshCw"
+                      size={13}
+                      className={isLoadingSessions ? "animate-spin text-amber-500" : ""}
+                    />
+                  </button>
+                </div>
                 {activeSessions.filter((s) => !s.is_current).length > 0 && (
                   <button
                     type="button"

@@ -132,3 +132,21 @@ CREATE POLICY "Usuários leem seus próprios logs de auditoria"
   TO authenticated 
   USING (auth.uid() = user_id);
 ```
+
+---
+
+## 4. Sincronização Global Automática (`sessionTracker.js`)
+
+Para solucionar a situação onde um dispositivo secundário (como o celular) estava conectado mas não aparecia no notebook, o rastreamento foi tornado **global**:
+
+1. **Rastreamento no Boot do App (`App.jsx`):**
+   - Assim que o usuário é autenticado no celular, tablet ou computador, o serviço `registerOrUpdateGlobalSession(user, tenant)` é disparado imediatamente.
+   - O dispositivo não precisa navegar até a tela de perfil para ter sua conexão registrada no banco `public.sessions`.
+
+2. **Heartbeat & Foco de Janela:**
+   - Intervalo de pulso a cada 2 minutos atualiza `last_activity_at`.
+   - Evento de foco de aba (`window.focus`) atualiza a presença do dispositivo em tempo real.
+
+3. **Botão de Atualização Rápida no Perfil:**
+   - Adicionado botão de atualização (`RefreshCw`) no cabeçalho da seção de sessões ativas do perfil, permitindo recarregar a lista instantaneamente com um clique.
+

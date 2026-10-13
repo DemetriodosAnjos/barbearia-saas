@@ -29,6 +29,7 @@ import {
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { PartialDataNotice } from "./components/ui/ContractFallback";
 import OfflineBanner from "./components/resilience/OfflineBanner";
+import { registerOrUpdateGlobalSession } from "./services/sessionTracker";
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -591,6 +592,29 @@ export default function App() {
       subscription?.unsubscribe();
     };
   }, [resolveAndSyncUserTenant]);
+
+  // Sincronização global automática do dispositivo e presença ativa (Notebook, Celular, Tablet)
+  useEffect(() => {
+    if (currentUser?.id && currentUser.id !== "owner-usr-01") {
+      registerOrUpdateGlobalSession(currentUser, tenant);
+
+      // Heartbeat a cada 2 minutos enquanto a aplicação estiver aberta
+      const heartbeatInterval = setInterval(() => {
+        registerOrUpdateGlobalSession(currentUser, tenant);
+      }, 120000);
+
+      // Sincroniza imediatamente ao focar na janela/aba do navegador
+      const handleWindowFocus = () => {
+        registerOrUpdateGlobalSession(currentUser, tenant);
+      };
+      window.addEventListener("focus", handleWindowFocus);
+
+      return () => {
+        clearInterval(heartbeatInterval);
+        window.removeEventListener("focus", handleWindowFocus);
+      };
+    }
+  }, [currentUser?.id, tenant?.id]);
 
   // Efeito de auditoria contínua a cada alteração de tela
   useEffect(() => {
