@@ -83,6 +83,7 @@ Mapeamento exato das **18 colunas SQL oficiais** da tabela `public.tenants` no S
 | `brand_primary` | `text` | Não | Cor hexadecimal primária da marca (padrão: `'#ea580c'`). |
 | `brand_secondary` | `text` | Não | Cor hexadecimal secundária da marca (padrão: `'#16a34a'`). |
 | `logo_url` | `text` | Não | URL da logomarca customizada da barbearia. |
+| `cnpj` | `text` | Não | CNPJ / MEI oficial cadastrado para a empresa / barbearia. |
 
 > **Atenção:** A tabela `public.tenants` **NÃO** possui coluna `owner_id`. O vínculo com o proprietário autenticado ocorre via `id` (`user_metadata.barbershop_id` / `profiles.barbershop_id`) e `owner_email`. Toda criação ou atualização deve utilizar `buildTenantRecordPayload()` (`src/lib/supabase.js`).
 
@@ -90,12 +91,26 @@ Mapeamento exato das **18 colunas SQL oficiais** da tabela `public.tenants` no S
 
 ## 4. Tabela: `authentication / users` & `profiles` (Supabase Auth & Perfis)
 
-| Nome da Coluna | Tipo de Dado | Descrição |
-|---|---|---|
-| `id` | `uuid` | ID único do usuário no Supabase Auth (`auth.users.id` / `profiles.id`). |
-| `email` | `text` | E-mail corporativo / credencial de acesso (`owner_email` na tabela `tenants`). |
-| `raw_user_meta_data` | `jsonb` | Metadados sincronizados (`{ role: 'admin', barbershop_id, tenant_id, name, owner_name, owner_email, barbershop_name, slug, phone, plan, status, trial_days_left, trial_ends_at }`). |
-| `role` | `text` | Papel RBAC compatível com a constraint `profiles_role_check` (`'admin'`, `'employee'`, `'client'`) e `'superadmin'` no JWT. Papéis legados (`'owner'`, `'tenant'`) são normalizados automaticamente para `'admin'`. |
+Mapeamento oficial das colunas da tabela `public.profiles` e metadados sincronizados em `auth.users`:
+
+| Nome da Coluna | Tipo de Dado | Obrigatório | Descrição |
+|---|---|---|---|
+| `id` | `uuid` | Sim | ID único do usuário no Supabase Auth (`auth.users.id` / `profiles.id`). Chave primária. |
+| `barbershop_id` | `uuid` | Não | ID da barbearia vinculada (compartilhado com `tenants.id` / `barbershops.id`). |
+| `email` | `text` | Não | E-mail corporativo / credencial de acesso (`owner_email` na tabela `tenants`). |
+| `full_name` | `text` | Sim | Nome completo documental do usuário. |
+| `display_name` | `text` | Não | Nome de exibição / apelido público no salão e agenda. |
+| `cpf` | `text` | Sim | CPF oficial do usuário (obrigatório para conformidade legal e fiscal). |
+| `cnpj` | `text` | Não | CNPJ / MEI (opcional, para parceiros e gestores PJ). |
+| `birth_date` | `date` | Não | Data de nascimento no formato `YYYY-MM-DD`. |
+| `phone` | `text` | Não | Telefone / WhatsApp com DDD. |
+| `bio` | `text` | Não | Mini biografia profissional e histórico. |
+| `pix_key` | `text` | Não | Chave PIX cadastrada para repasse de comissões e pagamentos. |
+| `avatar_url` | `text` | Não | URL da foto de perfil ou avatar. |
+| `role` | `text` | Sim | Papel RBAC compatível com a constraint `profiles_role_check` (`'admin'`, `'employee'`, `'client'`) e `'superadmin'` no JWT. |
+| `raw_user_meta_data` | `jsonb` | Não | Metadados sincronizados no GoTrue (`{ role, barbershop_id, name, full_name, display_name, cpf, cnpj, birth_date, phone, bio, pix_key }`). |
+| `created_at` | `timestamptz` | Sim | Data e hora de criação do perfil. |
+| `updated_at` | `timestamptz` | Sim | Data e hora da última alteração no perfil. |
 
 ---
 

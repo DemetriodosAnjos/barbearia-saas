@@ -321,6 +321,38 @@ export default function App() {
         authUser
       );
 
+      if (profileRow) {
+        setCurrentUser((prev) => {
+          if (!prev) return prev;
+          const mergedMeta = {
+            ...(prev.user_metadata || {}),
+            name: profileRow.full_name || prev.user_metadata?.name || prev.name,
+            full_name: profileRow.full_name || prev.user_metadata?.full_name,
+            display_name: profileRow.display_name || prev.user_metadata?.display_name,
+            displayName: profileRow.display_name || prev.user_metadata?.displayName,
+            cpf: profileRow.cpf || prev.user_metadata?.cpf,
+            cnpj: profileRow.cnpj || prev.user_metadata?.cnpj,
+            birth_date: profileRow.birth_date || prev.user_metadata?.birth_date,
+            birthDate: profileRow.birth_date || prev.user_metadata?.birthDate,
+            phone: profileRow.phone || prev.user_metadata?.phone,
+            avatar_url: profileRow.avatar_url || prev.user_metadata?.avatar_url,
+          };
+          const updated = {
+            ...prev,
+            name: profileRow.full_name || prev.name,
+            displayName: profileRow.display_name || prev.displayName,
+            display_name: profileRow.display_name || prev.display_name,
+            cpf: profileRow.cpf || prev.cpf,
+            cnpj: profileRow.cnpj || prev.cnpj,
+            birth_date: profileRow.birth_date || prev.birth_date,
+            birthDate: profileRow.birth_date || prev.birthDate,
+            user_metadata: mergedMeta,
+          };
+          safeStorage.setItem("saas_auth_user", JSON.stringify(updated));
+          return updated;
+        });
+      }
+
       setTenant(finalNormalized);
       return finalNormalized;
     } catch (err) {

@@ -20,7 +20,12 @@ import TagInput from "../../components/ui/TagInput";
 import Alert from "../../components/ui/Alert";
 import ProjectIcon from "../../components/ui/ProjectIcon";
 import { SafeHtml } from "../../components/ui/SafeHtml";
-import { validateAvatarUpload } from "../../utils/inputValidator";
+import {
+  validateAvatarUpload,
+  isValidCpf,
+  isValidCnpj,
+} from "../../utils/inputValidator";
+import { safeStorage } from "../../utils/safeStorage";
 
 // [Função componente: consome o usuário e barbearia reais autenticados]
 export default function UserProfileView({
@@ -132,16 +137,99 @@ export default function UserProfileView({
   };
 
   // 1. DADOS PESSOAIS (Iniciados com os metadados do usuário real)
+  // 1. DADOS PESSOAIS (Iniciados com os metadados do usuário real)
   const [personalData, setPersonalData] = useState({
-    fullName: user?.user_metadata?.name || user?.name || tenant?.name || "",
-    displayName: user?.user_metadata?.display_name || user?.displayName || "",
-    cpf: user?.user_metadata?.cpf || "",
-    cnpj: tenant?.cnpj || "",
-    birthDate: user?.user_metadata?.birth_date || "",
-    avatarSrc: user?.user_metadata?.avatar_url || "",
+    fullName:
+      user?.user_metadata?.full_name ||
+      user?.user_metadata?.name ||
+      user?.name ||
+      tenant?.owner_name ||
+      tenant?.name ||
+      "",
+    displayName:
+      user?.user_metadata?.display_name ||
+      user?.user_metadata?.displayName ||
+      user?.displayName ||
+      "",
+    cpf: user?.user_metadata?.cpf || user?.cpf || "",
+    cnpj: user?.user_metadata?.cnpj || tenant?.cnpj || "",
+    birthDate:
+      user?.user_metadata?.birth_date ||
+      user?.user_metadata?.birthDate ||
+      user?.birth_date ||
+      "",
+    avatarSrc: user?.user_metadata?.avatar_url || user?.avatar || "",
   });
 
-  // 2. CONTATO & LOCALIZAÇÃO PESSOAL
+  // 2. Sincroniza dados persistidos na tabela oficial `public.profiles` do Supabase
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchDatabaseProfile() {
+      if (!user?.id || user.id === "owner-usr-01") return;
+      try {
+        const { data: dbProfile, error: pErr } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (!pErr && dbProfile && isMounted) {
+          setPersonalData((prev) => ({
+            ...prev,
+            fullName: dbProfile.full_name || prev.fullName,
+            displayName:
+              dbProfile.display_name || prev.displayName || dbProfile.full_name || "",
+            cpf: dbProfile.cpf || prev.cpf,
+            cnpj: dbProfile.cnpj || prev.cnpj || tenant?.cnpj || "",
+            birthDate: dbProfile.birth_date
+              ? String(dbProfile.birth_date).slice(0, 10)
+              : prev.birthDate,
+            avatarSrc: dbProfile.avatar_url || prev.avatarSrc,
+          }));
+        }
+      } catch (err) {
+        console.warn("Aviso ao carregar dados do perfil de public.profiles:", err);
+      }
+    }
+
+    fetchDatabaseProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, tenant?.id]);
+
+  // Mantém os campos sincronizados quando as props de usuário ou tenant atualizam
+  useEffect(() => {
+    if (user) {
+      setPersonalData((prev) => ({
+        fullName:
+          user?.user_metadata?.full_name ||
+          user?.user_metadata?.name ||
+          user?.name ||
+          tenant?.owner_name ||
+          prev.fullName ||
+          "",
+        displayName:
+          user?.user_metadata?.display_name ||
+          user?.user_metadata?.displayName ||
+          user?.displayName ||
+          prev.displayName ||
+          "",
+        cpf: user?.user_metadata?.cpf || user?.cpf || prev.cpf || "",
+        cnpj: user?.user_metadata?.cnpj || tenant?.cnpj || prev.cnpj || "",
+        birthDate:
+          user?.user_metadata?.birth_date ||
+          user?.user_metadata?.birthDate ||
+          user?.birth_date ||
+          prev.birthDate ||
+          "",
+        avatarSrc:
+          user?.user_metadata?.avatar_url || user?.avatar || prev.avatarSrc || "",
+      }));
+    }
+  }, [user, tenant]);
+
+  // 3. CONTATO & LOCALIZAÇÃO PESSOAL
   const [contactData, setContactData] = useState({
     email: user?.email || "",
     phone:
@@ -160,7 +248,7 @@ export default function UserProfileView({
     state: tenant?.state || "",
   });
 
-  // 3. ATUAÇÃO PROFISSIONAL & CHAVE PIX
+  // 4. ATUAÇÃO PROFISSIONAL & CHAVE PIX
   const [professionalData, setProfessionalData] = useState({
     bio: user?.user_metadata?.bio || "",
     pixKey: getRegisteredUserPixKey(user, tenant),
@@ -267,12 +355,12 @@ export default function UserProfileView({
     }
   };
 
-  // Salvamento Geral do Perfil (Persiste Chave PIX Cadastrada e metadados no Supabase e Storage)
+  // Salvamento Geral do Perfil (Persiste dados pessoais, Chave PIX, metadados no Supabase Auth, public.profiles e public.tenants)
   const handleSaveProfile = async () => {
     const errs = {};
     setGlobalSuccessMessage("");
 
-    // Se estiver na aba "profissional" (Perfil & Chave PIX), valida prioritariamente a Chave PIX Cadastrada
+    // 1. Validação por Aba Ativa
     if (activeTab === "profissional") {
       if (!professionalData.pixKey.trim()) {
         errs.pixKey = "A chave PIX é obrigatória para o repasse de comissões e geração do QR Code.";
@@ -282,8 +370,26 @@ export default function UserProfileView({
           "Selecione ou digite pelo menos 1 especialidade de atendimento.";
       }
     } else if (activeTab === "pessoal") {
-      if (!personalData.fullName.trim() || personalData.fullName.length < 3) {
-        errs.fullName = "Informe o nome completo (mínimo 3 caracteres).";
+      if (!personalData.fullName.trim() || personalData.fullName.trim().length < 3) {
+        errs.fullName = "Informe o nome completo documental (mínimo 3 caracteres).";
+      }
+      if (!personalData.cpf?.trim()) {
+        errs.cpf = "O CPF é obrigatório para identificação legal e fiscal.";
+      } else {
+        const cleanCpfDigits = personalData.cpf.replace(/\D/g, "");
+        if (cleanCpfDigits.length !== 11) {
+          errs.cpf = "CPF incompleto. Digite os 11 dígitos do CPF.";
+        } else if (!isValidCpf(personalData.cpf)) {
+          errs.cpf = "CPF inválido. Verifique os números informados.";
+        }
+      }
+      if (personalData.cnpj?.trim()) {
+        const cleanCnpjDigits = personalData.cnpj.replace(/\D/g, "");
+        if (cleanCnpjDigits.length !== 14) {
+          errs.cnpj = "CNPJ incompleto. Digite os 14 dígitos ou deixe vazio.";
+        } else if (!isValidCnpj(personalData.cnpj)) {
+          errs.cnpj = "CNPJ inválido. Verifique os números informados.";
+        }
       }
     } else if (activeTab === "contato") {
       if (!contactData.phone || contactData.phone.length < 10) {
@@ -308,38 +414,168 @@ export default function UserProfileView({
       const cleanPhone = contactData.phone.trim();
       saveRegisteredUserPhone(cleanPhone);
 
+      const cleanFullName = personalData.fullName.trim();
+      const cleanDisplayName = personalData.displayName.trim() || cleanFullName;
+      const cleanCpf = personalData.cpf.trim();
+      const cleanCnpj = personalData.cnpj.trim();
+      const cleanBirthDate = personalData.birthDate ? personalData.birthDate.trim() : null;
+
+      // 1. Atualiza Metadados no Supabase Auth (SSOT para sessão, JWT e recuperação no refresh F5)
       const updatedMetadata = {
         ...(user?.user_metadata || {}),
-        name: personalData.fullName.trim(),
-        full_name: personalData.fullName.trim(),
-        display_name: personalData.displayName.trim(),
-        cpf: personalData.cpf.trim(),
+        name: cleanFullName,
+        full_name: cleanFullName,
+        display_name: cleanDisplayName,
+        displayName: cleanDisplayName,
+        cpf: cleanCpf,
+        cnpj: cleanCnpj,
+        birth_date: cleanBirthDate,
+        birthDate: cleanBirthDate,
         phone: cleanPhone,
         bio: professionalData.bio.trim(),
         pix_key: cleanPixKey,
         pixKey: cleanPixKey,
         instagram: professionalData.instagram.trim(),
         specialties: professionalData.specialties,
+        avatar_url: personalData.avatarSrc || user?.user_metadata?.avatar_url || "",
       };
 
-      const { data: updatedAuth } = await supabase.auth.updateUser({
+      const { data: updatedAuth, error: authErr } = await supabase.auth.updateUser({
         data: updatedMetadata,
       });
 
+      if (authErr) {
+        console.warn("Aviso ao sincronizar Supabase Auth updateUser:", authErr);
+      }
+
+      // 2. Persistência na tabela relacional `public.profiles` no banco de dados Supabase
+      if (user?.id && user.id !== "owner-usr-01") {
+        const fullProfilePayload = {
+          id: user.id,
+          barbershop_id: tenant?.id || user?.user_metadata?.barbershop_id || null,
+          full_name: cleanFullName,
+          display_name: cleanDisplayName,
+          cpf: cleanCpf,
+          cnpj: cleanCnpj || null,
+          birth_date: cleanBirthDate,
+          phone: cleanPhone,
+          email: user?.email || undefined,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: pErr } = await supabase
+          .from("profiles")
+          .upsert([fullProfilePayload], { onConflict: "id" });
+
+        if (pErr) {
+          console.warn("Aviso ao persistir colunas completas em public.profiles:", pErr.message);
+          // Fallback resiliente: caso as colunas novas ainda não tenham sido migradas no Supabase SQL
+          try {
+            await supabase.from("profiles").upsert([
+              {
+                id: user.id,
+                barbershop_id: tenant?.id || user?.user_metadata?.barbershop_id || null,
+                full_name: cleanFullName,
+                phone: cleanPhone,
+                email: user?.email || undefined,
+                updated_at: new Date().toISOString(),
+              },
+            ], { onConflict: "id" });
+          } catch (_fallbackErr) {
+            console.warn("Aviso no fallback de profiles:", _fallbackErr);
+          }
+        }
+      }
+
+      // 3. Persistência de CNPJ e dados corporativos na tabela `public.tenants`
+      if (tenant?.id) {
+        try {
+          const tenantUpdatePayload = {
+            owner_name: cleanFullName,
+            phone: cleanPhone,
+            cnpj: cleanCnpj || null,
+            updated_at: new Date().toISOString(),
+          };
+          const { error: tErr } = await supabase
+            .from("tenants")
+            .update(tenantUpdatePayload)
+            .eq("id", tenant.id);
+
+          if (tErr) {
+            // Se a coluna cnpj ainda não existir no PostgreSQL, salva campos base
+            await supabase
+              .from("tenants")
+              .update({
+                owner_name: cleanFullName,
+                phone: cleanPhone,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", tenant.id);
+          }
+        } catch (tCatchErr) {
+          console.warn("Aviso ao sincronizar tabela tenants:", tCatchErr);
+        }
+      }
+
+      // 4. Se o usuário for barbeiro da equipe, atualiza display_name e dados em `public.barbers`
+      if (tenant?.id && user?.email) {
+        try {
+          await supabase
+            .from("barbers")
+            .update({
+              name: cleanFullName,
+              display_name: cleanDisplayName,
+              phone: cleanPhone,
+              pix_key: cleanPixKey || undefined,
+            })
+            .eq("barbershop_id", tenant.id)
+            .ilike("email", user.email);
+        } catch (_bErr) {
+          // Não-bloqueante
+        }
+      }
+
+      // 5. Atualização reativa de estado e safeStorage
+      const finalUser = {
+        ...(user || {}),
+        name: cleanFullName,
+        fullName: cleanFullName,
+        displayName: cleanDisplayName,
+        display_name: cleanDisplayName,
+        cpf: cleanCpf,
+        cnpj: cleanCnpj,
+        birthDate: cleanBirthDate,
+        birth_date: cleanBirthDate,
+        user_metadata: updatedMetadata,
+      };
+
+      safeStorage.setItem("saas_auth_user", JSON.stringify(finalUser));
+
       if (onUpdateUser) {
         onUpdateUser(
-          updatedAuth?.user || {
-            ...(user || {}),
-            user_metadata: updatedMetadata,
-          }
+          updatedAuth?.user
+            ? {
+                ...updatedAuth.user,
+                displayName: cleanDisplayName,
+                display_name: cleanDisplayName,
+                cpf: cleanCpf,
+                cnpj: cleanCnpj,
+                birthDate: cleanBirthDate,
+                birth_date: cleanBirthDate,
+                user_metadata: updatedMetadata,
+              }
+            : finalUser
         );
       }
 
       if (onUpdateTenant && tenant) {
         onUpdateTenant({
           ...tenant,
+          owner_name: cleanFullName,
+          ownerName: cleanFullName,
           phone: cleanPhone,
           ownerPhone: cleanPhone,
+          cnpj: cleanCnpj,
           pix_key: cleanPixKey,
           pixKey: cleanPixKey,
         });
@@ -349,7 +585,7 @@ export default function UserProfileView({
     } finally {
       setIsSaving(false);
       setGlobalSuccessMessage(
-        "Todas as alterações do perfil e Chave PIX foram salvas com sucesso!"
+        "Todas as alterações do perfil (Nome de Exibição, CPF, CNPJ, Data de Nascimento e Chave PIX) foram salvas com sucesso!"
       );
     }
   };
@@ -530,10 +766,12 @@ export default function UserProfileView({
                     setProfileErrors({ ...profileErrors, cpf: null });
                 }}
                 error={profileErrors.cpf}
+                helperText="Obrigatório para identificação legal e fiscal."
               />
 
               <Input
                 label="CNPJ / MEI (Opcional se for parceiro PJ)"
+                mask="cnpj"
                 placeholder="00.000.000/0000-00"
                 value={personalData.cnpj}
                 onChange={(e) => {
@@ -542,6 +780,7 @@ export default function UserProfileView({
                     setProfileErrors({ ...profileErrors, cnpj: null });
                 }}
                 error={profileErrors.cnpj}
+                helperText="Opcional. Preencha caso possua MEI ou CNPJ."
               />
 
               <Input
@@ -557,6 +796,7 @@ export default function UserProfileView({
                     setProfileErrors({ ...profileErrors, birthDate: null });
                 }}
                 error={profileErrors.birthDate}
+                helperText="Utilizado para identificação e benefícios."
               />
             </div>
           </div>

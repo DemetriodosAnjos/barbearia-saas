@@ -24,6 +24,17 @@ export const masks = {
       .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
   },
 
+  // CNPJ: 00.000.000/0000-00
+  cnpj: (value = "") => {
+    const digits = cleanDigits(value).slice(0, 14);
+    if (!digits) return "";
+    return digits
+      .replace(/^(\d{2})(\d)/, "$1.$2")
+      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1/$2")
+      .replace(/(\d{4})(\d)/, "$1-$2");
+  },
+
   // Moeda (R$): 6500 vira 65,00
   currency: (value = "") => {
     const digits = cleanDigits(value);

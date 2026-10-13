@@ -276,3 +276,67 @@ export function validateAvatarUpload(file) {
     },
   };
 }
+
+/**
+ * Validação de CPF Brasileiro com cálculo de dígitos verificadores
+ */
+export function isValidCpf(rawCpf) {
+  if (!rawCpf) return false;
+  const digits = String(rawCpf).replace(/\D/g, "");
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(digits[i], 10) * (10 - i);
+  }
+  let rev = 11 - (sum % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  if (rev !== parseInt(digits[9], 10)) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(digits[i], 10) * (11 - i);
+  }
+  rev = 11 - (sum % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  if (rev !== parseInt(digits[10], 10)) return false;
+
+  return true;
+}
+
+/**
+ * Validação de CNPJ Brasileiro (opcional quando vazio)
+ */
+export function isValidCnpj(rawCnpj) {
+  if (!rawCnpj) return true;
+  const digits = String(rawCnpj).replace(/\D/g, "");
+  if (!digits) return true;
+  if (digits.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(digits)) return false;
+
+  let size = digits.length - 2;
+  let numbers = digits.substring(0, size);
+  const digitsToCheck = digits.substring(size);
+  let sum = 0;
+  let pos = size - 7;
+  for (let i = size; i >= 1; i--) {
+    sum += parseInt(numbers.charAt(size - i), 10) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  let result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+  if (result !== parseInt(digitsToCheck.charAt(0), 10)) return false;
+
+  size = size + 1;
+  numbers = digits.substring(0, size);
+  sum = 0;
+  pos = size - 7;
+  for (let i = size; i >= 1; i--) {
+    sum += parseInt(numbers.charAt(size - i), 10) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+  if (result !== parseInt(digitsToCheck.charAt(1), 10)) return false;
+
+  return true;
+}
