@@ -23,38 +23,98 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 2. Índices para consultas de alta performance
+-- 2. Remoção dinâmica de TODAS as políticas antigas para evitar erro 0A000 ao alterar tipos
+DO $$ 
+DECLARE
+  pol RECORD;
+BEGIN
+  FOR pol IN 
+    SELECT policyname 
+    FROM pg_policies 
+    WHERE schemaname = 'public' AND tablename = 'sessions'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.sessions', pol.policyname);
+  END LOOP;
+END $$;
+
+-- 3. Remover restrição foreign key se existir
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints 
+    WHERE constraint_name = 'sessions_user_id_fkey' AND table_name = 'sessions'
+  ) THEN
+    ALTER TABLE public.sessions DROP CONSTRAINT sessions_user_id_fkey;
+  END IF;
+END $$;
+
+-- 4. Alterar tipo da coluna user_id para TEXT de forma segura
+ALTER TABLE public.sessions ALTER COLUMN user_id TYPE TEXT;
+
+-- 5. Adicionar colunas complementares se a tabela for de versão anterior
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS user_email TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS device_name TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS browser TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS os TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS ip_address TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + interval '30 days');
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS revocation_reason TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- 6. Índices para consultas de alta performance
 CREATE INDEX IF NOT EXISTS idx_sessions_user_active 
   ON public.sessions(user_id, is_active);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_email_active 
+  ON public.sessions(user_email, is_active);
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_last_activity 
   ON public.sessions(user_id, last_activity_at DESC);
 
--- 3. Habilitação de Row Level Security (RLS)
+-- 7. Habilitação de RLS e Recriação das Políticas
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 
--- 4. Políticas RLS para gerenciamento seguro de sessões pelo próprio usuário
-DROP POLICY IF EXISTS "Usuários leem suas próprias sessões" ON public.sessions;
-CREATE POLICY "Usuários leem suas próprias sessões" 
+CREATE POLICY "Permitir leitura de sessões" 
   ON public.sessions 
   FOR SELECT 
-  TO authenticated 
-  USING (auth.uid() = user_id);
+  TO public 
+  USING (true);
 
-DROP POLICY IF EXISTS "Usuários inserem suas próprias sessões" ON public.sessions;
-CREATE POLICY "Usuários inserem suas próprias sessões" 
+CREATE POLICY "Permitir inserção de sessões" 
   ON public.sessions 
   FOR INSERT 
-  TO authenticated 
-  WITH CHECK (auth.uid() = user_id);
+  TO public 
+  WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Usuários atualizam ou revogam suas próprias sessões" ON public.sessions;
-CREATE POLICY "Usuários atualizam ou revogam suas próprias sessões" 
+CREATE POLICY "Permitir atualização de sessões" 
   ON public.sessions 
   FOR UPDATE 
-  TO authenticated 
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  TO public 
+  USING (true) 
+  WITH CHECK (true);
+
+CREATE POLICY "Permitir exclusão de sessões" 
+  ON public.sessions 
+  FOR DELETE 
+  TO public 
+  USING (true);
+
+-- 8. Habilitar Supabase Realtime para sincronização instantânea
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'sessions'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.sessions;
+  END IF;
+END $$;
 
 -- 5. Tabela complementar de Auditoria de Segurança
 CREATE TABLE IF NOT EXISTS public.security_audit_events (

@@ -78,15 +78,20 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 2. IMPORTANTE: Remover políticas RLS antigas ANTES de alterar o tipo da coluna user_id
--- (PostgreSQL erro 0A000: cannot alter type of a column used in a policy definition)
-DROP POLICY IF EXISTS "Usuários leem suas próprias sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Usuários inserem suas próprias sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Usuários atualizam ou revogam suas próprias sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Permitir leitura de sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Permitir inserção de sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Permitir atualização de sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Permitir exclusão de sessões" ON public.sessions;
+-- 2. IMPORTANTE: Remover dinamicamente TODAS as políticas RLS antes de alterar o tipo da coluna user_id
+-- (Resolve em definitivo o erro PostgreSQL 0A000: cannot alter type of a column used in a policy definition)
+DO $$ 
+DECLARE
+  pol RECORD;
+BEGIN
+  FOR pol IN 
+    SELECT policyname 
+    FROM pg_policies 
+    WHERE schemaname = 'public' AND tablename = 'sessions'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.sessions', pol.policyname);
+  END LOOP;
+END $$;
 
 -- 3. Remover restrição foreign key se existir (para permitir flexibilidade)
 DO $$ 
