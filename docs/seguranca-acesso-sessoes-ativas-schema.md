@@ -58,7 +58,7 @@ Para que o gerenciamento de sessões funcione entre múltiplos aparelhos de form
 Execute o script abaixo no **Painel do Supabase -> SQL Editor** para criar ou atualizar as tabelas e liberar o acesso compartilhado multi-dispositivo:
 
 ```sql
--- 1. Criação ou Atualização da tabela public.sessions (Dispositivos Conectados)
+-- 1. Criação da tabela public.sessions (se ainda não existir)
 CREATE TABLE IF NOT EXISTS public.sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id TEXT NOT NULL,
@@ -78,30 +78,47 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 2. Garantir compatibilidade de colunas caso a tabela já tenha sido criada anteriormente
+-- 2. IMPORTANTE: Remover políticas RLS antigas ANTES de alterar o tipo da coluna user_id
+-- (PostgreSQL erro 0A000: cannot alter type of a column used in a policy definition)
+DROP POLICY IF EXISTS "Usuários leem suas próprias sessões" ON public.sessions;
+DROP POLICY IF EXISTS "Usuários inserem suas próprias sessões" ON public.sessions;
+DROP POLICY IF EXISTS "Usuários atualizam ou revogam suas próprias sessões" ON public.sessions;
+DROP POLICY IF EXISTS "Permitir leitura de sessões" ON public.sessions;
+DROP POLICY IF EXISTS "Permitir inserção de sessões" ON public.sessions;
+DROP POLICY IF EXISTS "Permitir atualização de sessões" ON public.sessions;
+DROP POLICY IF EXISTS "Permitir exclusão de sessões" ON public.sessions;
+
+-- 3. Remover restrição foreign key se existir (para permitir flexibilidade)
 DO $$ 
 BEGIN
-  -- Remover restrição estrita de foreign key se existir
   IF EXISTS (
     SELECT 1 FROM information_schema.table_constraints 
     WHERE constraint_name = 'sessions_user_id_fkey' AND table_name = 'sessions'
   ) THEN
     ALTER TABLE public.sessions DROP CONSTRAINT sessions_user_id_fkey;
   END IF;
-
-  -- Alterar user_id para TEXT para aceitar UUIDs e identificadores de gestor
-  ALTER TABLE public.sessions ALTER COLUMN user_id TYPE TEXT;
-
-  -- Adicionar coluna user_email se não existir
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'sessions' AND column_name = 'user_email'
-  ) THEN
-    ALTER TABLE public.sessions ADD COLUMN user_email TEXT;
-  END IF;
 END $$;
 
--- 3. Índices para consultas de alta performance
+-- 4. Agora sim podemos alterar user_id para TEXT com segurança
+ALTER TABLE public.sessions ALTER COLUMN user_id TYPE TEXT;
+
+-- 5. Adicionar colunas faltantes se a tabela for de versão anterior
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS user_email TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS device_name TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS browser TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS os TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS ip_address TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + interval '30 days');
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS revocation_reason TEXT;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- 6. Índices para consultas de alta performance
 CREATE INDEX IF NOT EXISTS idx_sessions_user_active 
   ON public.sessions(user_id, is_active);
 
@@ -111,27 +128,21 @@ CREATE INDEX IF NOT EXISTS idx_sessions_email_active
 CREATE INDEX IF NOT EXISTS idx_sessions_user_last_activity 
   ON public.sessions(user_id, last_activity_at DESC);
 
--- 4. Habilitação de Row Level Security (RLS) permissiva para sincronização de sessões
+-- 7. Habilitação de Row Level Security (RLS) e Recriação das Políticas Permissivas
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Usuários leem suas próprias sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Permitir leitura de sessões" ON public.sessions;
 CREATE POLICY "Permitir leitura de sessões" 
   ON public.sessions 
   FOR SELECT 
   TO public 
   USING (true);
 
-DROP POLICY IF EXISTS "Usuários inserem suas próprias sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Permitir inserção de sessões" ON public.sessions;
 CREATE POLICY "Permitir inserção de sessões" 
   ON public.sessions 
   FOR INSERT 
   TO public 
   WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Usuários atualizam ou revogam suas próprias sessões" ON public.sessions;
-DROP POLICY IF EXISTS "Permitir atualização de sessões" ON public.sessions;
 CREATE POLICY "Permitir atualização de sessões" 
   ON public.sessions 
   FOR UPDATE 
@@ -139,15 +150,22 @@ CREATE POLICY "Permitir atualização de sessões"
   USING (true) 
   WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Permitir exclusão de sessões" ON public.sessions;
 CREATE POLICY "Permitir exclusão de sessões" 
   ON public.sessions 
   FOR DELETE 
   TO public 
   USING (true);
 
--- 5. Habilitar Supabase Realtime para que conexões no celular apareçam no notebook instantaneamente
-ALTER PUBLICATION supabase_realtime ADD TABLE public.sessions;
+-- 8. Habilitar Supabase Realtime (se ainda não adicionado)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'sessions'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.sessions;
+  END IF;
+END $$;
 
 -- 6. Tabela complementar de Auditoria de Segurança
 CREATE TABLE IF NOT EXISTS public.security_audit_events (
