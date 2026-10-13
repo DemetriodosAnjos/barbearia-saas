@@ -129,10 +129,19 @@ export function setStoredSessionId(id) {
   }
 }
 
+let lastGlobalRegistrationAt = 0;
+const REGISTRATION_THROTTLE_MS = 20000; // Máximo de 1 registro/atualização a cada 20 segundos
+
 /**
  * Registra ou atualiza a sessão do dispositivo atual no Supabase (Executado globalmente no login/início do app)
  */
-export async function registerOrUpdateGlobalSession(user, tenant) {
+export async function registerOrUpdateGlobalSession(user, tenant, force = false) {
+  const now = Date.now();
+  if (!force && now - lastGlobalRegistrationAt < REGISTRATION_THROTTLE_MS) {
+    return null;
+  }
+  lastGlobalRegistrationAt = now;
+
   const clientDevice = getClientDeviceInfo();
   const currentUa = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const storedSessionId = getStoredSessionId();

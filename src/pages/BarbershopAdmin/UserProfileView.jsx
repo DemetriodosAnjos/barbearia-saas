@@ -334,28 +334,46 @@ export default function UserProfileView({
   const [sessionFeedback, setSessionFeedback] = useState("");
   const [isDisconnectingSessions, setIsDisconnectingSessions] = useState(false);
 
+  // Refs de controle para prevenção de rajadas e loops em tempo real
+  const isFetchingSessionsRef = useRef(false);
+  const realtimeTimeoutRef = useRef(null);
+
   // Função para carregar e atualizar sessões ativas de todos os dispositivos
-  const loadActiveSessions = async () => {
-    setIsLoadingSessions(true);
+  const loadActiveSessions = async ({ showSpinner = false, registerPresence = false } = {}) => {
+    if (isFetchingSessionsRef.current) return;
+    isFetchingSessionsRef.current = true;
+
+    if (showSpinner) {
+      setIsLoadingSessions(true);
+    }
+
     try {
-      // 1. Assegura que o dispositivo atual está registrado e atualizado no banco
-      await registerOrUpdateGlobalSession(user, tenant);
-      // 2. Busca todas as sessões ativas do usuário e barbearia
+      // Registra presença apenas no mount inicial da aba ou no login, nunca durante escuta de Realtime
+      if (registerPresence) {
+        await registerOrUpdateGlobalSession(user, tenant);
+      }
+      // Busca todas as sessões ativas do usuário e barbearia
       const sessions = await fetchUserActiveSessions(user, tenant);
-      setActiveSessions(sessions);
+      if (Array.isArray(sessions)) {
+        setActiveSessions(sessions);
+      }
     } catch (err) {
       console.warn("Aviso ao carregar sessões ativas:", err);
     } finally {
-      setIsLoadingSessions(false);
+      if (showSpinner) {
+        setIsLoadingSessions(false);
+      }
+      isFetchingSessionsRef.current = false;
     }
   };
 
   // Efeito que sincroniza os dispositivos conectados reais com o Supabase ao abrir a aba e escuta eventos Realtime
   useEffect(() => {
     if (activeTab === "seguranca") {
-      loadActiveSessions();
+      // 1. Carregamento inicial ao entrar na aba de segurança
+      loadActiveSessions({ showSpinner: true, registerPresence: true });
 
-      // Inscrição em tempo real para sincronização instantânea entre múltiplos dispositivos
+      // 2. Inscrição em tempo real com debounce para refletir revogações e novos aparelhos sem loop
       let channel;
       try {
         channel = supabase
@@ -364,7 +382,13 @@ export default function UserProfileView({
             "postgres_changes",
             { event: "*", schema: "public", table: "sessions" },
             () => {
-              loadActiveSessions();
+              if (realtimeTimeoutRef.current) {
+                clearTimeout(realtimeTimeoutRef.current);
+              }
+              realtimeTimeoutRef.current = setTimeout(() => {
+                // Apenas busca as sessões atualizadas; NUNCA dispara gravação de presença aqui
+                loadActiveSessions({ showSpinner: false, registerPresence: false });
+              }, 2000);
             }
           )
           .subscribe();
@@ -373,6 +397,9 @@ export default function UserProfileView({
       }
 
       return () => {
+        if (realtimeTimeoutRef.current) {
+          clearTimeout(realtimeTimeoutRef.current);
+        }
         if (channel) {
           supabase.removeChannel(channel);
         }
@@ -1449,7 +1476,7 @@ export default function UserProfileView({
                   <button
                     type="button"
                     disabled={isLoadingSessions}
-                    onClick={loadActiveSessions}
+                    onClick={() => loadActiveSessions({ showSpinner: true, registerPresence: false })}
                     title="Atualizar lista de dispositivos conectados"
                     className="p-1 rounded text-neutral-400 hover:text-amber-400 hover:bg-neutral-900 transition-colors cursor-pointer"
                   >
@@ -1484,7 +1511,7 @@ export default function UserProfileView({
                 </Alert>
               )}
 
-              {isLoadingSessions ? (
+              {isLoadingSessions && activeSessions.length === 0 ? (
                 <div className="p-4 bg-neutral-950/60 border border-neutral-800 rounded-2xl text-center text-xs text-neutral-400">
                   Carregando sessões ativas...
                 </div>
