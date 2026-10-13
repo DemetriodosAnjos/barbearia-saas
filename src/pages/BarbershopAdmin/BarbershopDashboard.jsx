@@ -453,6 +453,9 @@ export default function BarbershopDashboard({
                       onUpdateAppointments={onUpdateAppointments}
                       services={services}
                       onAddService={onAddService}
+                      clients={clients}
+                      onUpdateClients={onUpdateClients}
+                      onNavigateToClients={() => setActiveMenuTab("clientes")}
                       onNavigateToCashier={() => setActiveMenuTab("caixa")}
                     />
                   </ErrorBoundary>

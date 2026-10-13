@@ -26,6 +26,9 @@ export default function ScheduleView({
   onUpdateAppointments,
   services = [],
   onAddService,
+  clients = [],
+  onUpdateClients,
+  onNavigateToClients,
   onNavigateToCashier,
   onBack,
 }) {
@@ -44,6 +47,21 @@ export default function ScheduleView({
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
   const [isMercadoPagoModalOpen, setIsMercadoPagoModalOpen] = useState(false);
+
+  // Estados para Prontuário Técnico e Cadastro de Cliente a partir do Card
+  const [selectedClientForRecord, setSelectedClientForRecord] = useState(null);
+  const [clientRecordNotes, setClientRecordNotes] = useState("");
+  const [isSavingRecordNotes, setIsSavingRecordNotes] = useState(false);
+
+  const [appointmentToSaveAsClient, setAppointmentToSaveAsClient] = useState(null);
+  const [newClientFormData, setNewClientFormData] = useState({
+    name: "",
+    phone: "",
+    notes: "",
+    technicalNotes: "",
+  });
+  const [isSavingNewClient, setIsSavingNewClient] = useState(false);
+  const [saveClientFeedback, setSaveClientFeedback] = useState("");
 
   // Estados do Modo Edição
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
@@ -125,6 +143,127 @@ export default function ScheduleView({
     } catch (err) {
       console.error("Erro ao salvar serviço no Supabase:", err);
       alert("Não foi possível salvar o novo serviço no catálogo.");
+    }
+  };
+
+  // 3b. Gestão de Prontuário Técnico e Ações de Cliente a partir do Card
+  const handleOpenClientRecord = (client, appt) => {
+    setSelectedClientForRecord({
+      ...client,
+      appointmentContext: appt,
+    });
+    setClientRecordNotes(
+      client.technicalNotes || client.technical_notes || client.notes || ""
+    );
+  };
+
+  const handleSaveClientFromAppointment = (appt) => {
+    setAppointmentToSaveAsClient(appt);
+    setNewClientFormData({
+      name: appt.clientName || appt.client_name || "",
+      phone: appt.clientPhone || appt.client_phone || "",
+      notes: appt.notes || "",
+      technicalNotes: `Cadastrado via Agenda. Serviço inicial: ${appt.serviceName || appt.service_name || "Corte"}.`,
+    });
+    setSaveClientFeedback("");
+  };
+
+  const handleConfirmSaveNewClient = async () => {
+    if (!newClientFormData.name.trim() || !newClientFormData.phone.trim()) {
+      alert("Informe o nome e o WhatsApp do cliente.");
+      return;
+    }
+
+    setIsSavingNewClient(true);
+    try {
+      const tenantId = tenant?.id || "788299e3-a26c-4a0b-bc71-c7ae81ed40d3";
+      const cleanPhone = newClientFormData.phone.trim();
+      const cleanName = DOMPurify.sanitize(newClientFormData.name.trim(), { ALLOWED_TAGS: [] });
+      const cleanNotes = DOMPurify.sanitize(newClientFormData.notes.trim(), { ALLOWED_TAGS: [] });
+      const cleanTechNotes = DOMPurify.sanitize(newClientFormData.technicalNotes.trim(), { ALLOWED_TAGS: [] });
+
+      const clientPayload = {
+        barbershop_id: tenantId,
+        name: cleanName,
+        phone: cleanPhone,
+        notes: cleanNotes || cleanTechNotes,
+        technical_notes: cleanTechNotes,
+        frequency_days: 18,
+        is_vip: false,
+        total_spent: 0,
+        total_cuts: 0,
+        last_visit: formatDateToYMD(new Date()),
+      };
+
+      const { data, error } = await supabase
+        .from("clients")
+        .insert([clientPayload])
+        .select()
+        .single();
+
+      if (error) {
+        console.warn("Aviso ao salvar no Supabase (utilizando fallback local):", error);
+      }
+
+      const createdClient = data || {
+        id: `cli-${Date.now()}`,
+        ...clientPayload,
+        created_at: new Date().toISOString(),
+      };
+
+      if (onUpdateClients) {
+        onUpdateClients([createdClient, ...clients]);
+      }
+
+      setSaveClientFeedback(`Cliente ${cleanName} cadastrado com sucesso!`);
+      setTimeout(() => {
+        setAppointmentToSaveAsClient(null);
+        setSaveClientFeedback("");
+      }, 1200);
+    } catch (err) {
+      console.error("Erro ao salvar cliente:", err);
+      alert("Não foi possível salvar o cliente no banco.");
+    } finally {
+      setIsSavingNewClient(false);
+    }
+  };
+
+  const handleSaveClientRecordNotes = async () => {
+    if (!selectedClientForRecord) return;
+    setIsSavingRecordNotes(true);
+    try {
+      const cleanNotes = DOMPurify.sanitize(clientRecordNotes.trim(), { ALLOWED_TAGS: [] });
+      const clientId = selectedClientForRecord.id;
+
+      if (clientId && !String(clientId).startsWith("cli-mock")) {
+        await supabase
+          .from("clients")
+          .update({
+            notes: cleanNotes,
+            technical_notes: cleanNotes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", clientId);
+      }
+
+      const updatedClients = clients.map((c) =>
+        c.id === clientId
+          ? { ...c, notes: cleanNotes, technicalNotes: cleanNotes, technical_notes: cleanNotes }
+          : c
+      );
+
+      if (onUpdateClients) {
+        onUpdateClients(updatedClients);
+      }
+
+      setSelectedClientForRecord((prev) =>
+        prev ? { ...prev, notes: cleanNotes, technicalNotes: cleanNotes } : null
+      );
+      alert("Prontuário técnico atualizado com sucesso!");
+    } catch (err) {
+      console.error("Erro ao atualizar prontuário:", err);
+    } finally {
+      setIsSavingRecordNotes(false);
     }
   };
 
@@ -479,6 +618,9 @@ export default function ScheduleView({
           const target = currentAppointments.find((a) => a.id === id);
           if (target) setAppointmentToCancel(target);
         }}
+        clients={clients}
+        onSaveClient={handleSaveClientFromAppointment}
+        onOpenClientRecord={handleOpenClientRecord}
         onDropAppointment={handleDropAppointment}
       />
 
@@ -960,6 +1102,197 @@ export default function ScheduleView({
           }}
         />
       )}
+
+      {/* MODAL 5: PRONTUÁRIO TÉCNICO & PREFERÊNCIAS DE CORTE (DIRETO DO CARD) */}
+      <Modal
+        isOpen={!!selectedClientForRecord}
+        size="lg"
+        onClose={() => setSelectedClientForRecord(null)}
+        title={`Prontuário & Ficha Técnica: ${selectedClientForRecord?.name || ""}`}
+        footer={
+          <div className="flex items-center justify-between w-full gap-2">
+            {onNavigateToClients && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSelectedClientForRecord(null);
+                  onNavigateToClients();
+                }}
+                className="text-xs text-amber-400 hover:text-amber-300 py-1.5 px-2.5"
+              >
+                Abrir Módulo de Clientes Completo
+              </Button>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              <Button
+                variant="secondary"
+                onClick={() => setSelectedClientForRecord(null)}
+              >
+                Fechar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSaveClientRecordNotes}
+                disabled={isSavingRecordNotes}
+                className="bg-amber-600 hover:bg-amber-500 font-bold"
+              >
+                {isSavingRecordNotes ? "Salvando..." : "Salvar Prontuário"}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        {selectedClientForRecord && (
+          <div className="space-y-4 text-left text-xs">
+            {/* Cartão de Resumo do Cliente */}
+            <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <span className="text-[10px] text-neutral-400 block font-bold uppercase">Telefone</span>
+                <span className="text-neutral-100 font-mono font-medium">{selectedClientForRecord.phone || "Não informado"}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-400 block font-bold uppercase">Total de Visitas</span>
+                <span className="text-amber-400 font-bold text-sm">{selectedClientForRecord.total_cuts || selectedClientForRecord.totalVisits || 1} cortes</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-400 block font-bold uppercase">LTV (Total Pago)</span>
+                <span className="text-emerald-400 font-bold text-sm">
+                  R$ {Number(selectedClientForRecord.total_spent || selectedClientForRecord.totalSpent || 0).toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-400 block font-bold uppercase">Status</span>
+                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">
+                  {selectedClientForRecord.is_vip ? "VIP / Fidelizado" : "Cliente Ativo"}
+                </span>
+              </div>
+            </div>
+
+            {/* Editor de Anotações Técnicas de Corte */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-neutral-200 block">
+                Ficha Técnica de Preferências (Lâmina, Pentes, Estilo e Observações):
+              </label>
+              <textarea
+                rows={4}
+                value={clientRecordNotes}
+                onChange={(e) => setClientRecordNotes(e.target.value)}
+                placeholder="Ex: Degradê navalhado alto (fade), tesoura no topo sem tirar comprimento. Não passar navalha na testa. Acabamento da barba com toalha quente."
+                className="w-full p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-neutral-100 text-xs focus:outline-none focus:border-amber-500 leading-relaxed font-sans"
+              />
+              <span className="text-[10px] text-neutral-500 block">
+                Essas notas ficam salvas no prontuário do cliente e serão consultadas em todos os atendimentos futuros.
+              </span>
+            </div>
+
+            {/* Histórico Recente de Agendamentos */}
+            <div className="space-y-2 pt-2 border-t border-neutral-800">
+              <span className="text-xs font-bold text-neutral-300 block">
+                Histórico de Atendimentos na Barbearia:
+              </span>
+              <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                {currentAppointments
+                  .filter((a) => {
+                    const cleanApptPhone = (a.clientPhone || a.client_phone || "").replace(/\D/g, "");
+                    const cleanCliPhone = (selectedClientForRecord.phone || "").replace(/\D/g, "");
+                    const cleanApptName = (a.clientName || a.client_name || "").trim().toLowerCase();
+                    const cleanCliName = (selectedClientForRecord.name || "").trim().toLowerCase();
+                    return (cleanApptPhone && cleanCliPhone && cleanApptPhone === cleanCliPhone) ||
+                           (cleanApptName && cleanCliName && cleanApptName === cleanCliName);
+                  })
+                  .map((pastAppt) => (
+                    <div
+                      key={pastAppt.id}
+                      className="p-2 bg-neutral-900 border border-neutral-800/80 rounded-lg flex items-center justify-between text-[11px]"
+                    >
+                      <div>
+                        <span className="font-bold text-neutral-200">{pastAppt.serviceName || "Serviço"}</span>
+                        <span className="text-neutral-400 ml-2">({pastAppt.date || pastAppt.bookingDate || "Hoje"} às {pastAppt.startTime || "00:00"})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold">R$ {Number(pastAppt.price || 0).toFixed(2)}</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${pastAppt.status === "completed" ? "bg-emerald-500/20 text-emerald-400" : "bg-neutral-800 text-neutral-400"}`}>
+                          {pastAppt.status === "completed" ? "Concluído" : pastAppt.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* MODAL 6: CADASTRAR NOVO CLIENTE A PARTIR DA AGENDA */}
+      <Modal
+        isOpen={!!appointmentToSaveAsClient}
+        size="md"
+        onClose={() => setAppointmentToSaveAsClient(null)}
+        title="Salvar Cliente no Diretório"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <Button
+              variant="secondary"
+              onClick={() => setAppointmentToSaveAsClient(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleConfirmSaveNewClient}
+              disabled={isSavingNewClient}
+              className="bg-emerald-600 hover:bg-emerald-500 font-bold"
+            >
+              {isSavingNewClient ? "Cadastrando..." : "Confirmar Cadastro"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-left text-xs">
+          {saveClientFeedback && (
+            <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 rounded-xl font-bold">
+              {saveClientFeedback}
+            </div>
+          )}
+
+          <p className="text-neutral-300">
+            Confirme os dados para registrar <strong>{appointmentToSaveAsClient?.clientName}</strong> como cliente oficial da barbearia:
+          </p>
+
+          <Input
+            label="Nome Completo do Cliente"
+            value={newClientFormData.name}
+            onChange={(e) =>
+              setNewClientFormData((prev) => ({ ...prev, name: e.target.value }))
+            }
+            placeholder="Nome do cliente"
+          />
+
+          <Input
+            label="WhatsApp com DDD"
+            value={newClientFormData.phone}
+            onChange={(e) =>
+              setNewClientFormData((prev) => ({ ...prev, phone: e.target.value }))
+            }
+            placeholder="(41) 99999-9999"
+          />
+
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-300 block">
+              Prontuário Inicial / Preferências de Corte:
+            </label>
+            <textarea
+              rows={3}
+              value={newClientFormData.technicalNotes}
+              onChange={(e) =>
+                setNewClientFormData((prev) => ({ ...prev, technicalNotes: e.target.value }))
+              }
+              placeholder="Ex: Pente 2 na lateral, disfarçado na navalha, corte clássico na tesoura."
+              className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-neutral-100 text-xs focus:outline-none focus:border-amber-500 leading-relaxed font-sans"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

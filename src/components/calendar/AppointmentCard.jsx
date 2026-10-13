@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Scissors, Receipt, FileText, Star, X, Sparkles, CreditCard, Check, MoreVertical } from "lucide-react";
+import { Scissors, Receipt, FileText, Star, X, Sparkles, CreditCard, Check, MoreVertical, UserPlus } from "lucide-react";
 import Badge from "../ui/Badge";
 import { appointmentCardStyles } from "./AppointmentCard.styles";
 
@@ -8,11 +8,14 @@ export default function AppointmentCard({
   minuteHeight = 2,
   isCompact = false,
   startMins = 0,
+  clients = [],
   onClick,
   onStatusChange,
   onOpenComanda,
   onPayMercadoPago,
   onCancel,
+  onSaveClient,
+  onOpenClientRecord,
   onMenuToggle,
   isMenuOpenExternal,
 }) {
@@ -61,6 +64,20 @@ export default function AppointmentCard({
   const isVip = Boolean(appointment.isVip ?? appointment.is_vip);
   const hasNotes = Boolean(appointment.hasNotes || appointment.notes?.trim());
   const isDelayed = Boolean(appointment.isDelayed);
+
+  // Detecção inteligente de cliente existente na base
+  const clientPhoneClean = (appointment.clientPhone || appointment.client_phone || "").replace(/\D/g, "");
+  const clientNameClean = (appointment.clientName || appointment.client_name || "").trim().toLowerCase();
+
+  const existingClient = (Array.isArray(clients) ? clients : []).find((c) => {
+    if (!c) return false;
+    const cPhoneClean = (c.phone || "").replace(/\D/g, "");
+    if (clientPhoneClean && cPhoneClean && clientPhoneClean === cPhoneClean) return true;
+    if (clientNameClean && (c.name || "").trim().toLowerCase() === clientNameClean) return true;
+    return false;
+  });
+
+  const isExistingClient = Boolean(existingClient);
 
   // Determina se o menu abre para baixo (se topo da agenda) ou para cima
   const openDownwards = startMins < 140;
@@ -242,6 +259,41 @@ export default function AppointmentCard({
                 </button>
               )}
 
+              {/* Ação Dinâmica: Cadastrar como Cliente se novo OU Ver Prontuário se já cadastrado */}
+              {isExistingClient ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onOpenClientRecord) {
+                      onOpenClientRecord(existingClient, appointment);
+                    }
+                    toggleMenu(false);
+                  }}
+                  className={appointmentCardStyles.menuItem}
+                  title="Visualizar histórico e notas técnicas do cliente"
+                >
+                  <FileText className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                  <span>Ver Prontuário do Cliente</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onSaveClient) {
+                      onSaveClient(appointment);
+                    }
+                    toggleMenu(false);
+                  }}
+                  className={appointmentCardStyles.menuItem}
+                  title="Cadastrar este cliente e abrir prontuário"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Salvar como Cliente (Novo)</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={(e) => {
@@ -252,7 +304,7 @@ export default function AppointmentCard({
                 className={appointmentCardStyles.menuItem}
               >
                 <Receipt className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>Abrir Comanda / Caixa</span>
+                <span>Ver Comanda no Caixa</span>
               </button>
 
               {!isPaid && (

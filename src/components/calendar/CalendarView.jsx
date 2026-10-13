@@ -59,12 +59,15 @@ export default function CalendarView({
   startHour = 8,
   endHour = 21,
   minuteHeight = 1.8,
+  clients = [],
   onSlotClick,
   onNewAppointmentClick,
   onAppointmentClick,
   onOpenComanda,
   onStatusChange,
   onCancelAppointment,
+  onSaveClient,
+  onOpenClientRecord,
   onDropAppointment,
   onDateChange,
 }) {
@@ -530,6 +533,9 @@ export default function CalendarView({
                   onOpenComanda={onOpenComanda}
                   onStatusChange={onStatusChange}
                   onCancel={onCancelAppointment}
+                  clients={clients}
+                  onSaveClient={onSaveClient}
+                  onOpenClientRecord={onOpenClientRecord}
                   onDropAppointment={onDropAppointment}
                 />
               );

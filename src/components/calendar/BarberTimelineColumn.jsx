@@ -13,6 +13,7 @@ export default function BarberTimelineColumn({
   breaks,
   appointments = [],
   allBarberAppointments,
+  clients = [],
   highlightedAppointmentId = null,
   onOpenBarberAppointments,
   onSlotClick,
@@ -20,6 +21,8 @@ export default function BarberTimelineColumn({
   onStatusChange,
   onOpenComanda,
   onCancel,
+  onSaveClient,
+  onOpenClientRecord,
   onDropAppointment,
 }) {
   // Estado para destacar o slot onde o mouse está passando por cima no arraste
@@ -387,6 +390,9 @@ export default function BarberTimelineColumn({
                   }
                   onOpenComanda={onOpenComanda}
                   onCancel={onCancel}
+                  clients={clients}
+                  onSaveClient={onSaveClient}
+                  onOpenClientRecord={onOpenClientRecord}
                 />
               </div>
             );
