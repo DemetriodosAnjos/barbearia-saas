@@ -549,6 +549,7 @@ export default function BarbershopDashboard({
                   onUpdateUser={onUpdateUser}
                   onUpdateTenant={onUpdateTenant}
                   onBack={() => setActiveMenuTab("agenda")}
+                  onLogout={onLogout}
                 />
               </ErrorBoundary>
             )}

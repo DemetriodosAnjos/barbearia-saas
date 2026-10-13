@@ -12,6 +12,7 @@ import { profileStyles } from "./UserProfileView.styles";
 import Tabs from "../../components/ui/Tabs";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import Modal from "../../components/ui/Modal";
 import Avatar from "../../components/ui/Avatar";
 import Badge from "../../components/ui/Badge";
 import Toggle from "../../components/ui/Toggle";
@@ -43,6 +44,7 @@ export default function UserProfileView({
   onUpdateUser,
   onUpdateTenant,
   onBack,
+  onLogout,
 }) {
   const [activeTab, setActiveTab] = useState("pessoal");
   const [isSaving, setIsSaving] = useState(false);
@@ -334,6 +336,10 @@ export default function UserProfileView({
   const [sessionFeedback, setSessionFeedback] = useState("");
   const [isDisconnectingSessions, setIsDisconnectingSessions] = useState(false);
 
+  // Modal oficial "Encerrar Sessão" acionado pelo link "Desconectar"
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [sessionToDisconnect, setSessionToDisconnect] = useState(null);
+
   // Refs de controle para prevenção de rajadas e loops em tempo real
   const isFetchingSessionsRef = useRef(false);
   const realtimeTimeoutRef = useRef(null);
@@ -407,50 +413,112 @@ export default function UserProfileView({
     }
   }, [activeTab, user?.id, user?.email, tenant?.id]);
 
-  // Função para desconectar todos os outros dispositivos remotos
-  const handleDisconnectOtherDevices = async () => {
-    setIsDisconnectingSessions(true);
-    setSessionFeedback("");
-    try {
-      try {
-        if (supabase.auth?.signOut) {
-          await supabase.auth.signOut({ scope: "others" });
-        }
-      } catch {
-        // Ignore
-      }
-      const currentSession = activeSessions.find((s) => s.is_current);
-      await revokeOtherUserSessions(currentSession?.id, user, tenant);
-
-      setActiveSessions((prev) => prev.filter((s) => s.is_current));
-      setSessionFeedback(
-        "Todas as outras sessões ativas foram desconectadas com sucesso."
-      );
-      setTimeout(() => setSessionFeedback(""), 4000);
-    } catch (err) {
-      console.error("Erro ao desconectar outros dispositivos:", err);
-      setSessionFeedback("Não foi possível desconectar todos os dispositivos remotos.");
-    } finally {
-      setIsDisconnectingSessions(false);
-    }
+  // Abre o modal oficial "Encerrar Sessão" para um aparelho específico
+  const handleOpenDisconnectModal = (session) => {
+    setSessionToDisconnect(session);
+    setIsLogoutModalOpen(true);
   };
 
-  // Função para desconectar uma sessão remota específica
-  const handleRevokeSingleSession = async (sessionId) => {
+  // Abre o modal oficial para desconectar outros dispositivos remotos
+  const handleOpenDisconnectOthersModal = () => {
+    setSessionToDisconnect({ id: "others", is_others: true, device_name: "Outros Dispositivos" });
+    setIsLogoutModalOpen(true);
+  };
+
+  // Confirmação no modal "Encerrar Sessão" (reseta o estado do aparelho e leva à tela de login)
+  const handleConfirmDisconnectSession = async () => {
+    if (!sessionToDisconnect) return;
+
+    setIsDisconnectingSessions(true);
+    setSessionFeedback("");
+
     try {
-      const targetSession = activeSessions.find((s) => s.id === sessionId);
-      await revokeUserSession(sessionId, user, tenant);
+      const targetSession = sessionToDisconnect;
+
+      // Caso 1: Desconectar todos os outros dispositivos
+      if (targetSession.is_others) {
+        try {
+          if (supabase.auth?.signOut) {
+            await supabase.auth.signOut({ scope: "others" });
+          }
+        } catch {
+          // ignore
+        }
+        const currentSession = activeSessions.find((s) => s.is_current);
+        await revokeOtherUserSessions(currentSession?.id, user, tenant);
+        setActiveSessions((prev) => prev.filter((s) => s.is_current));
+        setSessionFeedback("Todas as outras sessões foram desconectadas. O estado dos aparelhos foi resetado.");
+        setTimeout(() => setSessionFeedback(""), 4000);
+        return;
+      }
+
+      // Identifica se o alvo é o dispositivo atual deste navegador
+      const isTargetCurrent = Boolean(
+        targetSession.is_current ||
+        (typeof window !== "undefined" &&
+          safeStorage.getItem("saas_active_session_id") === targetSession.id)
+      );
+
+      // 1. Revoga a sessão no Supabase (atualiza is_active = false e registra motivo)
+      await revokeUserSession(
+        targetSession.id,
+        user,
+        tenant,
+        isTargetCurrent ? "Desconectado pelo próprio usuário no perfil" : "Dispositivo desconectado pelo usuário no perfil"
+      );
+
+      // 2. Se for o próprio aparelho atual a ser desconectado:
+      if (isTargetCurrent) {
+        // Reseta totalmente o estado do aparelho e limpa storages
+        safeStorage.removeItem("saas_auth_user");
+        safeStorage.removeItem("saas_active_screen");
+        safeStorage.removeItem("saas_jwt_access_token");
+        safeStorage.removeItem("access_token");
+        safeStorage.removeItem("saas_active_session_id");
+
+        try {
+          if (supabase.auth?.signOut) {
+            await supabase.auth.signOut().catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+
+        setIsLogoutModalOpen(false);
+        setSessionToDisconnect(null);
+
+        // Notifica aplicação e redireciona à tela de login
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("saas:force-logout"));
+        }
+        if (onLogout) {
+          onLogout();
+        } else if (onBack) {
+          safeStorage.setItem("saas_active_screen", "login");
+          window.location.reload();
+        }
+        return;
+      }
+
+      // 3. Se for um aparelho remoto:
       setActiveSessions((prev) =>
         prev.filter(
           (s) =>
-            s.id !== sessionId &&
-            (!targetSession?.device_name || s.device_name !== targetSession.device_name)
+            s.id !== targetSession.id &&
+            (!targetSession.device_name || s.device_name !== targetSession.device_name)
         )
       );
-      setSessionFeedback("Dispositivo desconectado com sucesso.");
-      setTimeout(() => setSessionFeedback(""), 3000);
+      setSessionFeedback(
+        `Dispositivo "${targetSession.device_name || "Aparelho"}" desconectado com sucesso. O estado foi resetado e o usuário direcionado para a tela de login.`
+      );
+      setTimeout(() => setSessionFeedback(""), 4000);
     } catch (err) {
       console.error("Erro ao encerrar sessão:", err);
+      setSessionFeedback("Não foi possível desconectar o dispositivo.");
+    } finally {
+      setIsDisconnectingSessions(false);
+      setIsLogoutModalOpen(false);
+      setSessionToDisconnect(null);
     }
   };
 
@@ -1498,7 +1566,7 @@ export default function UserProfileView({
                   <button
                     type="button"
                     disabled={isDisconnectingSessions}
-                    onClick={handleDisconnectOtherDevices}
+                    onClick={handleOpenDisconnectOthersModal}
                     className="text-xs text-red-400 hover:text-red-300 hover:underline cursor-pointer transition-colors"
                   >
                     {isDisconnectingSessions
@@ -1556,13 +1624,22 @@ export default function UserProfileView({
                         </span>
                       </div>
                       {session.is_current ? (
-                        <span className={profileStyles.activeNowBadge}>
-                          Conectado Agora
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={profileStyles.activeNowBadge}>
+                            Conectado Agora
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDisconnectModal(session)}
+                            className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded hover:bg-red-500/10 cursor-pointer transition-colors"
+                          >
+                            Desconectar
+                          </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
-                          onClick={() => handleRevokeSingleSession(session.id)}
+                          onClick={() => handleOpenDisconnectModal(session)}
                           className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded hover:bg-red-500/10 cursor-pointer transition-colors"
                         >
                           Desconectar
@@ -1575,6 +1652,54 @@ export default function UserProfileView({
             </div>
           </div>
         )}
+
+        {/* MODAL OFICIAL: Encerrar Sessão (Disparado pelo link "Desconectar") */}
+        <Modal
+          isOpen={isLogoutModalOpen}
+          onClose={() => {
+            setIsLogoutModalOpen(false);
+            setSessionToDisconnect(null);
+          }}
+          title="Encerrar Sessão"
+          size="sm"
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsLogoutModalOpen(false);
+                  setSessionToDisconnect(null);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                isLoading={isDisconnectingSessions}
+                onClick={handleConfirmDisconnectSession}
+              >
+                Sim, pode sair!
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-2 text-left py-1 select-none">
+            <p className="text-xs text-neutral-200 leading-relaxed font-semibold">
+              {sessionToDisconnect?.is_others
+                ? "Tem certeza de que deseja desconectar todos os outros aparelhos remotos?"
+                : sessionToDisconnect?.is_current
+                ? "Tem certeza de que deseja sair da plataforma?"
+                : `Tem certeza de que deseja desconectar o dispositivo "${sessionToDisconnect?.device_name || "Aparelho Selecionado"}"?`}
+            </p>
+            <p className="text-[11px] text-neutral-400 leading-relaxed">
+              {sessionToDisconnect?.is_others
+                ? "Todas as outras sessões ativas serão encerradas e os aparelhos redirecionados para a tela de login."
+                : sessionToDisconnect?.is_current
+                ? "Sua sessão será finalizada com segurança e você precisará digitar suas credenciais novamente para acessar o painel."
+                : "A sessão deste aparelho será encerrada com segurança no banco de dados, resetando seu estado e redirecionando o usuário para a tela de login."}
+            </p>
+          </div>
+        </Modal>
 
         {/* BOTÃO SALVAR ALTERAÇÕES */}
         <div className={profileStyles.footerActions}>

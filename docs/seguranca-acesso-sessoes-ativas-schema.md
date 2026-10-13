@@ -21,10 +21,12 @@ Este documento registra as melhorias de UI, a remoção de dados mockados e a ar
   - Navegador real (Google Chrome, Safari, Mozilla Firefox, Microsoft Edge, Opera)
   - Tipo de dispositivo (Desktop/Laptop ou Smartphone/Mobile)
   - Identificação da sessão ativa do usuário atual com o selo `"Conectado Agora"`.
-- **Revogação Real:**
-  - O botão *"Desconectar outros dispositivos"* agora só é exibido quando há mais de uma sessão ativa registrada.
-  - A ação aciona `supabase.auth.signOut({ scope: "others" })` e atualiza no banco `public.sessions` com `is_active = false`, `revoked_at = NOW()` e `revocation_reason`.
-  - É possível revogar cada dispositivo individualmente sem uso de chamadas bloqueantes como `window.alert`.
+- **Revogação Real & UX de Desconexão (v1.5.3.3):**
+  - Tanto o dispositivo atual (`Conectado Agora`) quanto os aparelhos remotos contam com o link de ação **"Desconectar"**.
+  - O clique em *"Desconectar"* aciona o modal oficial **"Encerrar Sessão"** (mesmo componente `Modal` utilizado na navbar/sidebar da aplicação).
+  - A confirmação no modal dispara a revogação da sessão no Supabase, limpa os registros locais de autenticação (`saas_auth_user`, tokens e IDs de sessão) e redireciona o usuário do aparelho desconectado diretamente para a tela de login.
+  - Para aparelhos remotos, a revogação é escutada via canal em tempo real do Supabase (`postgres_changes` na tabela `public.sessions`) e verificada periodicamente em heartbeat, assegurando que o aparelho remoto desconectado também resete seu estado e navegue para o login em menos de 1 segundo.
+  - O botão *"Desconectar outros dispositivos"* permanece disponível quando há mais de uma sessão ativa registrada, abrindo também a confirmação antes da execução em lote.
 
 ---
 

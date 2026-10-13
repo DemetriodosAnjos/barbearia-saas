@@ -593,25 +593,122 @@ export default function App() {
     };
   }, [resolveAndSyncUserTenant]);
 
-  // Sincronização global automática do dispositivo e presença ativa (Notebook, Celular, Tablet)
+  // Sincronização global automática do dispositivo, presença ativa e escuta de revogação remota
   useEffect(() => {
     if (currentUser?.id || currentUser?.email) {
       registerOrUpdateGlobalSession(currentUser, tenant);
 
-      // Heartbeat a cada 60 segundos enquanto a aplicação estiver aberta
-      const heartbeatInterval = setInterval(() => {
+      // Heartbeat a cada 30 segundos enquanto a aplicação estiver aberta
+      const heartbeatInterval = setInterval(async () => {
         registerOrUpdateGlobalSession(currentUser, tenant);
-      }, 60000);
 
-      // Sincroniza imediatamente ao focar na janela/aba do navegador
-      const handleWindowFocus = () => {
+        // Verifica se a sessão deste aparelho específico foi revogada remotamente
+        const storedSessionId = safeStorage.getItem("saas_active_session_id");
+        if (storedSessionId) {
+          try {
+            const { data } = await supabase
+              .from("sessions")
+              .select("id, is_active")
+              .eq("id", storedSessionId)
+              .maybeSingle();
+            if (data && data.is_active === false) {
+              console.warn("[Segurança] Sessão deste aparelho revogada. Redirecionando para login.");
+              safeStorage.removeItem("saas_auth_user");
+              safeStorage.removeItem("saas_active_screen");
+              safeStorage.removeItem("saas_jwt_access_token");
+              safeStorage.removeItem("access_token");
+              safeStorage.removeItem("saas_active_session_id");
+              setCurrentUser(null);
+              setActiveUserRole(USER_ROLES.ANON);
+              setCurrentScreen("login");
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }, 30000);
+
+      // Sincroniza e verifica status imediatamente ao focar na janela/aba do navegador
+      const handleWindowFocus = async () => {
         registerOrUpdateGlobalSession(currentUser, tenant);
+        const storedSessionId = safeStorage.getItem("saas_active_session_id");
+        if (storedSessionId) {
+          try {
+            const { data } = await supabase
+              .from("sessions")
+              .select("id, is_active")
+              .eq("id", storedSessionId)
+              .maybeSingle();
+            if (data && data.is_active === false) {
+              safeStorage.removeItem("saas_auth_user");
+              safeStorage.removeItem("saas_active_screen");
+              safeStorage.removeItem("saas_jwt_access_token");
+              safeStorage.removeItem("access_token");
+              safeStorage.removeItem("saas_active_session_id");
+              setCurrentUser(null);
+              setActiveUserRole(USER_ROLES.ANON);
+              setCurrentScreen("login");
+            }
+          } catch {
+            // ignore
+          }
+        }
       };
       window.addEventListener("focus", handleWindowFocus);
+
+      // Escuta eventos Realtime na tabela sessions para revogação instantânea (< 1s)
+      let channel;
+      try {
+        channel = supabase
+          .channel("realtime-session-revocation-guard")
+          .on(
+            "postgres_changes",
+            { event: "UPDATE", schema: "public", table: "sessions" },
+            (payload) => {
+              const currentStoredId = safeStorage.getItem("saas_active_session_id");
+              if (
+                payload.new &&
+                payload.new.is_active === false &&
+                currentStoredId &&
+                payload.new.id === currentStoredId
+              ) {
+                console.warn("[Segurança] Sessão revogada em tempo real. Redirecionando para login.");
+                safeStorage.removeItem("saas_auth_user");
+                safeStorage.removeItem("saas_active_screen");
+                safeStorage.removeItem("saas_jwt_access_token");
+                safeStorage.removeItem("access_token");
+                safeStorage.removeItem("saas_active_session_id");
+                setCurrentUser(null);
+                setActiveUserRole(USER_ROLES.ANON);
+                setCurrentScreen("login");
+              }
+            }
+          )
+          .subscribe();
+      } catch {
+        // ignore
+      }
+
+      // Escuta evento customizado de logout forçado disparado pelo perfil
+      const handleCustomForceLogout = () => {
+        safeStorage.removeItem("saas_auth_user");
+        safeStorage.removeItem("saas_active_screen");
+        safeStorage.removeItem("saas_jwt_access_token");
+        safeStorage.removeItem("access_token");
+        safeStorage.removeItem("saas_active_session_id");
+        setCurrentUser(null);
+        setActiveUserRole(USER_ROLES.ANON);
+        setCurrentScreen("login");
+      };
+      window.addEventListener("saas:force-logout", handleCustomForceLogout);
 
       return () => {
         clearInterval(heartbeatInterval);
         window.removeEventListener("focus", handleWindowFocus);
+        window.removeEventListener("saas:force-logout", handleCustomForceLogout);
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
       };
     }
   }, [currentUser?.id, currentUser?.email, tenant?.id]);
@@ -686,6 +783,7 @@ export default function App() {
       safeStorage.removeItem("saas_active_screen");
       safeStorage.removeItem("saas_jwt_access_token");
       safeStorage.removeItem("access_token");
+      safeStorage.removeItem("saas_active_session_id");
       setCurrentUser(null);
       setActiveUserRole(USER_ROLES.ANON);
       setCurrentScreen("login");
