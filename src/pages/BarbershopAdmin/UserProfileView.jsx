@@ -637,9 +637,11 @@ export default function UserProfileView({
           <div className={profileStyles.infoGroup}>
             <h2 className={profileStyles.nameTitle}>
               <SafeHtml html={personalData.fullName} />
-              <span className="text-amber-400 text-xs font-normal">
-                (<SafeHtml html={`"${personalData.displayName}"`} />)
-              </span>
+              {personalData.displayName ? (
+                <span className="text-amber-400 text-xs font-normal ml-1.5">
+                  (<SafeHtml html={personalData.displayName} />)
+                </span>
+              ) : null}
             </h2>
             <p className={profileStyles.displayNameTag}>
               Nome exibido para os clientes:{" "}
@@ -797,6 +799,7 @@ export default function UserProfileView({
                 }}
                 error={profileErrors.birthDate}
                 helperText="Utilizado para identificação e benefícios."
+                className="[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
               />
             </div>
           </div>
