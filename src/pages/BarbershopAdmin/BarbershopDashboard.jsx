@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { barbershopStyles } from "./BarbershopDashboard.styles";
 import Sidebar from "../../components/ui/Sidebar";
