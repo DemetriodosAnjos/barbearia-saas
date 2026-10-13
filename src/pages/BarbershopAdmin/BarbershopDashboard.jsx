@@ -225,12 +225,31 @@ export default function BarbershopDashboard({
     };
   }, [tenant?.id]);
 
+  // Contagem precisa de agendamentos ativos de hoje (excluindo cancelados)
+  const todayYMD = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, []);
+
+  const todayActiveAppointments = useMemo(() => {
+    if (!Array.isArray(appointments)) return [];
+    return appointments.filter((appt) => {
+      if (!appt || appt.status === "cancelled" || appt.status === "cancelado") return false;
+      const rawDate = appt.date || appt.bookingDate || appt.start_time || appt.created_at || "";
+      const dateStr = typeof rawDate === "string" ? rawDate.slice(0, 10) : "";
+      return dateStr ? dateStr === todayYMD : true;
+    });
+  }, [appointments, todayYMD]);
+
   const barbershopMenuItems = [
     {
       id: "agenda",
       label: "Agenda de Atendimentos",
       icon: "calendar",
-      badge: `${appointments.length} hoje`,
+      badge: `${todayActiveAppointments.length} hoje`,
     },
     { id: "servicos", label: "Serviços & Produtos", icon: "scissors" },
     { id: "profissionais", label: "Equipe de Barbeiros", icon: "barber" },
@@ -409,7 +428,7 @@ export default function BarbershopDashboard({
             breadcrumbs={["Painel da Barbearia", activeMenuTab.toUpperCase()]}
             barberStatus={barberPresenceStatus}
             onStatusChange={setBarberPresenceStatus}
-            notificationsCount={appointments.length}
+            notificationsCount={todayActiveAppointments.length}
             onMenuClick={() => setIsMobileSidebarOpen(true)}
             onQuickAction={() => setActiveMenuTab("agenda")}
             onProfileClick={() => setActiveMenuTab("perfil")}

@@ -71,6 +71,7 @@ export default function CalendarView({
   const [viewMode, setViewMode] = useState("day"); // 'day' | 'week' | 'month'
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedBarberFilter, setSelectedBarberFilter] = useState("all");
+  const [showCancelled, setShowCancelled] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Estado do Modal de Horário Indisponível (Slots Passados)
@@ -136,7 +137,7 @@ export default function CalendarView({
     const list = appointments.filter(
       (a) =>
         (a.barberId || a.barber_id) === selectedBarberForModal.id &&
-        a.status !== "cancelled"
+        (showCancelled ? true : a.status !== "cancelled" && a.status !== "cancelado")
     );
     return [...list].sort((a, b) => {
       const dateA = getAppointmentDateYMD(a);
@@ -146,7 +147,7 @@ export default function CalendarView({
       const timeB = b.startTime || b.start_time || "00:00";
       return timeA.localeCompare(timeB);
     });
-  }, [selectedBarberForModal, appointments]);
+  }, [selectedBarberForModal, appointments, showCancelled]);
 
   const filteredBarberModalAppointments = useMemo(() => {
     if (barberModalFilter === "current_day") {
@@ -320,7 +321,7 @@ export default function CalendarView({
 
     // Filtro: filtra o array 'appointments' pela data informada e pelo barbeiro ativo
     const dayAppts = appointments.filter((appt) => {
-      if (appt.status === "cancelled") return false;
+      if (!showCancelled && (appt.status === "cancelled" || appt.status === "cancelado")) return false;
       const apptDate = getAppointmentDateYMD(appt);
       const matchesDate = apptDate === targetDateStr;
 
@@ -415,6 +416,23 @@ export default function CalendarView({
             ))}
           </select>
 
+          <button
+            type="button"
+            onClick={() => setShowCancelled((prev) => !prev)}
+            className={`text-xs py-2 px-3 rounded-lg border font-medium transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+              showCancelled
+                ? "bg-red-950/60 border-red-500/60 text-red-300 hover:bg-red-900/70"
+                : "bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+            }`}
+            title="Alternar visibilidade de agendamentos cancelados na agenda"
+            aria-label="Alternar visibilidade de agendamentos cancelados"
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${showCancelled ? "bg-red-400" : "bg-neutral-500"}`}
+            />
+            <span>Cancelados: {showCancelled ? "Visíveis" : "Ocultos"}</span>
+          </button>
+
           <Button
             variant="primary"
             onClick={() =>
@@ -485,7 +503,7 @@ export default function CalendarView({
               const barberAllAppts = appointments.filter(
                 (a) =>
                   (a.barberId || a.barber_id) === barber.id &&
-                  a.status !== "cancelled",
+                  (showCancelled ? true : a.status !== "cancelled" && a.status !== "cancelado"),
               );
 
               // APENAS os agendamentos cuja data corresponde ao dia aberto na grade (ex: 08/10 não exibe 09/10 ou 10/10)

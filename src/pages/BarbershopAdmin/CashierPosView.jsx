@@ -563,9 +563,23 @@ export default function CashierPosView({
       list = list.filter((c) => c.status === "open");
     } else if (activeFilter === "paid") {
       list = list.filter((c) => c.status === "paid" || c.isPaid === true);
+    } else if (activeFilter === "cancelled") {
+      list = list.filter((c) => c.status === "cancelled" || c.status === "cancelado");
+    } else {
+      // Aba "Todas": exibe apenas comandas ativas operacionais (não canceladas)
+      list = list.filter((c) => c.status !== "cancelled" && c.status !== "cancelado");
     }
     return list;
   }, [dateScopedComandas, activeFilter]);
+
+  // Contagem específica para abas ativas e canceladas
+  const activeComandasCount = useMemo(() => {
+    return dateScopedComandas.filter((c) => c.status !== "cancelled" && c.status !== "cancelado").length;
+  }, [dateScopedComandas]);
+
+  const cancelledCount = useMemo(() => {
+    return dateScopedComandas.filter((c) => c.status === "cancelled" || c.status === "cancelado").length;
+  }, [dateScopedComandas]);
 
   // Formatação amigável da data selecionada
   const formattedSelectedDate = useMemo(() => {
@@ -787,7 +801,7 @@ export default function CashierPosView({
                     : "text-neutral-400 hover:text-white"
                 }`}
               >
-                Todas ({dateScopedComandas.length})
+                Todas ({activeComandasCount})
               </button>
               <button
                 type="button"
@@ -822,6 +836,19 @@ export default function CashierPosView({
               >
                 Pagas ({paidCount})
               </button>
+              {cancelledCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter("cancelled")}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer shrink-0 ${
+                    activeFilter === "cancelled"
+                      ? "bg-red-600 text-white"
+                      : "text-neutral-400 hover:text-red-400"
+                  }`}
+                >
+                  Canceladas ({cancelledCount})
+                </button>
+              )}
             </div>
           </div>
 

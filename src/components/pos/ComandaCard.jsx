@@ -69,6 +69,8 @@ export default function ComandaCard({
   const totalHouseNet = Math.max(0, totalComanda - totalBarberCommission);
 
   // 3. Estilos de Status
+  const isCancelled = comanda.status === "cancelled" || comanda.status === "cancelado";
+
   const statusConfig = {
     open: {
       label: "Na Cadeira (Aberta)",
@@ -85,26 +87,38 @@ export default function ComandaCard({
       style: comandaStyles.statusPaid,
       dot: "bg-neutral-500",
     },
+    cancelled: {
+      label: "Cancelada",
+      style: "bg-red-950/40 text-red-400 border border-red-500/30",
+      dot: "bg-red-500",
+    },
   };
 
-  const currentStatus = statusConfig[comanda.status] || statusConfig.open;
+  const currentStatus = isCancelled
+    ? statusConfig.cancelled
+    : statusConfig[comanda.status] || statusConfig.open;
 
   return (
-    <div className={`${comandaStyles.container} ${className}`}>
+    <div className={`${comandaStyles.container} ${isCancelled ? "opacity-75 border-red-950/50" : ""} ${className}`}>
       {/* 1. CABEÇALHO DA COMANDA COM CONTROLE MANUAL DE STATUS */}
       <div className={comandaStyles.header}>
         <div className={comandaStyles.identityWrapper}>
           {/* [Exibição do identificador real da comanda e badge de origem da agenda] */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={comandaStyles.comandaBadge}>#{comandaId}</span>
-            {comanda.source === "agenda" && (
+            {isCancelled && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-red-500/15 text-red-400 border border-red-500/30 font-mono">
+                Cancelada
+              </span>
+            )}
+            {comanda.source === "agenda" && !isCancelled && (
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono">
                 Agenda {openedAt ? `· ${openedAt}` : ""}
               </span>
             )}
           </div>
           <div>
-            <h3 className={comandaStyles.clientName}>
+            <h3 className={`${comandaStyles.clientName} ${isCancelled ? "line-through opacity-60 text-neutral-400" : ""}`}>
               {/* [Nome e telefone reais vinculados ao cliente da comanda] */}
               <span>{clientName}</span>
               {clientPhone && (
@@ -285,7 +299,21 @@ export default function ComandaCard({
             </Button>
           )}
 
-          {comanda.status !== "paid" ? (
+          {isCancelled ? (
+            <div className="flex items-center justify-between w-full">
+              <div className="text-xs font-bold text-red-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                <span>Comanda Cancelada (Não Operacional)</span>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => onStatusChange && onStatusChange("open")}
+                className="text-xs text-neutral-400 hover:text-amber-400 py-1 px-2.5 ml-auto cursor-pointer"
+              >
+                Reativar Comanda
+              </Button>
+            </div>
+          ) : comanda.status !== "paid" ? (
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="primary"

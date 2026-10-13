@@ -218,7 +218,8 @@ export default function BarberTimelineColumn({
   const fullAppointmentsList = Array.isArray(allBarberAppointments)
     ? allBarberAppointments
     : appointments;
-  const totalBarberCuts = fullAppointmentsList.length;
+  // O botão no topo da coluna do barbeiro agora reflete exatamente a quantidade de cortes agendados para o dia em exibição (dayCuts)
+  const dayCuts = Array.isArray(appointments) ? appointments.length : 0;
 
   return (
     <div className={timelineColumnStyles.column}>
@@ -239,12 +240,12 @@ export default function BarberTimelineColumn({
             onOpenBarberAppointments &&
             onOpenBarberAppointments(barber, fullAppointmentsList)
           }
-          title={`Ver os ${totalBarberCuts} agendamento(s) de ${barber.name} e ir para a data`}
-          aria-label={`Ver ${totalBarberCuts} cortes agendados de ${barber.name}`}
+          title={`Ver os ${dayCuts} agendamento(s) de ${barber.name} e ir para a data`}
+          aria-label={`Ver ${dayCuts} cortes agendados de ${barber.name}`}
           className="group text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 hover:text-amber-300 border border-amber-500/25 hover:border-amber-400/70 transition-all duration-150 cursor-pointer flex items-center gap-1 shrink-0 active:scale-95 shadow-xs"
         >
           <Calendar className="w-3 h-3 text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
-          <span>{totalBarberCuts} cortes</span>
+          <span>{dayCuts} cortes</span>
         </button>
       </div>
 
