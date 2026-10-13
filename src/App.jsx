@@ -595,13 +595,13 @@ export default function App() {
 
   // Sincronização global automática do dispositivo e presença ativa (Notebook, Celular, Tablet)
   useEffect(() => {
-    if (currentUser?.id && currentUser.id !== "owner-usr-01") {
+    if (currentUser?.id || currentUser?.email) {
       registerOrUpdateGlobalSession(currentUser, tenant);
 
-      // Heartbeat a cada 2 minutos enquanto a aplicação estiver aberta
+      // Heartbeat a cada 60 segundos enquanto a aplicação estiver aberta
       const heartbeatInterval = setInterval(() => {
         registerOrUpdateGlobalSession(currentUser, tenant);
-      }, 120000);
+      }, 60000);
 
       // Sincroniza imediatamente ao focar na janela/aba do navegador
       const handleWindowFocus = () => {
@@ -614,7 +614,7 @@ export default function App() {
         window.removeEventListener("focus", handleWindowFocus);
       };
     }
-  }, [currentUser?.id, tenant?.id]);
+  }, [currentUser?.id, currentUser?.email, tenant?.id]);
 
   // Efeito de auditoria contínua a cada alteração de tela
   useEffect(() => {

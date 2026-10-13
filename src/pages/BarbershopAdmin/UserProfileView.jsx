@@ -340,8 +340,8 @@ export default function UserProfileView({
     try {
       // 1. Assegura que o dispositivo atual está registrado e atualizado no banco
       await registerOrUpdateGlobalSession(user, tenant);
-      // 2. Busca todas as sessões ativas do usuário
-      const sessions = await fetchUserActiveSessions(user);
+      // 2. Busca todas as sessões ativas do usuário e barbearia
+      const sessions = await fetchUserActiveSessions(user, tenant);
       setActiveSessions(sessions);
     } catch (err) {
       console.warn("Aviso ao carregar sessões ativas:", err);
@@ -350,29 +350,50 @@ export default function UserProfileView({
     }
   };
 
-  // Efeito que sincroniza os dispositivos conectados reais com o Supabase ao abrir a aba
+  // Efeito que sincroniza os dispositivos conectados reais com o Supabase ao abrir a aba e escuta eventos Realtime
   useEffect(() => {
     if (activeTab === "seguranca") {
       loadActiveSessions();
+
+      // Inscrição em tempo real para sincronização instantânea entre múltiplos dispositivos
+      let channel;
+      try {
+        channel = supabase
+          .channel("public-sessions-sync")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "sessions" },
+            () => {
+              loadActiveSessions();
+            }
+          )
+          .subscribe();
+      } catch {
+        // Fallback silencioso
+      }
+
+      return () => {
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
+      };
     }
-  }, [activeTab, user?.id, tenant?.id]);
+  }, [activeTab, user?.id, user?.email, tenant?.id]);
 
   // Função para desconectar todos os outros dispositivos remotos
   const handleDisconnectOtherDevices = async () => {
     setIsDisconnectingSessions(true);
     setSessionFeedback("");
     try {
-      if (user?.id && user.id !== "owner-usr-01") {
-        try {
-          if (supabase.auth?.signOut) {
-            await supabase.auth.signOut({ scope: "others" });
-          }
-        } catch {
-          // Ignore
+      try {
+        if (supabase.auth?.signOut) {
+          await supabase.auth.signOut({ scope: "others" });
         }
-        const currentSession = activeSessions.find((s) => s.is_current);
-        await revokeOtherUserSessions(currentSession?.id, user.id);
+      } catch {
+        // Ignore
       }
+      const currentSession = activeSessions.find((s) => s.is_current);
+      await revokeOtherUserSessions(currentSession?.id, user, tenant);
 
       setActiveSessions((prev) => prev.filter((s) => s.is_current));
       setSessionFeedback(
@@ -390,9 +411,7 @@ export default function UserProfileView({
   // Função para desconectar uma sessão remota específica
   const handleRevokeSingleSession = async (sessionId) => {
     try {
-      if (user?.id && user.id !== "owner-usr-01") {
-        await revokeUserSession(sessionId, user.id);
-      }
+      await revokeUserSession(sessionId, user, tenant);
       setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
       setSessionFeedback("Dispositivo desconectado com sucesso.");
       setTimeout(() => setSessionFeedback(""), 3000);

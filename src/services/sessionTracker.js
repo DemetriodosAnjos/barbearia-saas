@@ -1,13 +1,56 @@
 /**
  * sessionTracker.js
  * Rastreador e gerenciador global de sessões ativas e dispositivos conectados.
- * Garante que qualquer dispositivo (celular, notebook, tablet) registre e atualize
+ * Garante que qualquer dispositivo (celular, notebook, tablet) registre e sincronize
  * sua presença no Supabase assim que acessa a aplicação.
  */
 import { supabase } from "../lib/supabase";
 import { safeStorage } from "../utils/safeStorage";
 
 const STORAGE_SESSION_KEY = "saas_active_session_id";
+
+/**
+ * Converte qualquer identificador (texto, e-mail ou 'owner-usr-01') em um UUID determinístico
+ * para garantir compatibilidade se a coluna user_id no Supabase for do tipo UUID.
+ */
+export function toSafeUuid(identifier) {
+  if (!identifier) return "a0000000-0000-0000-0000-000000000001";
+  const str = String(identifier).trim().toLowerCase();
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(str)) {
+    return str;
+  }
+  // Gera hash de 32 bits determinístico
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const hex = Math.abs(hash).toString(16).padStart(8, "0");
+  return `a0000000-0000-4000-8000-${hex.repeat(2).slice(0, 12)}`;
+}
+
+/**
+ * Normaliza os identificadores do usuário para localização multi-dispositivo
+ */
+export function getNormalizedSessionUser(user, tenant) {
+  const userId = user?.id ? String(user.id) : "owner-usr-01";
+  const userEmail = (user?.email || "").toLowerCase().trim();
+  const tenantId =
+    tenant?.id && tenant.id !== "default"
+      ? tenant.id
+      : user?.user_metadata?.barbershop_id || null;
+
+  // UUID determinístico compartilhado pelo mesmo usuário em qualquer dispositivo
+  const safeUuid = toSafeUuid(user?.id || userEmail || tenantId || "owner-usr-01");
+
+  return {
+    userId,
+    safeUuid,
+    userEmail,
+    tenantId,
+  };
+}
 
 /**
  * Detecta o sistema operacional, navegador e tipo de dispositivo do cliente atual
@@ -90,22 +133,18 @@ export function setStoredSessionId(id) {
  * Registra ou atualiza a sessão do dispositivo atual no Supabase (Executado globalmente no login/início do app)
  */
 export async function registerOrUpdateGlobalSession(user, tenant) {
-  if (!user?.id || user.id === "owner-usr-01") {
-    return null;
-  }
-
   const clientDevice = getClientDeviceInfo();
   const currentUa = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const storedSessionId = getStoredSessionId();
+  const { safeUuid, userEmail, tenantId, userId } = getNormalizedSessionUser(user, tenant);
 
   try {
     // 1. Se já temos um ID de sessão salvo no navegador, atualiza a última atividade
-    if (storedSessionId) {
+    if (storedSessionId && storedSessionId !== "current-local-session") {
       const { data: existingSession, error: checkErr } = await supabase
         .from("sessions")
         .select("id, is_active")
         .eq("id", storedSessionId)
-        .eq("user_id", user.id)
         .maybeSingle();
 
       if (!checkErr && existingSession && existingSession.is_active) {
@@ -116,22 +155,29 @@ export async function registerOrUpdateGlobalSession(user, tenant) {
             device_name: clientDevice.deviceName,
             browser: clientDevice.browser,
             os: clientDevice.os,
+            user_agent: currentUa,
           })
           .eq("id", storedSessionId);
         return existingSession;
       }
     }
 
-    // 2. Busca se já existe uma sessão ativa deste mesmo user_agent/aparelho
-    const { data: matchSession } = await supabase
+    // 2. Busca se já existe uma sessão ativa deste mesmo user_agent/aparelho para o usuário
+    let matchQuery = supabase
       .from("sessions")
       .select("id, is_active")
-      .eq("user_id", user.id)
       .eq("user_agent", currentUa)
       .eq("is_active", true)
       .order("last_activity_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    if (userEmail) {
+      matchQuery = matchQuery.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
+    } else {
+      matchQuery = matchQuery.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
+    }
+
+    const { data: matchSession } = await matchQuery.maybeSingle();
 
     if (matchSession?.id) {
       setStoredSessionId(matchSession.id);
@@ -142,19 +188,16 @@ export async function registerOrUpdateGlobalSession(user, tenant) {
           device_name: clientDevice.deviceName,
           browser: clientDevice.browser,
           os: clientDevice.os,
+          user_agent: currentUa,
         })
         .eq("id", matchSession.id);
       return matchSession;
     }
 
     // 3. Cria um novo registro para esta nova sessão/dispositivo conectado
-    const tenantId =
-      tenant?.id && tenant.id !== "default"
-        ? tenant.id
-        : user?.user_metadata?.barbershop_id || null;
-
     const payload = {
-      user_id: user.id,
+      user_id: safeUuid,
+      user_email: userEmail || null,
       tenant_id: tenantId,
       device_name: clientDevice.deviceName,
       browser: clientDevice.browser,
@@ -175,9 +218,19 @@ export async function registerOrUpdateGlobalSession(user, tenant) {
       setStoredSessionId(inserted.id);
       return inserted;
     }
+
+    if (insertErr) {
+      if (insertErr.code === "42501") {
+        console.warn(
+          "[Supabase Sessions] Erro 42501 (RLS): Para sincronizar múltiplos dispositivos (notebook e celular), aplique o script SQL em Supabase Editor.",
+          insertErr.message
+        );
+      } else {
+        console.debug("Info de sincronização de sessão:", insertErr.message || insertErr);
+      }
+    }
   } catch (err) {
-    // Falha silenciosa para não travar a aplicação caso a tabela ainda não exista no Supabase
-    console.debug("Info de sincronização de sessão:", err?.message || err);
+    console.debug("Falha na sincronização de sessão:", err?.message || err);
   }
 
   return null;
@@ -186,36 +239,25 @@ export async function registerOrUpdateGlobalSession(user, tenant) {
 /**
  * Busca todas as sessões ativas do usuário e identifica qual é o dispositivo atual
  */
-export async function fetchUserActiveSessions(user) {
+export async function fetchUserActiveSessions(user, tenant) {
   const clientDevice = getClientDeviceInfo();
   const currentUa = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const storedSessionId = getStoredSessionId();
-
-  // Caso usuário local ou offline
-  if (!user?.id || user.id === "owner-usr-01") {
-    return [
-      {
-        id: "current-local-session",
-        device_name: clientDevice.deviceName,
-        browser: clientDevice.browser,
-        os: clientDevice.os,
-        user_agent: currentUa,
-        is_current: true,
-        is_active: true,
-        last_activity_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        isMobile: clientDevice.isMobile,
-      },
-    ];
-  }
+  const { safeUuid, userEmail, userId } = getNormalizedSessionUser(user, tenant);
 
   try {
-    const { data: dbSessions, error } = await supabase
+    let query = supabase
       .from("sessions")
       .select("*")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("last_activity_at", { ascending: false });
+      .eq("is_active", true);
+
+    if (userEmail) {
+      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
+    } else {
+      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
+    }
+
+    const { data: dbSessions, error } = await query.order("last_activity_at", { ascending: false });
 
     if (!error && dbSessions && dbSessions.length > 0) {
       let hasCurrent = false;
@@ -231,16 +273,29 @@ export async function fetchUserActiveSessions(user) {
           ...s,
           is_current: isCurrent,
           isMobile: /mobile|android|iphone|ipad|ipod/i.test(
-            s.user_agent || s.device_name || ""
+            s.user_agent || s.device_name || s.os || ""
           ),
         };
       });
 
+      // Se nenhum bateu exatamente com o id armazenado, marca o dispositivo com user_agent local como atual
       if (!hasCurrent && mapped.length > 0) {
-        mapped[0].is_current = true;
+        const uaMatch = mapped.find((m) => m.user_agent === currentUa || m.device_name === clientDevice.deviceName);
+        if (uaMatch) {
+          uaMatch.is_current = true;
+        } else {
+          mapped[0].is_current = true;
+        }
       }
 
       return mapped;
+    }
+
+    if (error && error.code === "42501") {
+      console.warn(
+        "[Supabase Sessions] Erro 42501 (RLS) ao buscar sessões. Script SQL pendente de execução no Supabase SQL Editor.",
+        error.message
+      );
     }
   } catch (err) {
     console.debug("Info de busca de sessões:", err?.message || err);
@@ -249,7 +304,7 @@ export async function fetchUserActiveSessions(user) {
   // Fallback caso a tabela ainda esteja sendo criada no Supabase
   return [
     {
-      id: "current-local-session",
+      id: storedSessionId || "current-local-session",
       device_name: clientDevice.deviceName,
       browser: clientDevice.browser,
       os: clientDevice.os,
@@ -266,22 +321,30 @@ export async function fetchUserActiveSessions(user) {
 /**
  * Desconecta/Revoga uma sessão específica
  */
-export async function revokeUserSession(sessionId, userId, reason = "Revogado pelo usuário no perfil") {
+export async function revokeUserSession(sessionId, user, tenant, reason = "Revogado pelo usuário no perfil") {
+  const { safeUuid, userEmail, userId } = getNormalizedSessionUser(user, tenant);
   try {
-    await supabase
+    let query = supabase
       .from("sessions")
       .update({
         is_active: false,
         revoked_at: new Date().toISOString(),
         revocation_reason: reason,
       })
-      .eq("id", sessionId)
-      .eq("user_id", userId);
+      .eq("id", sessionId);
 
-    // Registra trilha de auditoria
+    if (userEmail) {
+      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
+    } else {
+      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
+    }
+
+    await query;
+
+    // Registra trilha de auditoria se tabela existir
     await supabase.from("security_audit_events").insert([
       {
-        user_id: userId,
+        user_id: safeUuid,
         event_type: "session_revoked",
         reason: reason,
         metadata: { revoked_session_id: sessionId },
@@ -298,7 +361,8 @@ export async function revokeUserSession(sessionId, userId, reason = "Revogado pe
 /**
  * Desconecta/Revoga todas as sessões exceto a atual
  */
-export async function revokeOtherUserSessions(currentSessionId, userId) {
+export async function revokeOtherUserSessions(currentSessionId, user, tenant) {
+  const { safeUuid, userEmail, userId } = getNormalizedSessionUser(user, tenant);
   try {
     let query = supabase
       .from("sessions")
@@ -307,8 +371,13 @@ export async function revokeOtherUserSessions(currentSessionId, userId) {
         revoked_at: new Date().toISOString(),
         revocation_reason: "Desconectado remotamente pelo usuário",
       })
-      .eq("user_id", userId)
       .eq("is_active", true);
+
+    if (userEmail) {
+      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId},user_email.eq.${userEmail}`);
+    } else {
+      query = query.or(`user_id.eq.${safeUuid},user_id.eq.${userId}`);
+    }
 
     if (currentSessionId && currentSessionId !== "current-local-session") {
       query = query.neq("id", currentSessionId);
@@ -319,7 +388,7 @@ export async function revokeOtherUserSessions(currentSessionId, userId) {
     // Registra trilha de auditoria
     await supabase.from("security_audit_events").insert([
       {
-        user_id: userId,
+        user_id: safeUuid,
         event_type: "all_other_sessions_revoked",
         reason: "Desconectou todos os outros dispositivos",
         metadata: { preserved_session_id: currentSessionId },
