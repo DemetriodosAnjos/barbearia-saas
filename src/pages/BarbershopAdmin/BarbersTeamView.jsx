@@ -14,6 +14,10 @@ import { SafeHtml } from "../../components/ui/SafeHtml";
 import WorkShiftSelector from "../../components/services/WorkShiftSelector";
 import { validateSchema, SCHEMAS, ALLOWED_BARBER_ROLES } from "../../utils/inputValidator";
 import { masks } from "../../utils/masks";
+import PlanLimitModal, {
+  getPlanMaxBarbers,
+  resolveTenantPlanKey,
+} from "../../components/team/PlanLimitModal";
 import {
   Scissors,
   Armchair,
@@ -114,18 +118,25 @@ const isValidUUID = (str) =>
 export default function BarbersTeamView({
   barbers = [], // Recebe via props
   onUpdateBarbers, // Atualiza o estado global
-  maxPlanChairs = 6,
+  maxPlanChairs,
   onBack,
   tenant,
+  onOpenPlansModal,
+  onNavigateToSupport,
 }) {
+  // ========================================================
+  // REGRAS E LIMITES DE PLANOS (TRIAL, STARTER, PRO, ENTERPRISE)
+  // ========================================================
+  const currentPlanKey = resolveTenantPlanKey(tenant);
+  const planMaxBarbers = getPlanMaxBarbers(tenant);
+  const totalChairs = maxPlanChairs || planMaxBarbers;
+
+  // Estado do Modal de Bloqueio por Limite do Plano
+  const [isPlanLimitModalOpen, setIsPlanLimitModalOpen] = useState(false);
+
   // ========================================================
   // ESTADOS DO MODAL "+ NOVO BARBEIRO" (COM 2 ABAS)
   // ========================================================
-
-  // Se não passar por props, garante o valor padrão:
-  const totalChairs = maxPlanChairs || 6;
-
-  // Modais e formulários...
   const [isNewBarberModalOpen, setIsNewBarberModalOpen] = useState(false);
   const [newBarberActiveTab, setNewBarberActiveTab] = useState("dados"); // 'dados' | 'escala'
   // [Novo estado: feedback visual durante inserção e atualização no Supabase]
@@ -165,8 +176,14 @@ export default function BarbersTeamView({
     (b) => b.status !== "inactive",
   ).length;
 
-  // Abrir Modal de Cadastro Zerado
+  // Abrir Modal de Cadastro Zerado (com validação estrita de limite por plano)
   const handleOpenNewBarberModal = () => {
+    // Se a barbearia atingiu ou ultrapassou o limite de profissionais do plano, exibe o Modal de Limite do Plano
+    if (barbers.length >= planMaxBarbers) {
+      setIsPlanLimitModalOpen(true);
+      return;
+    }
+
     setNewBarberActiveTab("dados");
     setNewBarberForm({
       name: "",
@@ -188,6 +205,13 @@ export default function BarbersTeamView({
 
   // [Função assíncrona: insere o novo barbeiro diretamente na tabela 'barbers' do Supabase]
   const handleSaveNewBarber = async () => {
+    // Validação estrita de limite de plano contra concorrência ou tentativa de bypass
+    if (barbers.length >= planMaxBarbers) {
+      setIsNewBarberModalOpen(false);
+      setIsPlanLimitModalOpen(true);
+      return;
+    }
+
     const errs = {};
     if (!newBarberForm.name.trim())
       errs.name = "Informe o nome completo do documento.";
@@ -1259,6 +1283,15 @@ export default function BarbersTeamView({
           />
         </div>
       </Modal>
+
+      {/* MODAL DE BLOQUEIO DE LIMITE POR PLANO (TRIAL, STARTER, PRO, ENTERPRISE) */}
+      <PlanLimitModal
+        isOpen={isPlanLimitModalOpen}
+        onClose={() => setIsPlanLimitModalOpen(false)}
+        tenant={tenant}
+        onOpenPlansModal={onOpenPlansModal}
+        onNavigateToSupport={onNavigateToSupport}
+      />
     </div>
   );
 }

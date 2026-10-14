@@ -65,3 +65,40 @@ Todas as 21 colunas devem ser respeitadas em consultas, inserções e atualizaç
    - Sempre manter a conversão segura entre `snake_case` (banco de dados) e `camelCase` (componentes React).
 5. **Normalização Defensiva de `breaks` e `schedule`:**
    - A coluna `breaks` (JSONB) pode conter um array de pausas `[{ startTime, endTime, label }]` ou um objeto de metadados. O front-end e o validador Zod devem sempre garantir `Array.isArray(breaks)` antes de iterar com `.map()` ou `.some()`, extraindo intervalos de almoço da coluna `schedule[].breakStart/breakEnd` para evitar quebras em tempo de execução.
+
+---
+
+## 5. Limites de Profissionais por Plano & Análise de UX (`PlanLimitModal.jsx`)
+
+Ao clicar no botão `+ Novo Barbeiro`, o sistema valida imediatamente a quantidade de profissionais já cadastrados na barbearia contra o limite contratado do plano ativo (`barbers.length >= maxBarbers`). Caso o limite seja atingido, a abertura do formulário de cadastro é bloqueada e o modal correspondente ao plano é exibido.
+
+### Matriz de Limites e Estrutura dos Modais:
+
+1. **Plano Trial (Limite: 1 profissional)**
+   - **Bloqueio:** Impede o cadastro de mais de 1 profissional.
+   - **Título:** `Plano Trial`
+   - **Texto:** `este plano só permite 1 cadastro, caso deseje cadastrar mais profissionais escolha os planos Starter Pro ou Enterprise`
+   - **Link:** `Starter / Pro / Enterprise` (redireciona para o modal de upgrades com seleção do plano)
+   - **Ações:** Botão fechar `(x)` e botão primário `Ok, entendi!` (fecham o modal).
+
+2. **Plano Starter (Limite: 2 profissionais)**
+   - **Bloqueio:** Impede o cadastro de mais de 2 profissionais.
+   - **Título:** `Plano Starter “Mais Popular”`
+   - **Texto:** `este plano só permite 2 cadastros, caso deseje cadastrar mais profissionais escolha os planos Pro ou Enterprise`
+   - **Link:** `Pro / Enterprise` (redireciona para o modal de upgrades)
+   - **Ações:** Botão fechar `(x)` e botão primário `Ok, entendi!` (fecham o modal).
+
+3. **Plano Pro (Limite: 5 profissionais)**
+   - **Bloqueio:** Impede o cadastro de mais de 5 profissionais.
+   - **Título:** `Plano Pro`
+   - **Texto:** `este plano só permite 5 cadastros, caso deseje cadastrar mais profissionais escolha o plano Enterprise`
+   - **Link:** `Enterprise` (redireciona para o modal de upgrades)
+   - **Ações:** Botão fechar `(x)` e botão primário `Ok, entendi!` (fecham o modal).
+
+4. **Plano Enterprise (Limite: 15 profissionais)**
+   - **Bloqueio:** Impede o cadastro de mais de 15 profissionais.
+   - **Título:** `Plano Enterprise`
+   - **Texto:** `este plano permite 15 cadastros caso deseje cadastrar mais profissionais entre em contato com o suporte técnico`
+   - **Link:** `Suporte Técnico` (abre o canal oficial de suporte / WhatsApp para liberação de vagas corporativas)
+   - **Ações:** Botão fechar `(x)` e botão primário `Ok, entendi!` (fecham o modal).
+

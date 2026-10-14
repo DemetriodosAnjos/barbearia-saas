@@ -214,13 +214,17 @@ export default function BarbershopDashboard({
       }
     };
 
+    const handleOpenPlans = () => setIsPlansModalOpen(true);
+
     window.addEventListener("saas:tenant-plan-updated", handlePlanChanged);
+    window.addEventListener("saas:open-plans-modal", handleOpenPlans);
     window.addEventListener("storage", handlePlanChanged);
 
     return () => {
       isMounted = false;
       supabase.removeChannel(realtimeChannel);
       window.removeEventListener("saas:tenant-plan-updated", handlePlanChanged);
+      window.removeEventListener("saas:open-plans-modal", handleOpenPlans);
       window.removeEventListener("storage", handlePlanChanged);
     };
   }, [tenant?.id]);
@@ -493,6 +497,8 @@ export default function BarbershopDashboard({
                   onUpdateBarbers={onUpdateBarbers}
                   tenant={tenant}
                   onBack={() => setActiveMenuTab("agenda")}
+                  onOpenPlansModal={() => setIsPlansModalOpen(true)}
+                  onNavigateToSupport={() => setActiveMenuTab("suporte")}
                 />
               </ErrorBoundary>
             )}

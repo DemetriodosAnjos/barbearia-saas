@@ -6,10 +6,10 @@ O sistema SaaS Barbearia opera em um modelo multi-tenant híbrido com 4 planos p
 
 | Plano | Categoria | Cadeiras / Barbeiros | Preço | Checkout Mercado Pago |
 | :--- | :--- | :--- | :--- | :--- |
-| **Plano de Teste** | Gratuito (Trial) | Até 2 Cadeiras | R$ 0,00 (7 Dias) | Não requer cartão |
-| **Starter (Solo)** | Pago Ativo | 1 Cadeira / Barbeiro | R$ 69,90/mês | PIX / Cartão em até 12x |
-| **Pro** | Pago Ativo | Até 6 Cadeiras | R$ 149,90/mês | PIX / Cartão em até 12x |
-| **Entreprise** | Pago Ativo | Ilimitado | R$ 279,90/mês | PIX / Cartão em até 12x |
+| **Plano Trial** | Gratuito (Trial) | Apenas 1 Profissional | R$ 0,00 (7 Dias) | Não requer cartão |
+| **Starter (“Mais Popular”)** | Pago Ativo | Até 2 Profissionais | R$ 69,90/mês | PIX / Cartão em até 12x |
+| **Pro** | Pago Ativo | Até 5 Profissionais | R$ 149,90/mês | PIX / Cartão em até 12x |
+| **Enterprise** | Pago Ativo | Até 15 Profissionais | R$ 279,90/mês | PIX / Cartão em até 12x |
 
 ---
 
