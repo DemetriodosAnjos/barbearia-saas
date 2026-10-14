@@ -5,14 +5,13 @@ import IconButton from "./IconButton";
 import ThemeToggle from "./ThemeToggle";
 import Modal from "./Modal";
 import ProjectIcon from "./ProjectIcon";
+import { getBarbershopUnitName, formatUnitLocation } from "../../utils/unitLocation";
 
 export default function Navbar({
   variant = "admin", // 'admin' ou 'client'
+  tenant,
   breadcrumbs = ["Agenda", "Visão Geral"],
-  branches = [
-    { id: "1", name: "Unidade Jardins - SP" },
-    { id: "2", name: "Unidade Centro - SP" },
-  ],
+  branches,
   selectedBranch = "1",
   onSelectBranch,
   barberStatus = "available",
@@ -77,6 +76,46 @@ export default function Navbar({
     loyaltyPoints: user?.loyaltyPoints,
   };
 
+  // Localização da unidade sincronizada com o cadastro em (Meu perfil / Aba- contato e endereço)
+  const [currentUnitName, setCurrentUnitName] = useState(() =>
+    getBarbershopUnitName(tenant, user)
+  );
+
+  useEffect(() => {
+    setCurrentUnitName(getBarbershopUnitName(tenant, user));
+  }, [tenant, user]);
+
+  useEffect(() => {
+    const handleAddressUpdated = (e) => {
+      const detail = e?.detail;
+      if (detail) {
+        const { neighborhood, city, state } = detail;
+        const formatted = formatUnitLocation(
+          neighborhood,
+          city,
+          state,
+          tenant?.name ? `${tenant.name} - SP` : "Jardim - SP"
+        );
+        setCurrentUnitName(formatted);
+      } else {
+        setCurrentUnitName(getBarbershopUnitName(tenant, user));
+      }
+    };
+
+    window.addEventListener("saas:tenant-address-updated", handleAddressUpdated);
+    return () => {
+      window.removeEventListener("saas:tenant-address-updated", handleAddressUpdated);
+    };
+  }, [tenant, user]);
+
+  // Lista de unidades / filiais dinâmicas refletindo o endereço exato da barbearia
+  const resolvedBranches =
+    branches && branches.length > 0
+      ? branches.map((b, idx) => (idx === 0 ? { ...b, name: currentUnitName } : b))
+      : [
+          { id: "1", name: currentUnitName },
+        ];
+
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
 
@@ -127,7 +166,7 @@ export default function Navbar({
 
           <div className={navbarStyles.clientBranchBadge}>
             <ProjectIcon name="MapPin" size={13} colorVariant="amber" className="mr-1" />
-            <span>Unidade Jardins • 1.2 km</span>
+            <span>{currentUnitName} • 1.2 km</span>
           </div>
         </div>
 
@@ -210,22 +249,28 @@ export default function Navbar({
             ))}
           </div>
 
-          <select
-            value={selectedBranch}
-            onChange={(e) => onSelectBranch && onSelectBranch(e.target.value)}
-            className={navbarStyles.branchSelect}
-            aria-label="Selecionar Filial"
-          >
-            {branches.map((b) => (
-              <option
-                key={b.id}
-                value={b.id}
-                className="bg-neutral-900 text-white"
-              >
-                {b.name}
-              </option>
-            ))}
-          </select>
+          <div className="relative inline-flex items-center">
+            <select
+              value={selectedBranch}
+              onChange={(e) => onSelectBranch && onSelectBranch(e.target.value)}
+              className={`${navbarStyles.branchSelect} appearance-none pr-7`}
+              aria-label="Selecionar Filial ou Unidade"
+              title={`Unidade da Barbearia: ${currentUnitName}`}
+            >
+              {resolvedBranches.map((b) => (
+                <option
+                  key={b.id}
+                  value={b.id}
+                  className="bg-neutral-900 text-white"
+                >
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute right-2 flex items-center text-neutral-400">
+              <ProjectIcon name="ChevronDown" size={13} colorVariant="neutral" />
+            </div>
+          </div>
         </div>
 
         {/* Lado Direito: Status + Atalho + Tema + Notificações + Perfil */}

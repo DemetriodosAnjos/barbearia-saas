@@ -197,6 +197,33 @@ export default function UserProfileView({
               : prev.birthDate,
             avatarSrc: dbProfile.avatar_url || prev.avatarSrc,
           }));
+
+          setContactData((prev) => ({
+            ...prev,
+            phone: dbProfile.phone || prev.phone,
+            cep: dbProfile.cep || prev.cep,
+            street: dbProfile.street || prev.street,
+            number: dbProfile.number || prev.number,
+            complement: dbProfile.complement || prev.complement,
+            neighborhood: dbProfile.neighborhood || prev.neighborhood,
+            city: dbProfile.city || prev.city,
+            state: dbProfile.state || prev.state,
+          }));
+
+          if (dbProfile.neighborhood || dbProfile.city || dbProfile.state) {
+            window.dispatchEvent(
+              new CustomEvent("saas:tenant-address-updated", {
+                detail: {
+                  neighborhood: dbProfile.neighborhood || "",
+                  city: dbProfile.city || "",
+                  state: dbProfile.state || "",
+                  street: dbProfile.street || "",
+                  number: dbProfile.number || "",
+                  cep: dbProfile.cep || "",
+                },
+              })
+            );
+          }
         }
       } catch (err) {
         console.warn("Aviso ao carregar dados do perfil de public.profiles:", err);
@@ -870,6 +897,39 @@ export default function UserProfileView({
           instagram: professionalData.instagram.trim(),
         });
       }
+
+      // Sincroniza cache local e notifica a Navbar em tempo real sobre a nova localização
+      try {
+        const cached = safeStorage.getItem("saas_active_tenant");
+        const parsed = cached ? JSON.parse(cached) : {};
+        safeStorage.setItem(
+          "saas_active_tenant",
+          JSON.stringify({
+            ...parsed,
+            ...(tenant || {}),
+            neighborhood: cleanNeighborhood,
+            city: cleanCity,
+            state: cleanState,
+            street: cleanStreet,
+            number: cleanNumber,
+            complement: cleanComplement,
+            cep: cleanCep,
+          })
+        );
+      } catch {}
+
+      window.dispatchEvent(
+        new CustomEvent("saas:tenant-address-updated", {
+          detail: {
+            neighborhood: cleanNeighborhood,
+            city: cleanCity,
+            state: cleanState,
+            street: cleanStreet,
+            number: cleanNumber,
+            cep: cleanCep,
+          },
+        })
+      );
     } catch (err) {
       console.warn("Aviso ao sincronizar metadados do perfil:", err);
     } finally {

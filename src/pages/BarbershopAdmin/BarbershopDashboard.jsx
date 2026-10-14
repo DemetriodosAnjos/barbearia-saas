@@ -428,6 +428,7 @@ export default function BarbershopDashboard({
         <div className="flex-1 flex flex-col min-w-0">
           <Navbar
             variant="admin"
+            tenant={tenant}
             user={
               user || {
                 name: tenant?.name ? `Gestor ${DOMPurify.sanitize(tenant.name)}` : "Administrador",

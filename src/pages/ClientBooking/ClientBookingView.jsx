@@ -255,6 +255,7 @@ export default function ClientBookingView({
       <div className={clientBookingStyles.pageWrapper}>
         <Navbar
           variant="client"
+          tenant={tenant}
           user={{ name: clientName || "Cliente", avatar: "CL", loyaltyPoints: 120 }}
         />
         <div className={clientBookingStyles.appContainer}>
@@ -285,6 +286,7 @@ export default function ClientBookingView({
       )}
       <Navbar
         variant="client"
+        tenant={tenant}
         user={{
           name: clientName || "Cliente",
           avatar: clientName ? clientName.slice(0, 2).toUpperCase() : "CL",
