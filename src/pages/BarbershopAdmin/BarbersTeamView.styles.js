@@ -1,8 +1,8 @@
 export const teamStyles = {
   // Container principal
-  container: "w-full max-w-6xl mx-auto space-y-6 text-left select-none",
+  container: "w-full max-w-6xl mx-auto space-y-5 text-left select-none",
 
-  // Cabeçalho da Página de Equipe
+  // Cabeçalho da Página de Equipe (Componente 1)
   headerCard:
     "p-6 bg-neutral-900 border border-neutral-800 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl",
   titleWrapper: "space-y-1 text-left",
@@ -14,11 +14,20 @@ export const teamStyles = {
   capacityBadge:
     "text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center gap-1.5 shrink-0",
 
-  // Grade dos Cards de Barbeiros
-  teamGrid:
-    "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch",
+  // Barra de Pesquisa e Ordenação (Componente 2)
+  filterBar:
+    "p-4 bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-lg",
 
-  // Card Expandido de Gestão do Barbeiro
+  // Barra de Título / Cabeçalho da Tabela Inline (Componente 3)
+  tableHeader:
+    "bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-xs font-bold text-neutral-400 uppercase tracking-wider hidden md:grid md:grid-cols-12 items-center gap-3 select-none",
+
+  // Lista de Profissionais / Linha da Tabela Inline (Componente 4)
+  tableList: "space-y-2.5",
+  tableRow:
+    "p-3.5 bg-neutral-900/90 hover:bg-neutral-900 border border-neutral-800 hover:border-neutral-700/80 rounded-2xl transition-all duration-150 flex flex-col md:grid md:grid-cols-12 md:items-center gap-3 text-xs text-neutral-200 shadow-md",
+
+  // Card Expandido legado / fallback
   barberCard:
     "p-5 bg-neutral-900 border border-neutral-800 rounded-3xl flex flex-col justify-between space-y-4 shadow-xl text-left hover:border-neutral-700 transition-all",
   cardHeader:
@@ -40,3 +49,4 @@ export const teamStyles = {
   actionsFooter:
     "flex items-center justify-between gap-2 pt-3 border-t border-neutral-800",
 };
+

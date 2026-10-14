@@ -102,3 +102,47 @@ Ao clicar no botão `+ Novo Barbeiro`, o sistema valida imediatamente a quantida
    - **Link:** `Suporte Técnico` (abre o canal oficial de suporte / WhatsApp para liberação de vagas corporativas)
    - **Ações:** Botão fechar `(x)` e botão primário `Ok, entendi!` (fecham o modal).
 
+---
+
+## 6. Redesign da Tela de Equipe: Arquitetura dos 4 Componentes
+
+A tela de gestão de equipe (`BarbersTeamView.jsx`) foi totalmente redesenhada substituindo os cards volumosos por uma data table moderna e inline de alta produtividade:
+
+### COMPONENTE 1: Header (Topo)
+- **Ícone:** Tesoura (`Scissors` da Lucide) estilizada em âmbar.
+- **Título & Subtítulo:** Identificação oficial da tela e subtítulo de gestão de comissões/escalas.
+- **Tag de Capacidade:** Contagem dinâmica de cadeiras ocupadas com limite do plano (ex: `15 de 15 Cadeiras ocupadas`).
+- **Botões:**
+  - `Novo Barbeiro`: Ícone `Plus` da biblioteca Lucide substituindo o caracter "+".
+  - `Voltar`: Ícone `ArrowLeft` para retorno rápido à agenda.
+
+### COMPONENTE 2: Barra de Pesquisa & Ordenação (Novo)
+- **Busca em Tempo Real:** Campo com ícone `Search` da Lucide. A cada caractere digitado pelo operador, filtra instantaneamente os profissionais comparando nome completo, apelido (`displayName`), cargo ou iniciais (ex: digitar `"c"` filtra profissionais com iniciais C).
+- **Ordenação:** Texto `Ordenar por:` acompanhado de dois botões de rádio estilizados com ícones:
+  - `Crescente` (A-Z, com ícone `ArrowUpAZ`).
+  - `Decrescente` (Z-A, com ícone `ArrowDownZA`).
+  - Permite seleção única e reordena a lista reativamente.
+
+### COMPONENTE 3: Barra de Título (Header Inline da Lista)
+Alinhamento horizontal em colunas (`grid md:grid-cols-12`) contendo:
+- `Checkbox`: Seleciona ou desmarca todos os profissionais da lista de uma única vez.
+- `Profissional` (Avatar + Nome + Cargo).
+- `Telefone`.
+- `Status`.
+- `Chave Pix`.
+- `Ação`.
+
+### COMPONENTE 4: Linhas da Lista de Profissionais (Inline)
+Cada linha apresenta todos os dados no mesmo alinhamento horizontal:
+1. **Checkbox:** Seleção individual do profissional (com suporte a ações em lote quando múltiplos itens forem marcados).
+2. **Avatar:** Foto oficial ou iniciais geradas dinamicamente (ex: `CE` para Carlos Eduardo) com badge colorido de status operacional.
+3. **Nome:** Nome completo e display name/cargo.
+4. **Telefone:** Telefone formatado com DDD (ex: `(44) 9999-9999`).
+5. **Status:** Badge com cor (Ativo, Férias, Inativo) e ícone `ChevronDown`, abrindo um dropdown rápido para alterar a situação do profissional no Supabase com 1 clique.
+6. **Chave Pix:** Exibe a chave cadastrada com tipo (`CPF`, `E-mail`, `Telefone`, `Aleatória`) ou texto `"Não cadastrado"`, acompanhado do botão de cópia com ícone `Copy` e feedback de `Check` verde ("Copiado!").
+7. **Ações:** Botões com ícones dedicados:
+   - `Editar Dados` (`Edit3`): abre o formulário de edição de cadastro.
+   - `Ficha do Profissional` (`FileText`): abre a ficha cadastral do barbeiro.
+   - `Escala & Horários` (`Clock`): atalho para o modal de horários e almoço.
+
+

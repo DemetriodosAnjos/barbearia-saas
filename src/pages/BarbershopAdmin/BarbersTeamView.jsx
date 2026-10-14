@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import DOMPurify from "dompurify";
 // [Import: cliente Supabase para persistência real de barbeiros no banco de dados]
 import { supabase } from "../../lib/supabase";
@@ -32,6 +32,13 @@ import {
   AlertTriangle,
   Edit3,
   Key,
+  Plus,
+  Search,
+  ArrowUpAZ,
+  ArrowDownZA,
+  ChevronDown,
+  Copy,
+  CheckSquare,
 } from "lucide-react";
 
 // Escala padrão para inicialização
@@ -175,6 +182,184 @@ export default function BarbersTeamView({
   const activeChairsCount = barbers.filter(
     (b) => b.status !== "inactive",
   ).length;
+
+  // ========================================================
+  // ESTADOS DO REDESIGN (BUSCA, ORDENAÇÃO, SELEÇÃO E PIX)
+  // ========================================================
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOrder, setSortOrder] = useState("asc"); // 'asc' | 'desc'
+  const [selectedBarberIds, setSelectedBarberIds] = useState([]);
+  const [copiedPixBarberId, setCopiedPixBarberId] = useState(null);
+  const [openStatusDropdownId, setOpenStatusDropdownId] = useState(null);
+
+  // Helper para gerar iniciais do profissional (ex: Carlos Eduardo -> CE)
+  const getInitials = (name = "") => {
+    const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "BP";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  // Helper de label amigável para tipo de chave Pix
+  const getPixTypeLabel = (type) => {
+    switch (type) {
+      case "cpf":
+        return "CPF";
+      case "email":
+        return "E-mail";
+      case "phone":
+        return "Telefone";
+      case "random":
+        return "Aleatória";
+      default:
+        return "PIX";
+    }
+  };
+
+  // Filtro em tempo real por caractere digitado e ordenação Crescente / Decrescente
+  const filteredAndSortedBarbers = useMemo(() => {
+    let result = [...barbers];
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      result = result.filter((b) => {
+        const name = (b.name || "").toLowerCase();
+        const disp = (b.displayName || b.display_name || "").toLowerCase();
+        const role = (b.role || "").toLowerCase();
+        const phone = (b.phone || "").replace(/\D/g, "");
+        const searchDigits = term.replace(/\D/g, "");
+
+        if (name.includes(term) || disp.includes(term) || role.includes(term)) {
+          return true;
+        }
+
+        // Checa por iniciais (ex: digitou "c" ou "ce", encontra Carlos Eduardo)
+        const initials = getInitials(b.name).toLowerCase();
+        if (initials.includes(term) || initials.startsWith(term)) {
+          return true;
+        }
+
+        const words = name.split(/\s+/);
+        if (words.some((w) => w.startsWith(term))) {
+          return true;
+        }
+
+        if (searchDigits && phone.includes(searchDigits)) {
+          return true;
+        }
+
+        return false;
+      });
+    }
+
+    result.sort((a, b) => {
+      const nameA = (a.name || "").toLowerCase();
+      const nameB = (b.name || "").toLowerCase();
+      if (sortOrder === "asc") {
+        return nameA.localeCompare(nameB, "pt-BR");
+      } else {
+        return nameB.localeCompare(nameA, "pt-BR");
+      }
+    });
+
+    return result;
+  }, [barbers, searchTerm, sortOrder]);
+
+  // Controle de seleção em massa (Checkbox do Header e itens)
+  const isAllSelected =
+    filteredAndSortedBarbers.length > 0 &&
+    filteredAndSortedBarbers.every((b) => selectedBarberIds.includes(b.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedBarberIds([]);
+    } else {
+      setSelectedBarberIds(filteredAndSortedBarbers.map((b) => b.id));
+    }
+  };
+
+  const handleToggleSelectBarber = (barberId) => {
+    setSelectedBarberIds((prev) =>
+      prev.includes(barberId)
+        ? prev.filter((id) => id !== barberId)
+        : [...prev, barberId]
+    );
+  };
+
+  // Alteração ágil de status com Chevron Down
+  const handleQuickStatusChange = async (barberId, newStatus) => {
+    setOpenStatusDropdownId(null);
+    try {
+      const { error } = await supabase
+        .from("barbers")
+        .update({ status: newStatus })
+        .eq("id", barberId);
+
+      if (error) {
+        console.error("Erro ao atualizar status no Supabase:", error);
+      }
+
+      const updated = barbers.map((b) =>
+        b.id === barberId ? { ...b, status: newStatus } : b
+      );
+      if (onUpdateBarbers) {
+        onUpdateBarbers(updated);
+      }
+    } catch (err) {
+      console.error("Falha ao trocar status:", err);
+    }
+  };
+
+  // Alteração de status em massa para itens selecionados
+  const handleBulkChangeStatus = async (newStatus) => {
+    if (selectedBarberIds.length === 0) return;
+    try {
+      const { error } = await supabase
+        .from("barbers")
+        .update({ status: newStatus })
+        .in("id", selectedBarberIds);
+
+      if (error) {
+        console.error("Erro ao atualizar status em massa:", error);
+      }
+
+      const updated = barbers.map((b) =>
+        selectedBarberIds.includes(b.id) ? { ...b, status: newStatus } : b
+      );
+      if (onUpdateBarbers) {
+        onUpdateBarbers(updated);
+      }
+      setSelectedBarberIds([]);
+    } catch (err) {
+      console.error("Falha ao atualizar status em massa:", err);
+    }
+  };
+
+  // Cópia da Chave Pix com feedback visual
+  const handleCopyPixKey = (barber) => {
+    const key = barber.pixKey || barber.pix_key;
+    if (!key) return;
+    try {
+      navigator.clipboard.writeText(key);
+      setCopiedPixBarberId(barber.id);
+      setTimeout(() => {
+        setCopiedPixBarberId((curr) => (curr === barber.id ? null : curr));
+      }, 2000);
+    } catch (err) {
+      console.error("Erro ao copiar Pix:", err);
+    }
+  };
+
+  // Abertura direta do modal de edição de dados
+  const handleOpenEditBarber = (barber) => {
+    setSelectedBarberForDetails(barber);
+    setIsEditMode(true);
+    setEditFormData({
+      ...barber,
+      pixType: barber.pix_type || barber.pixType || "cpf",
+      pixKey: barber.pix_key || barber.pixKey || "",
+    });
+  };
 
   // Abrir Modal de Cadastro Zerado (com validação estrita de limite por plano)
   const handleOpenNewBarberModal = () => {
@@ -396,7 +581,9 @@ export default function BarbersTeamView({
 
   return (
     <div className={teamStyles.container}>
-      {/* 1. CABEÇALHO */}
+      {/* ======================================================== */}
+      {/* COMPONENTE 1: HEADER (TOPO)                               */}
+      {/* ======================================================== */}
       <div className={teamStyles.headerCard}>
         <div className={teamStyles.titleWrapper}>
           <h1 className={teamStyles.title}>
@@ -413,23 +600,25 @@ export default function BarbersTeamView({
           <div className={teamStyles.capacityBadge}>
             <Armchair className="w-3.5 h-3.5 text-amber-500 inline-block mr-1.5" />
             <span>
-              {activeChairsCount} de {totalChairs} cadeiras ocupadas
+              {activeChairsCount} de {totalChairs} {totalChairs === 1 ? "Cadeira ocupada" : "Cadeiras ocupadas"}
             </span>
           </div>
 
+          {/* Botão Novo com ícone Plus da biblioteca Lucide */}
           <Button
             variant="primary"
             onClick={handleOpenNewBarberModal}
-            className="text-xs py-2.5 px-4 font-bold shadow-md bg-amber-600 hover:bg-amber-500"
+            className="text-xs py-2.5 px-4 font-bold shadow-md bg-amber-600 hover:bg-amber-500 flex items-center gap-1.5 cursor-pointer"
           >
-            <span>+</span> Novo Barbeiro
+            <Plus className="w-4 h-4" />
+            <span>Novo Barbeiro</span>
           </Button>
 
           {onBack && (
             <Button
               variant="secondary"
               onClick={onBack}
-              className="text-xs py-2 px-3"
+              className="text-xs py-2 px-3 cursor-pointer"
             >
               <span className="flex items-center gap-1.5">
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -440,141 +629,403 @@ export default function BarbersTeamView({
         </div>
       </div>
 
-      {/* 2. GRADE DE CARDS DOS BARBEIROS */}
-      <div className={teamStyles.teamGrid}>
-        {barbers.map((barber) => {
-          const isInactive = barber.status === "inactive";
-          const isVacation = barber.status === "vacation";
-
-          return (
-            <div
-              key={barber.id}
-              onClick={() => handleOpenDetails(barber)}
-              className={`
-                ${teamStyles.barberCard} cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:border-amber-500/60
-                ${isInactive ? "opacity-40 bg-neutral-950 border-neutral-900" : isVacation ? "opacity-75 bg-neutral-900/60 border-neutral-800" : ""}
-              `}
+      {/* ======================================================== */}
+      {/* COMPONENTE 2: BARRA DE PESQUISA & ORDENAÇÃO (NOVO)        */}
+      {/* ======================================================== */}
+      <div className={teamStyles.filterBar}>
+        {/* Barra de pesquisa (ícone search - Biblioteca Lucide) */}
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Pesquisar profissional por nome ou inicial..."
+            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-10 pr-10 py-2.5 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/50 transition-all font-sans"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 p-1 text-xs cursor-pointer"
+              title="Limpar pesquisa"
             >
-              <div className={teamStyles.cardHeader}>
-                <div className={teamStyles.profileInfo}>
-                  <Avatar
-                    name={barber.name}
-                    size="lg"
-                    status={
-                      isInactive
-                        ? "offline"
-                        : isVacation
-                          ? "on_break"
-                          : "available"
-                    }
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Texto: Ordenar por: Radio button (icone) Crescente / Radio button (icone) Decrescente */}
+        <div className="flex items-center gap-3 shrink-0 text-xs flex-wrap">
+          <span className="text-neutral-400 font-semibold whitespace-nowrap">
+            Ordenar por:
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSortOrder("asc")}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+                sortOrder === "asc"
+                  ? "bg-amber-500/10 border-amber-500/50 text-amber-300 shadow-sm"
+                  : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700"
+              }`}
+            >
+              <span
+                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                  sortOrder === "asc" ? "border-amber-400" : "border-neutral-600"
+                }`}
+              >
+                {sortOrder === "asc" && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                )}
+              </span>
+              <ArrowUpAZ className="w-3.5 h-3.5 text-amber-400" />
+              <span>Crescente</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSortOrder("desc")}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+                sortOrder === "desc"
+                  ? "bg-amber-500/10 border-amber-500/50 text-amber-300 shadow-sm"
+                  : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700"
+              }`}
+            >
+              <span
+                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                  sortOrder === "desc" ? "border-amber-400" : "border-neutral-600"
+                }`}
+              >
+                {sortOrder === "desc" && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                )}
+              </span>
+              <ArrowDownZA className="w-3.5 h-3.5 text-amber-400" />
+              <span>Decrescente</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* BARRA DE AÇÕES EM MASSA (quando houver seleção via checkbox) */}
+      {selectedBarberIds.length > 0 && (
+        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between flex-wrap gap-3 text-xs text-amber-300 animate-in fade-in">
+          <div className="flex items-center gap-2 font-bold">
+            <CheckSquare className="w-4 h-4 text-amber-400" />
+            <span>{selectedBarberIds.length} profissional(is) selecionado(s)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleBulkChangeStatus("active")}
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 font-semibold transition-colors cursor-pointer"
+            >
+              Marcar como Ativos
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkChangeStatus("inactive")}
+              className="px-2.5 py-1.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 font-semibold transition-colors cursor-pointer"
+            >
+              Marcar como Inativos
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedBarberIds([])}
+              className="px-2.5 py-1.5 rounded-lg bg-neutral-800 text-neutral-300 hover:bg-neutral-700 transition-colors cursor-pointer"
+            >
+              Desmarcar todos
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* COMPONENTE 3: BARRA DE TÍTULO (HEADER INLINE)             */}
+      {/* Checkbox + Profissional + Telefone + Status + Chave Pix + Ação */}
+      {/* ======================================================== */}
+      <div className={teamStyles.tableHeader}>
+        {/* Checkbox + Profissional */}
+        <div className="col-span-4 flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={isAllSelected}
+            onChange={handleToggleSelectAll}
+            className="w-4 h-4 rounded bg-neutral-950 border-neutral-700 text-amber-500 focus:ring-amber-500/40 cursor-pointer accent-amber-500"
+            title="Selecionar todos da lista"
+          />
+          <span className="text-neutral-300">Profissional</span>
+        </div>
+
+        {/* Telefone */}
+        <div className="col-span-2 text-left">
+          <span>Telefone</span>
+        </div>
+
+        {/* Status */}
+        <div className="col-span-2 text-left">
+          <span>Status</span>
+        </div>
+
+        {/* Chave Pix */}
+        <div className="col-span-2 text-left">
+          <span>Chave Pix</span>
+        </div>
+
+        {/* Ação */}
+        <div className="col-span-2 text-right pr-2">
+          <span>Ação</span>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* COMPONENTE 4: LISTA DE PROFISSIONAIS (INLINE)            */}
+      {/* Checkbox + Avatar + Nome + Telefone + Status + Pix + Ações */}
+      {/* ======================================================== */}
+      <div className={teamStyles.tableList}>
+        {filteredAndSortedBarbers.length === 0 ? (
+          <div className="p-8 bg-neutral-900 border border-neutral-800 rounded-2xl text-center space-y-2">
+            <User className="w-8 h-8 text-neutral-600 mx-auto" />
+            <p className="text-sm font-semibold text-neutral-300">
+              Nenhum profissional encontrado
+            </p>
+            <p className="text-xs text-neutral-500">
+              {searchTerm
+                ? `Nenhum resultado corresponde a "${searchTerm}". Tente outro termo.`
+                : "Cadastre o primeiro membro da sua equipe clicando em Novo Barbeiro."}
+            </p>
+          </div>
+        ) : (
+          filteredAndSortedBarbers.map((barber) => {
+            const isInactive = barber.status === "inactive";
+            const isVacation = barber.status === "vacation";
+            const isSelected = selectedBarberIds.includes(barber.id);
+            const initials = getInitials(barber.name);
+            const pixKeyVal = barber.pixKey || barber.pix_key;
+            const pixType = barber.pixType || barber.pix_type || "cpf";
+            const isCopied = copiedPixBarberId === barber.id;
+            const isDropdownOpen = openStatusDropdownId === barber.id;
+
+            return (
+              <div
+                key={barber.id}
+                className={`${teamStyles.tableRow} ${
+                  isSelected ? "bg-amber-500/5 border-amber-500/40" : ""
+                } ${isInactive ? "opacity-60" : ""}`}
+              >
+                {/* 1. CHECKBOX + AVATAR (CE) CARLOS EDUARDO */}
+                <div className="col-span-4 flex items-center gap-3 min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => handleToggleSelectBarber(barber.id)}
+                    className="w-4 h-4 rounded bg-neutral-950 border-neutral-700 text-amber-500 focus:ring-amber-500/40 cursor-pointer accent-amber-500 shrink-0"
+                    title={`Selecionar ${barber.name}`}
                   />
-                  <div className={teamStyles.nameWrapper}>
-                    <h3 className="text-sm font-bold text-white truncate flex items-center gap-1.5">
-                      <SafeHtml html={barber.name} />
+
+                  {/* Avatar com foto ou iniciais em destaque estilizado */}
+                  <div className="relative shrink-0">
+                    {barber.avatar ? (
+                      <img
+                        src={barber.avatar}
+                        alt={barber.name}
+                        className="w-10 h-10 rounded-full object-cover border border-neutral-700 shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 font-black text-xs flex items-center justify-center shadow-inner">
+                        {initials}
+                      </div>
+                    )}
+                    <span
+                      className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-neutral-900 ${
+                        isInactive
+                          ? "bg-red-500"
+                          : isVacation
+                          ? "bg-amber-400"
+                          : "bg-emerald-400"
+                      }`}
+                    />
+                  </div>
+
+                  {/* Nome e Cargo / Especialidade */}
+                  <div className="min-w-0 truncate">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="font-bold text-white text-sm truncate">
+                        <SafeHtml html={barber.name} />
+                      </span>
                       {barber.notes && (
-                        <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" title="Possui observações internas" />
+                        <FileText
+                          className="w-3 h-3 text-amber-400 shrink-0"
+                          title="Possui observações internas"
+                        />
                       )}
-                    </h3>
-                    <p className={teamStyles.barberRole}>
-                      <SafeHtml html={`"${barber.displayName}" • ${barber.role}`} />
+                    </div>
+                    <p className="text-[11px] text-neutral-400 truncate">
+                      <SafeHtml
+                        html={
+                          barber.displayName
+                            ? `"${barber.displayName}" • ${barber.role}`
+                            : barber.role
+                        }
+                      />
                     </p>
                   </div>
                 </div>
 
-                <span
-                  className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
-                    isInactive
-                      ? "bg-red-950/40 text-red-400 border-red-800/60"
-                      : isVacation
-                        ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
-                        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                  }`}
-                >
-                  {isInactive
-                    ? "Inativo (Desligado)"
-                    : isVacation
-                      ? "Férias / Folga"
-                      : "Ativo"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-neutral-400">
-                <span className="flex items-center gap-1 text-amber-400 font-bold">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span>{barber.rating}</span>{" "}
-                  <span className="text-neutral-500 font-normal">
-                    ({barber.reviewCount})
-                  </span>
-                </span>
-                <span className="font-mono text-[11px]">{barber.phone}</span>
-              </div>
-
-              <div className={teamStyles.commissionBox}>
-                <div className={teamStyles.commissionItem}>
-                  <span className={teamStyles.commissionLabel}>
-                    Comissão Serviços
-                  </span>
-                  <span className={teamStyles.commissionValue}>
-                    {barber.serviceCommission}%
-                  </span>
+                {/* 2. TELEFONE */}
+                <div className="col-span-2 text-left font-mono text-xs text-neutral-300 truncate">
+                  {barber.phone || "Não informado"}
                 </div>
-                <div className="h-6 w-px bg-neutral-800" />
-                <div className={teamStyles.commissionItem}>
-                  <span className={teamStyles.commissionLabel}>
-                    Comissão Produtos
-                  </span>
-                  <span className={teamStyles.commissionValue}>
-                    {barber.productCommission}%
-                  </span>
-                </div>
-              </div>
 
-              {/* Chave PIX cadastrada para repasse */}
-              <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-neutral-950/60 border border-neutral-800/80">
-                <span className="text-neutral-500 font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  PIX:
-                </span>
-                <span className="font-mono text-emerald-400 font-medium truncate max-w-[170px]" title={barber.pixKey || barber.pix_key || "Não cadastrado"}>
-                  {barber.pixKey || barber.pix_key || "Não cadastrado"}
-                </span>
-              </div>
-
-              <div className="space-y-1 text-left">
-                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                  Especialidades:
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {barber.specialties.map((spec, i) => (
+                {/* 3. STATUS + CHEVRON DOWN */}
+                <div className="col-span-2 text-left relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenStatusDropdownId(isDropdownOpen ? null : barber.id)
+                    }
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
+                      isInactive
+                        ? "bg-red-950/40 text-red-400 border-red-800/60 hover:bg-red-950/60"
+                        : isVacation
+                        ? "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
+                        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                    }`}
+                    title="Clique para alterar status"
+                  >
                     <span
-                      key={i}
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-neutral-950 border border-neutral-800 text-neutral-300"
-                    >
-                      {spec}
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isInactive
+                          ? "bg-red-400"
+                          : isVacation
+                          ? "bg-amber-400"
+                          : "bg-emerald-400"
+                      }`}
+                    />
+                    <span>
+                      {isInactive
+                        ? "Inativo"
+                        : isVacation
+                        ? "Férias"
+                        : "Ativo"}
                     </span>
-                  ))}
+                    <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
+                  </button>
+
+                  {/* Dropdown rápido de troca de status */}
+                  {isDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-20"
+                        onClick={() => setOpenStatusDropdownId(null)}
+                      />
+                      <div className="absolute left-0 top-full mt-1.5 z-30 w-36 bg-neutral-950 border border-neutral-800 rounded-xl shadow-2xl p-1 text-xs space-y-0.5 animate-in fade-in">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickStatusChange(barber.id, "active")}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-neutral-900 text-emerald-400 font-semibold cursor-pointer"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          <span>Ativo</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickStatusChange(barber.id, "vacation")}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-neutral-900 text-amber-400 font-semibold cursor-pointer"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                          <span>Férias / Folga</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickStatusChange(barber.id, "inactive")}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-neutral-900 text-red-400 font-semibold cursor-pointer"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                          <span>Inativo</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* 4. CHAVE PIX + ÍCONE COPIAR */}
+                <div className="col-span-2 text-left">
+                  {pixKeyVal ? (
+                    <div className="flex items-center gap-1.5 max-w-full">
+                      <div className="truncate min-w-0" title={`${getPixTypeLabel(pixType)}: ${pixKeyVal}`}>
+                        <span className="text-[10px] uppercase font-bold text-neutral-500 mr-1">
+                          {getPixTypeLabel(pixType)}
+                        </span>
+                        <span className="font-mono text-emerald-400 font-medium text-[11px] truncate inline-block max-w-[100px]">
+                          {pixKeyVal}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPixKey(barber)}
+                        className={`p-1 rounded-md transition-colors cursor-pointer shrink-0 ${
+                          isCopied
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : "text-neutral-400 hover:text-amber-400 hover:bg-neutral-800"
+                        }`}
+                        title={isCopied ? "Copiado!" : "Copiar Chave Pix"}
+                      >
+                        {isCopied ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-neutral-500 text-[11px]">
+                      <span>Não cadastrado</span>
+                      <Copy className="w-3.5 h-3.5 text-neutral-600 opacity-60 cursor-not-allowed" />
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. AÇÕES (EDITAR + FICHA DO PROFISSIONAL + ESCALA) */}
+                <div className="col-span-2 flex items-center justify-end gap-1.5 pr-1">
+                  {/* Ícone Editar: carrega a tela de editar dados */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditBarber(barber)}
+                    className="p-2 rounded-xl text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 border border-transparent hover:border-neutral-700 transition-all cursor-pointer"
+                    title="Editar Dados do Profissional"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+
+                  {/* Ícone Ficha do Profissional: carrega detalhes */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDetails(barber)}
+                    className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-700 transition-all cursor-pointer"
+                    title="Ficha do Profissional"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </button>
+
+                  {/* Atalho Escala Semanal */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBarberForScheduleEdit(barber);
+                      setTempSchedule(barber.schedule || defaultWeeklySchedule);
+                    }}
+                    className="p-2 rounded-xl text-neutral-400 hover:text-amber-300 hover:bg-neutral-800 border border-transparent hover:border-neutral-700 transition-all cursor-pointer"
+                    title="Escala e Horários de Trabalho"
+                  >
+                    <Clock className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-
-              <div
-                className={teamStyles.actionsFooter}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setBarberForScheduleEdit(barber);
-                    setTempSchedule(barber.schedule || defaultWeeklySchedule);
-                  }}
-                  className="w-full text-xs py-2 flex items-center justify-center gap-1.5"
-                >
-                  <Clock className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Escala & Horários</span>
-                </Button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* ======================================================== */}
