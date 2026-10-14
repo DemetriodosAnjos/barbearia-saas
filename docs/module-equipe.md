@@ -145,4 +145,9 @@ Cada linha apresenta todos os dados no mesmo alinhamento horizontal:
    - `Ficha do Profissional` (`FileText`): abre a ficha cadastral do barbeiro.
    - `Escala & Horários` (`Clock`): atalho para o modal de horários e almoço.
 
+### Refinamentos de UX no Modal de Edição (`isEditMode`):
+- **Eliminação do Duplo Scroll:** Removido o container aninhado com `max-h-[75vh] overflow-y-auto pr-1` interno. A rolagem agora é controlada exclusivamente pelo container principal do `Modal` (`max-h-[80vh] overflow-y-auto`), proporcionando uma experiência de rolagem suave e fluida sem barras de rolagem duplicadas.
+- **Remoção do Componente "Alterar Status Operacional":** Como a alteração de status (`Ativo`, `Férias / Folga`, `Inativo`) foi centralizada no dropdown rápido com `ChevronDown` na própria linha da lista (Componente 4), o seletor redundante de status no modal de edição foi removido, simplificando o formulário para focar em nome, telefone, comissões, chave Pix e especialidades.
+
+
 

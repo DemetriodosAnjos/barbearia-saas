@@ -1088,7 +1088,7 @@ export default function BarbersTeamView({
           </div>
         }
       >
-        <div className="space-y-4 text-left max-h-[75vh] overflow-y-auto pr-1">
+        <div className="space-y-4 text-left">
           {/* BARRA SELETORA DAS 2 ABAS DO MODAL */}
           <div className="flex items-center gap-2 p-1.5 bg-neutral-950 border border-neutral-800 rounded-2xl">
             <button
@@ -1391,7 +1391,7 @@ export default function BarbersTeamView({
         }
       >
         {selectedBarberForDetails && (
-          <div className="space-y-4 text-left max-h-[75vh] overflow-y-auto pr-1">
+          <div className="space-y-4 text-left">
             {!isEditMode ? (
               <div className="space-y-4">
                 <div className="p-3.5 bg-neutral-950/80 border border-neutral-800 rounded-2xl flex items-center justify-between">
@@ -1524,56 +1524,6 @@ export default function BarbersTeamView({
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-2xl space-y-2">
-                  <label className="text-xs font-bold text-neutral-300">
-                    Alterar Status Operacional
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditFormData({ ...editFormData, status: "active" })
-                      }
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                        editFormData.status === "active"
-                          ? "bg-emerald-600 text-white border-emerald-500 shadow-md"
-                          : "bg-neutral-900 text-neutral-400 border-neutral-800"
-                      }`}
-                    >
-                      <span className="flex items-center justify-center gap-1">
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Ativo</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditFormData({ ...editFormData, status: "vacation" })
-                      }
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                        editFormData.status === "vacation"
-                          ? "bg-amber-600 text-white border-amber-500 shadow-md"
-                          : "bg-neutral-900 text-neutral-400 border-neutral-800"
-                      }`}
-                    >
-                      Férias / Folga
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditFormData({ ...editFormData, status: "inactive" })
-                      }
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                        editFormData.status === "inactive"
-                          ? "bg-red-600 text-white border-red-500 shadow-md"
-                          : "bg-neutral-900 text-neutral-400 border-neutral-800"
-                      }`}
-                    >
-                      Inativo
-                    </button>
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Input
                     label="Nome de Exibição"
