@@ -13,6 +13,7 @@ import TagInput from "../../components/ui/TagInput";
 import { SafeHtml } from "../../components/ui/SafeHtml";
 import WorkShiftSelector from "../../components/services/WorkShiftSelector";
 import { validateSchema, SCHEMAS, ALLOWED_BARBER_ROLES } from "../../utils/inputValidator";
+import { masks } from "../../utils/masks";
 import {
   Scissors,
   Armchair,
@@ -138,6 +139,7 @@ export default function BarbersTeamView({
     role: "Barbeiro Profissional",
     serviceCommission: "50",
     productCommission: "10",
+    pixType: "cpf",
     pixKey: "",
     notes: "",
     specialties: ["Degradê Navalhado", "Barboterapia"],
@@ -174,6 +176,7 @@ export default function BarbersTeamView({
       role: "Barbeiro Profissional",
       serviceCommission: "50",
       productCommission: "10",
+      pixType: "cpf",
       pixKey: "",
       notes: "",
       specialties: ["Degradê Navalhado", "Barboterapia"],
@@ -233,6 +236,7 @@ export default function BarbersTeamView({
       role: memberValidation.sanitized.role, // Estritamente 'barber', 'assistant' ou 'receptionist'
       email: newBarberForm.email?.trim() ? DOMPurify.sanitize(newBarberForm.email.trim(), { ALLOWED_TAGS: [] }) : null,
       phone: DOMPurify.sanitize(newBarberForm.phone.trim(), { ALLOWED_TAGS: [] }),
+      pix_type: newBarberForm.pixType || "cpf",
       pix_key: newBarberForm.pixKey?.trim() ? DOMPurify.sanitize(newBarberForm.pixKey.trim(), { ALLOWED_TAGS: [] }) : null,
       service_commission: Math.min(100, Math.max(0, Number(newBarberForm.serviceCommission || 50))),
       product_commission: Math.min(100, Math.max(0, Number(newBarberForm.productCommission || 10))),
@@ -259,6 +263,7 @@ export default function BarbersTeamView({
         displayName: data.display_name || data.name,
         serviceCommission: data.service_commission ?? 50,
         productCommission: data.product_commission ?? 10,
+        pixType: data.pix_type || newBarberForm.pixType || "cpf",
         pixKey: data.pix_key || "",
       };
 
@@ -283,7 +288,11 @@ export default function BarbersTeamView({
   const handleOpenDetails = (barber) => {
     setSelectedBarberForDetails(barber);
     setIsEditMode(false);
-    setEditFormData({ ...barber });
+    setEditFormData({
+      ...barber,
+      pixType: barber.pix_type || barber.pixType || "cpf",
+      pixKey: barber.pix_key || barber.pixKey || "",
+    });
   };
 
   // [Função assíncrona: atualiza os dados do profissional na tabela 'barbers' do Supabase]
@@ -294,6 +303,7 @@ export default function BarbersTeamView({
     const updatePayload = {
       display_name: DOMPurify.sanitize((editFormData.displayName || editFormData.name || "").trim(), { ALLOWED_TAGS: [] }),
       phone: DOMPurify.sanitize((editFormData.phone || "").trim(), { ALLOWED_TAGS: [] }),
+      pix_type: editFormData.pixType || "cpf",
       pix_key: editFormData.pixKey ? DOMPurify.sanitize(editFormData.pixKey.trim(), { ALLOWED_TAGS: [] }) : null,
       role: editFormData.role,
       service_commission: Number(editFormData.serviceCommission || 50),
@@ -495,6 +505,17 @@ export default function BarbersTeamView({
                 </div>
               </div>
 
+              {/* Chave PIX cadastrada para repasse */}
+              <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-neutral-950/60 border border-neutral-800/80">
+                <span className="text-neutral-500 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  PIX:
+                </span>
+                <span className="font-mono text-emerald-400 font-medium truncate max-w-[170px]" title={barber.pixKey || barber.pix_key || "Não cadastrado"}>
+                  {barber.pixKey || barber.pix_key || "Não cadastrado"}
+                </span>
+              </div>
+
               <div className="space-y-1 text-left">
                 <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
                   Especialidades:
@@ -686,35 +707,52 @@ export default function BarbersTeamView({
                   error={newBarberErrors.phone}
                 />
 
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-neutral-300">
-                      Chave PIX (Para repasse de comissões)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setNewBarberForm({
-                          ...newBarberForm,
-                          pixKey: generateUUID(),
-                        })
-                      }
-                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Gerar chave aleatória no formato padrão PIX (EVP)"
-                    >
-                      <Key className="w-3 h-3 text-amber-400" />
-                      <span>Gerar Aleatória</span>
-                    </button>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:col-span-2">
+                  <Select
+                    label="Tipo de Chave PIX"
+                    value={newBarberForm.pixType || "cpf"}
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      setNewBarberForm((prev) => ({
+                        ...prev,
+                        pixType: newType,
+                        pixKey: "",
+                      }));
+                    }}
+                    options={[
+                      { value: "cpf", label: "CPF" },
+                      { value: "phone", label: "Celular / WhatsApp" },
+                      { value: "email", label: "E-mail" },
+                      { value: "random", label: "Chave Aleatória (EVP)" },
+                    ]}
+                  />
+
                   <Input
-                    placeholder="CPF, E-mail, Telefone ou Aleatória"
-                    value={newBarberForm.pixKey}
-                    onChange={(e) =>
-                      setNewBarberForm({
-                        ...newBarberForm,
-                        pixKey: e.target.value,
-                      })
+                    label="Chave PIX (Para repasse de comissões)"
+                    placeholder={
+                      newBarberForm.pixType === "cpf"
+                        ? "000.000.000-00"
+                        : newBarberForm.pixType === "phone"
+                        ? "(00) 00000-0000"
+                        : newBarberForm.pixType === "email"
+                        ? "barbeiro@exemplo.com"
+                        : "Cole sua chave aleatória gerada no banco"
                     }
+                    value={newBarberForm.pixKey}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (newBarberForm.pixType === "cpf") {
+                        val = masks.cpf(val);
+                      } else if (newBarberForm.pixType === "phone") {
+                        val = masks.phone(val);
+                      } else if (newBarberForm.pixType === "email") {
+                        val = val.trim().toLowerCase();
+                      }
+                      setNewBarberForm((prev) => ({
+                        ...prev,
+                        pixKey: val,
+                      }));
+                    }}
                   />
                 </div>
               </div>
@@ -937,10 +975,19 @@ export default function BarbersTeamView({
                   </div>
                   <div>
                     <span className="text-neutral-500 block text-[10px] uppercase font-bold">
-                      Chave PIX:
+                      Chave PIX (Repasse):
                     </span>
-                    <span className="text-emerald-400 font-mono font-bold">
-                      {selectedBarberForDetails.pixKey}
+                    <span className="text-emerald-400 font-mono font-bold text-xs flex items-center gap-1.5 flex-wrap mt-0.5">
+                      {selectedBarberForDetails.pixKey || selectedBarberForDetails.pix_key ? (
+                        <>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold uppercase">
+                            {selectedBarberForDetails.pixType || selectedBarberForDetails.pix_type || "PIX"}
+                          </span>
+                          <span>{selectedBarberForDetails.pixKey || selectedBarberForDetails.pix_key}</span>
+                        </>
+                      ) : (
+                        <span className="text-neutral-500 italic font-normal text-xs">Não cadastrada</span>
+                      )}
                     </span>
                   </div>
                   <div>
@@ -1077,37 +1124,53 @@ export default function BarbersTeamView({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-bold text-neutral-300">
-                        Chave PIX
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditFormData({
-                            ...editFormData,
-                            pixKey: generateUUID(),
-                          })
-                        }
-                        className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Gerar chave aleatória no formato padrão PIX (EVP)"
-                      >
-                        <Key className="w-3 h-3 text-amber-400" />
-                        <span>Gerar Aleatória</span>
-                      </button>
-                    </div>
-                    <Input
-                      placeholder="CPF, E-mail, Telefone ou Aleatória"
-                      value={editFormData.pixKey}
-                      onChange={(e) =>
-                        setEditFormData({
-                          ...editFormData,
-                          pixKey: e.target.value,
-                        })
+                  <Select
+                    label="Tipo de Chave PIX"
+                    value={editFormData.pixType || "cpf"}
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        pixType: newType,
+                        pixKey: "",
+                      }));
+                    }}
+                    options={[
+                      { value: "cpf", label: "CPF" },
+                      { value: "phone", label: "Celular / WhatsApp" },
+                      { value: "email", label: "E-mail" },
+                      { value: "random", label: "Chave Aleatória (EVP)" },
+                    ]}
+                  />
+
+                  <Input
+                    label="Chave PIX (Para repasse de comissões)"
+                    placeholder={
+                      editFormData.pixType === "cpf"
+                        ? "000.000.000-00"
+                        : editFormData.pixType === "phone"
+                        ? "(00) 00000-0000"
+                        : editFormData.pixType === "email"
+                        ? "barbeiro@exemplo.com"
+                        : "Cole a chave aleatória fornecida"
+                    }
+                    value={editFormData.pixKey || ""}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (editFormData.pixType === "cpf") {
+                        val = masks.cpf(val);
+                      } else if (editFormData.pixType === "phone") {
+                        val = masks.phone(val);
+                      } else if (editFormData.pixType === "email") {
+                        val = val.trim().toLowerCase();
                       }
-                    />
-                  </div>
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        pixKey: val,
+                      }));
+                    }}
+                  />
+                </div>
                   <Select
                     label="Cargo"
                     value={editFormData.role}
@@ -1130,7 +1193,6 @@ export default function BarbersTeamView({
                       },
                     ]}
                   />
-                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <Input

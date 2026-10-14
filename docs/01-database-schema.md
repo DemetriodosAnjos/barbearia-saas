@@ -214,4 +214,32 @@ Mapeamento da tabela `public.sessions` para controle de dispositivos conectados 
 | `metadata` | `jsonb` | Metadados extras do evento em formato JSON. |
 | `created_at` | `timestamptz` | Data e hora do registro de auditoria. |
 
+---
+
+## 9. Tabela: `barber_settlements` (Histórico de Quitação e Fechamento de Comissões)
+
+Mapeamento da tabela `public.barber_settlements` para auditoria e controle de fechamentos semanais/mensais de comissões executados pelo Dono/Administrador:
+
+| Nome da Coluna | Tipo de Dado (PostgreSQL) | Obrigatório | Descrição / Regra |
+|---|---|---|---|
+| `id` | `uuid` | Sim | Identificador único da quitação (`gen_random_uuid()`). |
+| `barbershop_id` | `uuid` | Sim | Identificador da barbearia / tenant. |
+| `barber_id` | `text` | Sim | ID do profissional beneficiário da comissão. |
+| `barber_name` | `text` | Sim | Nome do profissional no momento do fechamento. |
+| `period_start` | `date` | Sim | Data inicial do período apurado. |
+| `period_end` | `date` | Sim | Data final do período apurado. |
+| `services_amount` | `numeric(10,2)` | Sim | Total apurado de comissões sobre serviços prestados. |
+| `products_amount` | `numeric(10,2)` | Sim | Total apurado de comissões sobre produtos vendidos. |
+| `total_paid` | `numeric(10,2)` | Sim | Total líquido pago ao profissional (`services_amount + products_amount`). |
+| `services_count` | `integer` | Sim | Quantidade de atendimentos inclusos no lote. |
+| `products_count` | `integer` | Sim | Quantidade de produtos vendidos inclusos no lote. |
+| `pix_key_used` | `text` | Não | Chave PIX utilizada no repasse. |
+| `paid_by` | `uuid` | Não | Usuário administrador responsável pela quitação (`auth.users(id)`). |
+| `paid_at` | `timestamptz` | Sim | Data e hora exata da confirmação do pagamento. Padrão: `now()`. |
+| `notes` | `text` | Não | Observações e notas adicionais da quitação. |
+| `created_at` | `timestamptz` | Sim | Data e hora de criação do registro de quitação. |
+
+> **Nota de Vinculação:** As tabelas `appointments` e `comandas` recebem a coluna opcional `settlement_id` (`uuid`). Ao acionar o botão exclusivo *"Marcar como Pago"*, os registros quitados são vinculados a este lote, zerando automaticamente o saldo em aberto do profissional para o próximo período sem excluir os atendimentos da agenda.
+
+
 

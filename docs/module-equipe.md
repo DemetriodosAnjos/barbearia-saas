@@ -13,7 +13,7 @@ O módulo **Gestão de Equipe (`BarbersTeamView.jsx`)** é responsável pela adm
 
 ## 2. Estrutura SQL Oficial da Tabela `barbers` (20 Colunas)
 
-Todas as 20 colunas devem ser respeitadas em consultas, inserções e atualizações:
+Todas as 21 colunas devem ser respeitadas em consultas, inserções e atualizações:
 
 | Coluna | Tipo SQL | Nullable | Descrição / Regra de Negócio |
 |---|---|---|---|
@@ -34,7 +34,8 @@ Todas as 20 colunas devem ser respeitadas em consultas, inserções e atualizaç
 | `product_commission` | `numeric` | Não | Percentual específico de comissão sobre produtos (0 a 100%). |
 | `email` | `text` | Sim | E-mail corporativo / chave de login no sistema. |
 | `phone` | `text` | Sim | Telefone / WhatsApp com DDD para contato e notificações. |
-| `pix_key` | `text` | Sim | Chave PIX cadastrada para pagamento de comissões. |
+| `pix_type` | `text` | Sim | Tipo de chave PIX: `'cpf'`, `'phone'`, `'email'`, `'random'`. |
+| `pix_key` | `text` | Sim | Chave PIX informada pelo profissional para recebimento de comissões (sem gerador randômico automático). |
 | `notes` | `text` | Sim | Anotações internas da gerência sobre o profissional. |
 | `created_at` | `timestamptz` | Não | Data/hora de inclusão do registro no banco. |
 

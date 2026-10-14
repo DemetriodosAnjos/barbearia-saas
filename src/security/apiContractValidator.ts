@@ -66,6 +66,8 @@ export const clientBarberContractSchema = z
     email: z.string().trim().nullable().optional(),
     pixKey: z.string().trim().nullable().optional().default(""),
     pix_key: z.string().trim().nullable().optional(),
+    pixType: z.string().trim().nullable().optional().default("cpf"),
+    pix_type: z.string().trim().nullable().optional(),
     serviceCommission: z.coerce.number().min(0).max(100).nullable().default(50),
     service_commission: z.coerce.number().nullable().optional(),
     productCommission: z.coerce.number().min(0).max(100).nullable().default(10),

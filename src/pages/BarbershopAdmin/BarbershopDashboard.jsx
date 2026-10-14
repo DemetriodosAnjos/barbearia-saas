@@ -270,6 +270,11 @@ export default function BarbershopDashboard({
           label: "Dashboard & Big Numbers",
           icon: "barChart",
         },
+        {
+          id: "pagamentos",
+          label: "Pagamentos & Comissões",
+          icon: "creditCard",
+        },
       ],
     },
     {
@@ -523,10 +528,19 @@ export default function BarbershopDashboard({
               </ErrorBoundary>
             )}
 
-            {/* 6. DASHBOARD FINANCEIRO */}
-            {activeMenuTab === "dashboard_financeiro" && (
+            {/* 6. DASHBOARD FINANCEIRO E PAGAMENTOS */}
+            {(activeMenuTab === "dashboard_financeiro" || activeMenuTab === "pagamentos") && (
               <ErrorBoundary componentName="Dashboard Financeiro & Comissões">
                 <FinancialDashboardView
+                  initialTab={activeMenuTab === "pagamentos" ? "pagamentos" : "visao_geral"}
+                  appointments={appointments}
+                  onUpdateAppointments={onUpdateAppointments}
+                  barbers={barbers}
+                  onUpdateBarbers={onUpdateBarbers}
+                  comandas={comandas}
+                  onUpdateComandas={onUpdateComandas}
+                  tenant={tenant}
+                  user={user}
                   onBack={() => setActiveMenuTab("caixa")}
                 />
               </ErrorBoundary>
