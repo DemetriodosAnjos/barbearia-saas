@@ -444,19 +444,61 @@ export default function ScheduleView({
     const targetBarber = activeBarbers.find((b) => b.id === targetBarberId);
     const targetBarberName = targetBarber ? targetBarber.name : "Barbeiro";
 
-    // Conflito de Almoço
-    const rawBreaks = Array.isArray(targetBarber?.breaks)
+    // Conflito de Almoço isolado por dia do agendamento (sem duplicação semanal)
+    const apptDateYMD = getAppointmentDateYMD(draggedAppt);
+    const apptDate = parseYMDToLocalDate(apptDateYMD);
+    const dayKeys = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"];
+    const targetDayKey = dayKeys[apptDate.getDay()];
+
+    let daySpecificBreaks = null;
+    if (targetBarber?.breaks && typeof targetBarber.breaks === "object" && !Array.isArray(targetBarber.breaks)) {
+      if (Array.isArray(targetBarber.breaks[targetDayKey])) {
+        daySpecificBreaks = targetBarber.breaks[targetDayKey];
+      } else if (Array.isArray(targetBarber.breaks[apptDate.getDay()])) {
+        daySpecificBreaks = targetBarber.breaks[apptDate.getDay()];
+      }
+    }
+
+    const rawBreaks = Array.isArray(daySpecificBreaks)
+      ? daySpecificBreaks
+      : Array.isArray(targetBarber?.breaks) && targetBarber.breaks.length > 0
       ? targetBarber.breaks
       : Array.isArray(targetBarber?.breaks?.intervals)
       ? targetBarber.breaks.intervals
       : [];
-    const barberBreaks = [...rawBreaks];
+
+    const barberBreaks = [];
+    const seenDropBreaks = new Set();
+
+    rawBreaks.forEach((b) => {
+      const s = (b?.startTime || b?.start_time || b?.breakStart || "").trim();
+      const e = (b?.endTime || b?.end_time || b?.breakEnd || "").trim();
+      if (s && e && !seenDropBreaks.has(`${s}-${e}`)) {
+        seenDropBreaks.add(`${s}-${e}`);
+        barberBreaks.push({ startTime: s, endTime: e });
+      }
+    });
+
     if (barberBreaks.length === 0 && Array.isArray(targetBarber?.schedule)) {
-      targetBarber.schedule.forEach((s) => {
-        if (s?.breakStart && s?.breakEnd) {
-          barberBreaks.push({ startTime: s.breakStart, endTime: s.breakEnd });
-        }
-      });
+      const daySched =
+        targetBarber.schedule.find((s) => {
+          if (!s || typeof s !== "object") return false;
+          const sDay = String(s.dayId || s.day || s.id || "").toLowerCase().trim();
+          return (
+            sDay === targetDayKey ||
+            (targetDayKey === "dom" && (sDay.includes("dom") || sDay === "sun")) ||
+            (targetDayKey === "seg" && (sDay.includes("seg") || sDay === "mon")) ||
+            (targetDayKey === "ter" && (sDay.includes("ter") || sDay === "tue")) ||
+            (targetDayKey === "qua" && (sDay.includes("qua") || sDay === "wed")) ||
+            (targetDayKey === "qui" && (sDay.includes("qui") || sDay === "thu")) ||
+            (targetDayKey === "sex" && (sDay.includes("sex") || sDay === "fri")) ||
+            (targetDayKey === "sab" && (sDay.includes("sab") || sDay.includes("sáb") || sDay === "sat"))
+          );
+        }) || (targetBarber.schedule.length === 7 ? targetBarber.schedule[apptDate.getDay() === 0 ? 6 : apptDate.getDay() - 1] : null);
+
+      if (daySched?.breakStart && daySched?.breakEnd && daySched?.active !== false) {
+        barberBreaks.push({ startTime: daySched.breakStart, endTime: daySched.breakEnd });
+      }
     }
 
     const hasLunchConflict = barberBreaks.some((brk) => {

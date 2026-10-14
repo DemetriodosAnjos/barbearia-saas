@@ -11,6 +11,7 @@ export default function BarberTimelineColumn({
   isPastDate = false,
   isSlotPast,
   breaks,
+  currentDate,
   appointments = [],
   allBarberAppointments,
   clients = [],
@@ -30,38 +31,92 @@ export default function BarberTimelineColumn({
   // Estado para rastrear qual card está com o menu de 3 pontos aberto e elevar o z-index
   const [openMenuApptId, setOpenMenuApptId] = useState(null);
 
-  // 2. Extrai e normaliza as pausas de forma defensiva para garantir que seja sempre um Array
-  const rawBreaks = Array.isArray(breaks)
-    ? breaks
-    : Array.isArray(barber.breaks)
-    ? barber.breaks
-    : Array.isArray(barber.breaks?.intervals)
-    ? barber.breaks.intervals
-    : [];
+  // 2. Extrai e normaliza as pausas de forma defensiva para garantir que seja sempre um Array único e sem duplicatas
+  const actualBreaks = useMemo(() => {
+    // Determina o dia da semana da data sendo exibida
+    const dateObj = currentDate
+      ? currentDate instanceof Date
+        ? currentDate
+        : new Date(currentDate)
+      : new Date();
+    const dayOfWeek = !isNaN(dateObj.getTime()) ? dateObj.getDay() : new Date().getDay();
+    const DAY_KEYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"];
+    const currentDayKey = DAY_KEYS[dayOfWeek];
 
-  // Se não houver breaks no formato de array, tenta extrair da escala semanal do barbeiro
-  const extractedScheduleBreaks = [];
-  if (rawBreaks.length === 0 && Array.isArray(barber.schedule)) {
-    barber.schedule.forEach((daySchedule) => {
+    // Se breaks for um objeto indexado por dia (ex: { seg: [...], ter: [...] })
+    let daySpecificBreaks = null;
+    if (breaks && typeof breaks === "object" && !Array.isArray(breaks)) {
+      if (Array.isArray(breaks[currentDayKey])) {
+        daySpecificBreaks = breaks[currentDayKey];
+      } else if (Array.isArray(breaks[dayOfWeek])) {
+        daySpecificBreaks = breaks[dayOfWeek];
+      }
+    }
+
+    const rawBreaks = Array.isArray(daySpecificBreaks)
+      ? daySpecificBreaks
+      : Array.isArray(breaks) && breaks.length > 0
+      ? breaks
+      : Array.isArray(barber?.breaks) && barber.breaks.length > 0
+      ? barber.breaks
+      : Array.isArray(barber?.breaks?.intervals)
+      ? barber.breaks.intervals
+      : [];
+
+    const extractedScheduleBreaks = [];
+    // Se não houver breaks no formato de array direto, extrai APENAS da escala do dia correspondente (elimina duplicação dos 7 dias da semana no mesmo slot)
+    if (rawBreaks.length === 0 && Array.isArray(barber?.schedule)) {
+      const daySchedule =
+        barber.schedule.find((s) => {
+          if (!s || typeof s !== "object") return false;
+          const sDay = String(s.dayId || s.day || s.id || "").toLowerCase().trim();
+          return (
+            sDay === currentDayKey ||
+            (currentDayKey === "dom" && (sDay.includes("dom") || sDay === "sun")) ||
+            (currentDayKey === "seg" && (sDay.includes("seg") || sDay === "mon")) ||
+            (currentDayKey === "ter" && (sDay.includes("ter") || sDay === "tue")) ||
+            (currentDayKey === "qua" && (sDay.includes("qua") || sDay === "wed")) ||
+            (currentDayKey === "qui" && (sDay.includes("qui") || sDay === "thu")) ||
+            (currentDayKey === "sex" && (sDay.includes("sex") || sDay === "fri")) ||
+            (currentDayKey === "sab" && (sDay.includes("sab") || sDay.includes("sáb") || sDay === "sat"))
+          );
+        }) || (barber.schedule.length === 7 ? barber.schedule[dayOfWeek === 0 ? 6 : dayOfWeek - 1] : null);
+
       if (daySchedule?.breakStart && daySchedule?.breakEnd && daySchedule?.active !== false) {
         extractedScheduleBreaks.push({
           startTime: daySchedule.breakStart,
           endTime: daySchedule.breakEnd,
-          label: "Intervalo de Almoço",
+          label: daySchedule.breakLabel || "Intervalo de Almoço",
         });
       }
-    });
-  }
+    }
 
-  const finalBreaksList = rawBreaks.length > 0 ? rawBreaks : extractedScheduleBreaks;
+    const candidateList = rawBreaks.length > 0 ? rawBreaks : extractedScheduleBreaks;
 
-  const actualBreaks = (Array.isArray(finalBreaksList) ? finalBreaksList : []).filter(
-    (b) =>
-      b &&
-      typeof b === "object" &&
-      (b.startTime || b.start_time || b.breakStart) &&
-      (b.endTime || b.end_time || b.breakEnd)
-  );
+    // Deduplicação estrita de pausas por intervalo de horário (startTime - endTime) para eliminar duplicatas
+    const seen = new Set();
+    const deduplicated = [];
+
+    for (const b of candidateList) {
+      if (!b || typeof b !== "object") continue;
+      const s = (b.startTime || b.start_time || b.breakStart || "").trim();
+      const e = (b.endTime || b.end_time || b.breakEnd || "").trim();
+      if (!s || !e) continue;
+
+      const key = `${s}-${e}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicated.push({
+          ...b,
+          startTime: s,
+          endTime: e,
+          label: b.label || "Intervalo de Almoço",
+        });
+      }
+    }
+
+    return deduplicated;
+  }, [breaks, barber?.breaks, barber?.schedule, currentDate]);
 
   const totalHours = endHour - startHour;
   const totalMinutes = totalHours * 60;

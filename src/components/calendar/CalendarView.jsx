@@ -521,6 +521,7 @@ export default function CalendarView({
                   startHour={startHour}
                   endHour={endHour}
                   minuteHeight={minuteHeight}
+                  currentDate={currentDate}
                   isPastDate={isCurrentViewPast}
                   isSlotPast={(time) => isSlotInPast(currentDate, time)}
                   breaks={Array.isArray(barber.breaks) ? barber.breaks : Array.isArray(barber.breaks?.intervals) ? barber.breaks.intervals : []}

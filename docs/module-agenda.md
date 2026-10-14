@@ -84,6 +84,35 @@ A **Agenda de Atendimentos** é o núcleo (Core Engine) da barbearia. É nela qu
 - **BLOQUEIO DE SLOTS PASSADOS:** Qualquer tentativa de agendamento em datas ou horários retroativos deve obrigatoriamente exibir o `UnavailableSlotModal` com overlay, título `"OPS! Horário indisponível para agendamento"` e opções de `"Ver horários disponíveis"` e `"Fechar"`.
 - **NUNCA** remover a gravação assíncrona na tabela `appointments` do Supabase.
 - **NUNCA** reintroduzir `localStorage` sem o adapter `safeStorage`.
-- **DEFESA DE INTERVALOS (BREAKS):** O tratamento de pausas e almoço (`breaks` JSONB) deve sempre validar `Array.isArray(breaks)` defensivamente antes de iterar com `.map()` ou `.some()`, recorrendo a `schedule[].breakStart/breakEnd` caso `breaks` não seja um array direto.
+- **DEFESA DE INTERVALOS E ALMOÇO (ANTI-DUPLICAÇÃO):** O tratamento de pausas e horários de almoço (`breaks` JSONB ou fallback `schedule[].breakStart/breakEnd`) deve obrigatoriamente:
+  1. Identificar o dia da semana da data ativa sendo exibida (`currentDate`) e extrair **estritamente o intervalo do dia correspondente**, jamais iterando cegamente sobre os 7 dias da escala semanal no mesmo slot.
+  2. Aplicar deduplicação estrita de pausas por intervalo de horário (`${startTime}-${endTime}`) utilizando `Set`, eliminando quaisquer blocos redundantes ou sobrepostos na coluna do barbeiro.
+  3. Respeitar folgas (`active === false`), não exibindo almoço em dias inativos.
+  4. Na validação de conflito de almoço por arrastar e soltar (`handleDropAppointment` no `ScheduleView.jsx`), extrair apenas o horário de almoço da data do agendamento de destino.
 - **TAGS HTML E SAFEHTML:** Componentes renderizados dentro de `<p>` (como `SafeHtml`) devem sempre utilizar `as="span"` para preservar a semântica do DOM e evitar erros de hidratação (`<div> cannot be a descendant of <p>`).
 - Ao alterar campos no modal, manter sincronizadas as propriedades snake_case (banco) e camelCase (React).
+
+---
+
+## 5. Resolução da Duplicação de Horário de Almoço no Slot (v1.5.3.4)
+
+### Causa Raiz Identificada
+No componente `BarberTimelineColumn.jsx`, quando o barbeiro não possuía `breaks` fixos cadastrados diretamente como array, o sistema recorria ao array `barber.schedule` (que contém a escala semanal completa dos 7 dias). No entanto, o código executava um `.forEach()` irrestrito sobre todos os 7 dias da semana:
+```javascript
+// Comportamento problemático anterior:
+barber.schedule.forEach((daySchedule) => {
+  if (daySchedule?.breakStart && daySchedule?.breakEnd && daySchedule?.active !== false) {
+    extractedScheduleBreaks.push({
+      startTime: daySchedule.breakStart,
+      endTime: daySchedule.breakEnd,
+      label: "Intervalo de Almoço",
+    });
+  }
+});
+```
+Como de segunda a sábado o horário de almoço configurado era idêntico (ex: `12:00` às `13:00`), a lista de pausas recebia até 6 entradas redundantes. Ao renderizar a coluna diária, o componente criava múltiplos blocos `<div className={breakBlock}>` sobrepostos no mesmo slot da timeline.
+
+### Correção Aplicada
+1. **Isolamento por Dia da Semana (`currentDate`):** `CalendarView.jsx` agora transmite explicitamente `currentDate` para `BarberTimelineColumn.jsx`. O componente calcula o dia da semana ativo (`dom`, `seg`, `ter`, `qua`, `qui`, `sex`, `sab`) e localiza unicamente o expediente do dia em questão.
+2. **Deduplicação Estrita por Chave Única:** Uma camada com `Set` (`${startTime}-${endTime}`) filtra qualquer intervalo duplicado antes da renderização na grade visual.
+3. **Harmonização no Drag & Drop (`ScheduleView.jsx`):** O cálculo de colisão com almoço ao arrastar cartões também foi ajustado para considerar unicamente a data do agendamento sendo movimentado.
