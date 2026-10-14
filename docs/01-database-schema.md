@@ -26,13 +26,14 @@ Tabela central do núcleo (Core) da aplicação onde convergem clientes, profiss
 | `is_paid` | `boolean` | Sim | Flag indicando se o atendimento já foi quitado no caixa. |
 | `is_vip` | `boolean` | Não | Flag indicando atendimento VIP ou cliente prioritário. |
 | `notes` | `text` | Não | Observações e preferências do cliente. |
+| `settlement_id` | `uuid` | Não | ID do lote de quitação (`barber_settlements`) ao qual este atendimento foi faturado. |
 | `created_at` | `timestamp with time zone` | Sim | Timestamp de criação do registro no banco. |
 
 ---
 
 ## 2. Tabela: `barbers` (Equipe de Barbeiros)
 
-Mapeamento exato de todas as 20 colunas SQL oficiais no Supabase:
+Mapeamento exato de todas as 21 colunas SQL oficiais no Supabase:
 
 | Nome da Coluna | Tipo de Dado (PostgreSQL) | Obrigatório | Descrição / Regra |
 |---|---|---|---|
@@ -52,7 +53,8 @@ Mapeamento exato de todas as 20 colunas SQL oficiais no Supabase:
 | `schedule` | `jsonb` | Não | Escala semanal com horários de entrada e saída por dia. |
 | `email` | `text` | Não | E-mail de contato / login. |
 | `phone` | `text` | Não | Telefone / WhatsApp do profissional. |
-| `pix_key` | `text` | Não | Chave PIX (CPF, E-mail, Telefone ou Aleatória/EVP). |
+| `pix_type` | `text` | Não | Tipo de chave PIX: `'cpf'`, `'email'`, `'phone'`, `'random'`. |
+| `pix_key` | `text` | Não | Chave PIX fornecida pelo profissional no cadastro. |
 | `service_commission` | `numeric` | Sim | Comissão sobre serviços realizados (0 a 100%). |
 | `product_commission` | `numeric` | Sim | Comissão sobre venda de produtos (0 a 100%). |
 | `notes` | `text` | Não | Anotações administrativas sobre o membro da equipe. |
@@ -173,6 +175,7 @@ Mapeamento oficial das colunas da tabela `public.profiles` e metadados sincroniz
 | `total` | `numeric` | Total quitado. |
 | `payment_method` | `text` | Forma de quitação (`'pix'`, `'credit'`, `'debit'`, `'cash'`). |
 | `items` | `jsonb` | Array com lista de itens e comissões. |
+| `settlement_id` | `uuid` | ID do lote de quitação (`barber_settlements`) ao qual a comanda foi vinculada. |
 | `created_at` | `timestamp with time zone` | Abertura da comanda. |
 
 ---

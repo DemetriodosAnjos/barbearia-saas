@@ -6,6 +6,7 @@ import { scheduleStyles } from "./ScheduleView.styles";
 import CalendarView, {
   formatDateToYMD,
   getAppointmentDateYMD,
+  parseYMDToLocalDate,
 } from "../../components/calendar/CalendarView";
 import NewAppointmentModal from "../../components/calendar/NewAppointmentModal";
 import Modal from "../../components/ui/Modal";
@@ -548,6 +549,24 @@ export default function ScheduleView({
 
     if (onUpdateAppointments) {
       onUpdateAppointments(updatedList);
+    }
+
+    try {
+      if (draggedAppt.id && !String(draggedAppt.id).startsWith("mock-") && !String(draggedAppt.id).startsWith("temp-")) {
+        supabase
+          .from("appointments")
+          .update({
+            barber_id: targetBarberId,
+            start_time: targetStartTime,
+            end_time: targetEndTime,
+          })
+          .eq("id", draggedAppt.id)
+          .then(({ error }) => {
+            if (error) console.error("Erro ao sincronizar reagendamento no Supabase:", error);
+          });
+      }
+    } catch (err) {
+      console.error("Erro ao reagendar no Supabase:", err);
     }
   };
 

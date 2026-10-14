@@ -7,15 +7,11 @@ O módulo financeiro é composto por duas interfaces integradas acessíveis pela
    - Gestão integrada de comandas e atendimentos concluídos/em andamento vindos da agenda (ex: Atendimento `#apt-179138762174` concluído com valor R$ 20,00 e status Pendente).
    - **Controle Manual de Status:** Opção nos cards para o operador alterar manualmente o status entre `Pendente (Aguardando Pagamento)`, `Pago (Liquidado no Caixa)`, `Na Cadeira (Em Andamento)` e `Cancelado`, com sincronização bidirecional em tempo real com a tabela `appointments` e a tela de Agenda (`ScheduleView.jsx`).
    - **Checkout Oficial de Pagamento (`MercadoPagoCheckoutModal.tsx`):**
-     - **CardInfo #01 (Título):** Título unificado e limpo `"Pagamento"`.
-     - **CardInfo #02 (Resumo do Atendimento):** Nome do barbeiro exibido na cor branca (`text-white`).
-     - **CardInfo #03 (Seletores de Modo):** Botões `Pix`, `Cartão Crédito / Débito` e `Link WhatsApp` com estado ativo na cor Âmbar (`bg-amber-600`) e ícones + fonte na cor branca (`text-white`).
-     - **CardInfo #04 (PIX & QR Code Real):** Geração de QR Code real (padrão EMV® QRCPS-MPM BR Code do Banco Central com CRC16-CCITT) a partir da chave cadastrada pelo usuário em `"Meu Perfil" => Perfil & Chave PIX / Chave PIX Cadastrada` (`src/utils/pixQrCode.ts`), sem botões ou textos de simulação de webhook.
-     - **CardInfo Cartão de Crédito / Débito (Checkout Pro):** Criação de preferência real via `POST https://api.mercadopago.com/checkout/preferences` e botão de ação intitulado `"Pagar com Mercado Pago"`.
-     - **CardInfo Link WhatsApp:**
-       - **Link Editar:** Padrão minimalista e limpo (`text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer`), permitindo editar a mensagem para o cliente ou restaurar o modelo padrão.
-       - **Telefone do Cliente:** Carrega e formata o telefone do cliente cadastrado no atendimento (ex: Marilia Santos -> `41 99788-4424` / `wa.me/5541997884424`).
-       - **Botão Oficial:** Intitulado `"Compartilhar por WhatsApp"`, abrindo diretamente a conversa no WhatsApp com o cliente para envio da cobrança com o link oficial de pagamento.
+     - **CardInfo #01 (Título):** Título unificado e limpo `"Pagamento do Atendimento"`.
+     - **CardInfo #02 (Resumo do Atendimento):** Nome do barbeiro exibido na cor branca (`text-white`) e valor destacado.
+     - **CardInfo #03 (Seletores de Modo Focados):** Botões `Pix (QR Code & Chave)` e `Enviar no WhatsApp`. A opção de cartão online foi removida para eliminar intermediários digitais e taxas redundantes; clientes que optam por cartão realizam o pagamento presencialmente na maquininha física do caixa da barbearia.
+     - **CardInfo #04 (PIX Oficial & QR Code):** Geração de QR Code real (padrão EMV® Banco Central) a partir da chave cadastrada da barbearia, com cópia da chave crua e do código Copia e Cola.
+     - **CardInfo Link WhatsApp:** Preenchimento automático com telefone do cliente (`wa.me/55...`), contendo a Chave Pix da barbearia, valor e dados do corte para quitação ágil.
      - **CardInfo #05 (Rodapé Limpo):** Sem rodapé técnico e sem botão inferior `Fechar` redundante.
    - Adição de serviços realizados e consumo do bar/produtos.
    - Fechamento tradicional de conta no balcão com rateio de comissões por profissional.
