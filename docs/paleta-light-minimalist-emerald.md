@@ -52,3 +52,31 @@ O sistema utiliza o seletor contextual `html:not(.dark)` para as regras de trans
    - Iniciais do Usuário/Gestor: Texto `#18181B` (`text-zinc-900`) e borda stroke em `#D4D4D8`.
 4. **Breadcrumb**:
    - Título da aba ativa padronizado de caixa alta (`AGENDA`) para texto formatado (`Agenda`).
+5. **Ícone Hambúrguer (Menu Mobile)**:
+   - Versão Light: Alterado para `Color: #059669` (verde esmeralda), hover com fundo `#F4F4F5`.
+   - Versão Dark: Mantido integralmente em tom neutro `neutral-400` (`#a3a3a3` com hover `#ffffff`).
+
+---
+
+## 6. Refinamento Oficial do Componente AVATAR (Theme Toggle Light)
+
+Refinamento da paleta de cor clara aplicado ao botão de usuário ativo e ao menu suspenso do Avatar, mantendo **100% preservadas todas as cores da versão DARK**.
+
+### 6.1. Tabela Comparativa de Tokens (Light vs. Dark)
+
+| Elemento do Componente Avatar | Versão DARK (Preservada) | Versão LIGHT (Refinada) | Finalidade / Especificação |
+| :--- | :--- | :--- | :--- |
+| **Ativo / Hover (Expandido)** | `BG #262626` (`neutral-800`) | `BG #262626` | Fundo ativo/hover quando expandido ou cursor passa por cima |
+| **AVATAR ("DE")** | `bg-neutral-800` / `#FFB900` | `BG #F4F4F5` | Permanece na cor cinza claro (#F4F4F5) com stroke #D4D4D8 |
+| **Título do Profissional** | `Color #e5e5e5` (`neutral-200`) | `Color #059669` (verde) | "Demetrio A L dos Anjos" em verde esmeralda de alta legibilidade |
+| **Cargo / Papel** | `Color #FFB900` (âmbar nobre) | `Color #55555E` / `#A1A1AA` | "Administrador" em tom de cinza neutro balanceado |
+| **Ícones do Menu** | `Color #FFC21F` (amarelo) | `Color #059669` (verde) | Ícones: *E-mail & Senha*, *Meu perfil*, *Configurações da Barbearia*, *Suporte & Ajuda* |
+| **Textos do Menu** | `Color #d4d4d8` / `text-red-400` | `Color #55555E` (hover: `#ffffff`) | Textos: *E-mail & Senha*, *Meu perfil*, *Configurações da Barbearia*, *Suporte & Ajuda*, *Sair da Plataforma* |
+| **Hover nos Itens do Menu** | `hover:bg-neutral-800` | `hover:bg-[#262626]` | Quando o mouse passa por cima das opções do menu |
+| **Bordas e Divisores** | `border-neutral-800` (`#262626`) | `border-[#E4E4E7]` / `border-[#D4D4D8]` | Traços refinados em zinc-200 e zinc-300 |
+
+### 6.2. Regras de Preservação da Versão Dark
+- No modo escuro (`html.dark`), o menu flutuante e o estado ativo do Avatar utilizam estritamente o fundo escuro `#262626`.
+- O papel "Administrador" reluz no tom dourado `#FFB900` e os 4 ícones institucionais permanecem em `#FFC21F`.
+- A opção de logout "Sair da Plataforma" preserva a semântica de alerta em vermelho suave (`text-red-400`).
+

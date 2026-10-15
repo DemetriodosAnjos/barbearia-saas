@@ -447,6 +447,161 @@ html:not(.dark) div[class*="navbarStyles-avatar"] * {
   color: #18181b !important;
 }
 
+/* 19.4. REFINAMENTO DO COMPONENTE AVATAR (THEME TOGGLE LIGHT) */
+/* Estado Ativo (Avatar & Menu Suspenso): Ativo / hover (qdo mouse passa por cima): BG #262626 (expandido) */
+html:not(.dark) [data-avatar-button][data-active="true"],
+html:not(.dark) [data-avatar-button]:hover,
+html:not(.dark) .avatar-user-button-active {
+  background-color: #262626 !important;
+  border-color: #404040 !important;
+}
+
+/* AVATAR: "DE" Permanece na cor cinza claro (#F4F4F5) */
+html:not(.dark) .navbar-avatar,
+html:not(.dark) [data-navbar-avatar],
+html:not(.dark) div[class*="navbarStyles-avatar"] {
+  color: #18181b !important;
+  background-color: #F4F4F5 !important;
+  border-color: #D4D4D8 !important;
+}
+
+html:not(.dark) .navbar-avatar *,
+html:not(.dark) [data-navbar-avatar] *,
+html:not(.dark) div[class*="navbarStyles-avatar"] * {
+  color: #18181b !important;
+}
+
+/* Titulo: Demetrio A L dos Anjos (nome do Profissional) -> Color #059669 (verde) */
+html:not(.dark) [data-user-name],
+html:not(.dark) .avatar-user-name {
+  color: #059669 !important;
+}
+
+/* Administrador: Color #55555E (normal) e #A1A1AA sobre fundo ativo/hover #262626 */
+html:not(.dark) [data-user-role],
+html:not(.dark) .avatar-user-role {
+  color: #55555E !important;
+}
+
+html:not(.dark) [data-avatar-button][data-active="true"] [data-user-role],
+html:not(.dark) [data-avatar-button]:hover [data-user-role] {
+  color: #a1a1aa !important;
+}
+
+/* Menu Suspenso (Dropdown container) */
+html:not(.dark) [data-user-dropdown-menu],
+html:not(.dark) .avatar-dropdown-menu {
+  background-color: #F4F4F5 !important;
+  border-color: #D4D4D8 !important;
+}
+
+/* Menu Suspenso - Itens no Hover (qdo mouse passa por cima): BG #262626 */
+html:not(.dark) .avatar-dropdown-item:hover,
+html:not(.dark) .avatar-dropdown-item:focus {
+  background-color: #262626 !important;
+}
+
+html:not(.dark) .avatar-dropdown-item:hover span,
+html:not(.dark) .avatar-dropdown-item:focus span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .avatar-dropdown-item:hover [data-user-dropdown-icon],
+html:not(.dark) .avatar-dropdown-item:hover svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* ICONES: E-mail & Senha, Meu perfil, Configurações da Barbearia, Suporte & Ajuda -> Color #059669 (verde) */
+html:not(.dark) [data-user-dropdown-icon],
+html:not(.dark) [data-user-dropdown-icon] svg,
+html:not(.dark) [data-user-dropdown-auth] svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* TEXTOS: E-mail & Senha, Meu perfil, Configurações da Barbearia, Suporte & Ajuda, Sair da Plataforma -> Color #55555E */
+html:not(.dark) [data-user-dropdown-text],
+html:not(.dark) [data-user-dropdown-auth],
+html:not(.dark) .avatar-dropdown-item span {
+  color: #55555E !important;
+}
+
+/* Divisores internos no modo claro */
+html:not(.dark) [data-user-dropdown-divider],
+html:not(.dark) [data-user-dropdown-header] {
+  border-color: #E4E4E7 !important;
+}
+
+/* 19.5. ÍCONE HAMBÚRGUER (MENU) - LIGHT: #059669 (VERDE) */
+html:not(.dark) [data-menu-button],
+html:not(.dark) [data-menu-button] svg,
+html:not(.dark) [data-menu-icon],
+html:not(.dark) .navbar-menu-button,
+html:not(.dark) .navbar-menu-button svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+html:not(.dark) [data-menu-button]:hover,
+html:not(.dark) .navbar-menu-button:hover {
+  background-color: #F4F4F5 !important;
+  color: #047857 !important;
+}
+
+/* ======================================================== */
+/* PRESERVAÇÃO INTEGRAL DA VERSÃO DARK (MANTER AS CORES)    */
+/* ======================================================== */
+/* Ativo / Menu Dropdown no Modo Escuro: BG #262626 */
+html.dark [data-avatar-button][data-active="true"],
+html.dark [data-user-dropdown-menu],
+html.dark .avatar-dropdown-menu {
+  background-color: #262626 !important;
+  border-color: #3f3f46 !important;
+}
+
+/* Titulo Dark: Neutral-200 (#e5e5e5) */
+html.dark [data-user-name],
+html.dark .avatar-user-name {
+  color: #e5e5e5 !important;
+}
+
+/* Administrador Dark: Color #FFB900 */
+html.dark [data-user-role],
+html.dark .avatar-user-role {
+  color: #FFB900 !important;
+}
+
+/* ICONES Dark: Color #FFC21F (amarelo) */
+html.dark [data-user-dropdown-icon],
+html.dark [data-user-dropdown-icon] svg {
+  color: #FFC21F !important;
+  stroke: #FFC21F !important;
+}
+
+/* TEXTOS Dark: neutral-300 / neutral-400 / red-400 */
+html.dark [data-user-dropdown-text="sair"] {
+  color: #f87171 !important;
+}
+
+/* Ícone Hambúrguer Dark: Manter #a3a3a3 / hover #ffffff */
+html.dark [data-menu-button],
+html.dark [data-menu-button] svg,
+html.dark [data-menu-icon],
+html.dark .navbar-menu-button,
+html.dark .navbar-menu-button svg {
+  color: #a3a3a3 !important;
+  stroke: #a3a3a3 !important;
+}
+
+html.dark [data-menu-button]:hover,
+html.dark [data-menu-button]:hover svg,
+html.dark .navbar-menu-button:hover,
+html.dark .navbar-menu-button:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
 /* ======================================================== */
 /* REMOVE ÍCONE NATIVO ESCURO DE CALENDÁRIO                 */
 /* Mantém exclusivamente o ícone da biblioteca Lucide em branco #ffffff */

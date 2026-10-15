@@ -9,7 +9,7 @@ export const navbarStyles = {
 
   // Botão hambúrguer no mobile para abrir a Sidebar
   menuButton:
-    "md:hidden text-neutral-400 hover:text-white p-2 rounded-lg hover:bg-neutral-800 transition-colors",
+    "md:hidden text-[#059669] hover:text-emerald-700 dark:text-neutral-400 dark:hover:text-white p-2 rounded-lg hover:bg-[#F4F4F5] dark:hover:bg-neutral-800 transition-colors",
 
   // Breadcrumbs (Caminho da página)
   breadcrumbWrapper:
@@ -47,19 +47,23 @@ export const navbarStyles = {
 
   // Menu de Usuário / Perfil
   userButton:
-    "flex items-center gap-2.5 p-1 rounded-xl hover:bg-neutral-800 transition-colors cursor-pointer border border-transparent hover:border-neutral-700",
+    "flex items-center gap-2.5 p-1 rounded-xl transition-colors cursor-pointer border border-transparent hover:bg-[#262626] hover:border-neutral-700",
+  userButtonActive:
+    "bg-[#262626] border-neutral-700 shadow-md",
   avatar:
-    "w-8 h-8 rounded-lg bg-zinc-100 dark:bg-neutral-800 border border-[#D4D4D8] dark:border-neutral-700 flex items-center justify-center text-xs font-bold text-zinc-900 dark:text-amber-400 shrink-0",
+    "w-8 h-8 rounded-lg bg-[#F4F4F5] dark:bg-neutral-800 border border-[#D4D4D8] dark:border-neutral-700 flex items-center justify-center text-xs font-bold text-zinc-900 dark:text-[#FFB900] shrink-0",
   userMeta: "hidden lg:flex flex-col text-left",
-  userName: "text-xs font-semibold text-neutral-200 leading-tight",
-  userRole: "text-[10px] text-neutral-400 leading-tight",
+  userName: "text-xs font-semibold text-[#059669] dark:text-neutral-200 leading-tight",
+  userRole: "text-[10px] text-[#55555E] dark:text-[#FFB900] leading-tight font-medium",
 
   // Dropdown Flutuante (Menu do Usuário / Status)
   dropdownMenu:
-    "absolute right-0 top-full mt-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl py-1.5 z-40 text-left animate-in fade-in zoom-in-95 duration-100",
+    "absolute right-0 top-full mt-2 w-56 bg-[#F4F4F5] dark:bg-[#262626] border border-[#D4D4D8] dark:border-neutral-700 rounded-xl shadow-2xl py-1.5 z-40 text-left animate-in fade-in zoom-in-95 duration-100",
+  dropdownHeader:
+    "px-3.5 py-2.5 border-b border-[#E4E4E7] dark:border-neutral-800",
   dropdownItem:
-    "w-full px-3.5 py-2 text-xs font-medium text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors flex items-center gap-2.5 cursor-pointer",
-  dropdownDivider: "my-1 border-t border-neutral-800",
+    "w-full px-3.5 py-2 text-xs font-medium text-[#55555E] dark:text-neutral-300 hover:bg-[#262626] hover:text-white dark:hover:bg-neutral-800/80 dark:hover:text-white transition-colors flex items-center gap-2.5 cursor-pointer",
+  dropdownDivider: "my-1 border-t border-[#E4E4E7] dark:border-neutral-800",
 
   // Elementos Exclusivos da Navbar do Cliente
   clientBrandWrapper: "flex items-center gap-3",

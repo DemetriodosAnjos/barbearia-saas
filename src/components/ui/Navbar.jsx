@@ -224,10 +224,16 @@ export default function Navbar({
           <button
             type="button"
             onClick={onMenuClick}
-            className={navbarStyles.menuButton}
+            className={`${navbarStyles.menuButton} navbar-menu-button`}
             aria-label="Abrir menu de navegação"
+            data-menu-button="true"
           >
-            <ProjectIcon name="Menu" size={22} colorVariant="neutral" />
+            <ProjectIcon
+              name="Menu"
+              size={22}
+              className="text-[#059669] dark:text-neutral-400"
+              data-menu-icon="true"
+            />
           </button>
 
           <div className={navbarStyles.breadcrumbWrapper}>
@@ -363,8 +369,10 @@ export default function Navbar({
             <button
               type="button"
               onClick={() => setIsUserMenuOpen((prev) => !prev)}
-              className={navbarStyles.userButton}
+              className={`${navbarStyles.userButton} ${isUserMenuOpen ? navbarStyles.userButtonActive : ""}`}
               aria-expanded={isUserMenuOpen}
+              data-avatar-button="true"
+              data-active={isUserMenuOpen ? "true" : "false"}
             >
               <div
                 className={`${navbarStyles.avatar} navbar-avatar`}
@@ -373,9 +381,9 @@ export default function Navbar({
                 {resolvedUser.avatar}
               </div>
               <div className={navbarStyles.userMeta}>
-                <span className={navbarStyles.userName}>{resolvedUser.name}</span>
+                <span className={navbarStyles.userName} data-user-name="true">{resolvedUser.name}</span>
                 <span className={`${navbarStyles.userRole} flex items-center gap-1.5`}>
-                  <span>{resolvedUser.role}</span>
+                  <span data-user-role="true">{resolvedUser.role}</span>
                   {resolvedUser.isGoogleAuth ? (
                     <span
                       className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30"
@@ -391,7 +399,7 @@ export default function Navbar({
                     </span>
                   ) : (
                     <span
-                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-medium bg-neutral-800 text-neutral-400 border border-neutral-700"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-medium bg-[#F4F4F5] dark:bg-neutral-800 text-[#55555E] dark:text-neutral-400 border border-[#D4D4D8] dark:border-neutral-700"
                       title="Sessão autenticada por E-mail e Senha"
                     >
                       Senha
@@ -409,18 +417,23 @@ export default function Navbar({
 
             {/* Menu Suspenso */}
             {isUserMenuOpen && (
-              <div className={navbarStyles.dropdownMenu} role="menu" aria-label="Opções do usuário">
-                <div className="px-3.5 py-2.5 border-b border-neutral-800">
-                  <p className="text-xs font-semibold text-neutral-200">
+              <div
+                className={`${navbarStyles.dropdownMenu} avatar-dropdown-menu`}
+                role="menu"
+                aria-label="Opções do usuário"
+                data-user-dropdown-menu="true"
+              >
+                <div className={navbarStyles.dropdownHeader} data-user-dropdown-header="true">
+                  <p className="text-xs font-semibold text-[#059669] dark:text-neutral-200" data-user-name="true">
                     {resolvedUser.name}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] font-bold text-amber-400">
+                    <span className="text-[10px] font-bold text-[#55555E] dark:text-[#FFB900]" data-user-role="true">
                       {resolvedUser.role}
                     </span>
-                    <span className="text-neutral-600">•</span>
+                    <span className="text-neutral-400 dark:text-neutral-600">•</span>
                     {resolvedUser.isGoogleAuth ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-neutral-300">
+                      <span className="inline-flex items-center gap-1 text-[10px] text-[#55555E] dark:text-neutral-300">
                         <svg className="w-2.5 h-2.5" viewBox="0 0 24 24">
                           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                           <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -430,15 +443,15 @@ export default function Navbar({
                         Conta Google Vinculada
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
-                        <ProjectIcon name="Lock" size={10} colorVariant="inherit" />
-                        E-mail & Senha
+                      <span className="inline-flex items-center gap-1 text-[10px] text-[#55555E] dark:text-neutral-400" data-user-dropdown-auth="true">
+                        <ProjectIcon name="Lock" size={10} className="text-[#059669] dark:text-[#FFC21F]" data-user-dropdown-icon="email-senha" />
+                        <span data-user-dropdown-text="email-senha">E-mail & Senha</span>
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="px-3.5 py-2 flex sm:hidden items-center justify-between text-xs text-neutral-300 border-b border-neutral-800">
+                <div className="px-3.5 py-2 flex sm:hidden items-center justify-between text-xs text-[#55555E] dark:text-neutral-300 border-b border-[#E4E4E7] dark:border-neutral-800">
                   <span>Modo de Exibição</span>
                   <ThemeToggle />
                 </div>
@@ -450,10 +463,10 @@ export default function Navbar({
                     if (onProfileClick) onProfileClick();
                     setIsUserMenuOpen(false);
                   }}
-                  className={navbarStyles.dropdownItem}
+                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item`}
                 >
-                  <ProjectIcon name="User" size={15} colorVariant="amber" className="mr-2" />
-                  <span>Meu Perfil</span>
+                  <ProjectIcon name="User" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F]" data-user-dropdown-icon="perfil" />
+                  <span className="text-[#55555E] dark:text-neutral-300" data-user-dropdown-text="perfil">Meu Perfil</span>
                 </button>
 
                 <button
@@ -463,10 +476,10 @@ export default function Navbar({
                     if (onSettingsClick) onSettingsClick();
                     setIsUserMenuOpen(false);
                   }}
-                  className={navbarStyles.dropdownItem}
+                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item`}
                 >
-                  <ProjectIcon name="Settings" size={15} colorVariant="amber" className="mr-2" />
-                  <span>Configurações da Barbearia</span>
+                  <ProjectIcon name="Settings" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F]" data-user-dropdown-icon="configuracoes" />
+                  <span className="text-[#55555E] dark:text-neutral-300" data-user-dropdown-text="configuracoes">Configurações da Barbearia</span>
                 </button>
 
                 <button
@@ -476,13 +489,13 @@ export default function Navbar({
                     if (onSupportClick) onSupportClick();
                     setIsUserMenuOpen(false);
                   }}
-                  className={navbarStyles.dropdownItem}
+                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item`}
                 >
-                  <ProjectIcon name="MessageSquare" size={15} colorVariant="amber" className="mr-2" />
-                  <span>Suporte & Ajuda</span>
+                  <ProjectIcon name="MessageSquare" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F]" data-user-dropdown-icon="suporte" />
+                  <span className="text-[#55555E] dark:text-neutral-300" data-user-dropdown-text="suporte">Suporte & Ajuda</span>
                 </button>
 
-                <div className={navbarStyles.dropdownDivider} />
+                <div className={navbarStyles.dropdownDivider} data-user-dropdown-divider="true" />
 
                 {/* CLIQUE ABRE O MODAL EM VEZ DE SAIR DIRETO */}
                 <button
@@ -492,10 +505,10 @@ export default function Navbar({
                     setIsUserMenuOpen(false);
                     setIsLogoutModalOpen(true);
                   }}
-                  className={`${navbarStyles.dropdownItem} text-red-400 hover:text-red-300 hover:bg-red-950/30`}
+                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item text-[#55555E] dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50/60 dark:hover:bg-red-950/30`}
                 >
                   <ProjectIcon name="LogOut" size={15} colorVariant="danger" className="mr-2" />
-                  <span>Sair da Plataforma</span>
+                  <span className="text-[#55555E] dark:text-red-400" data-user-dropdown-text="sair">Sair da Plataforma</span>
                 </button>
               </div>
             )}
