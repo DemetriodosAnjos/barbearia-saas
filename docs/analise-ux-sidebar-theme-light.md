@@ -49,6 +49,10 @@ Quando um item de menu, submenu ou o menu **Financeiro** está ativo (selecionad
   - **Theme Light**: Texto `SaaS V1.5.4.0` configurado com a cor **`#059669`** (Verde Esmeralda).
   - **Theme Dark**: Texto `SaaS V1.5.4.0` configurado com a cor **`#ffffff`** (Branco Puro).
 
+### 3.5. Botão Expandir/Recolher (Chevron Left / Chevron Right)
+- **Ícones**: `ChevronLeft` (no cabeçalho expandido) e `ChevronRight` (no cabeçalho recolhido).
+- **Cor Unificada**: **`#ffffff`** (Branco Puro) tanto no Theme Light quanto no Theme Dark, garantindo contraste nítido e visibilidade imediata para alternância de layout.
+
 ---
 
 ## 4. Conformidade e Acessibilidade (WCAG 2.2 AA / AAA)

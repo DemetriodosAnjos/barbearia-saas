@@ -948,6 +948,28 @@ html.dark .sidebar-version-text {
   color: #ffffff !important;
 }
 
+/* Botão Expandir/Recolher do Menu Lateral - Ícone Chevron Left/Right: #ffffff (branco) */
+[data-sidebar-toggle-collapse] svg,
+[data-sidebar-toggle-collapse] .sidebar-chevron-toggle,
+.sidebar-chevron-toggle {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html:not(.dark) [data-sidebar-toggle-collapse] svg,
+html:not(.dark) [data-sidebar-toggle-collapse] .sidebar-chevron-toggle,
+html:not(.dark) .sidebar-chevron-toggle {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html.dark [data-sidebar-toggle-collapse] svg,
+html.dark [data-sidebar-toggle-collapse] .sidebar-chevron-toggle,
+html.dark .sidebar-chevron-toggle {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
 /* ======================================================== */
 /* REMOVE ÍCONE NATIVO ESCURO DE CALENDÁRIO                 */
 /* Mantém exclusivamente o ícone da biblioteca Lucide em branco #ffffff */

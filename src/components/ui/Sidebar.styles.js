@@ -22,7 +22,7 @@ export const sidebarStyles = {
   brandPlan:
     "text-[11px] font-semibold text-[#059669] dark:text-amber-500 uppercase tracking-wider mt-0.5",
   collapseButton:
-    "hidden md:flex text-neutral-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors shrink-0 items-center justify-center",
+    "hidden md:flex text-white hover:text-white p-1.5 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors shrink-0 items-center justify-center",
   closeMobileButton:
     "md:hidden text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors",
 

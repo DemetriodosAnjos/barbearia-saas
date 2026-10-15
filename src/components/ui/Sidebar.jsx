@@ -179,8 +179,14 @@ export default function Sidebar({
                 className={sidebarStyles.collapseButton}
                 title="Recolher menu lateral"
                 aria-label="Recolher menu lateral"
+                data-sidebar-toggle-collapse="true"
               >
-                <ProjectIcon name="ChevronLeft" size={18} />
+                <ProjectIcon
+                  name="ChevronLeft"
+                  size={18}
+                  colorVariant="white"
+                  className="text-white text-[#ffffff] sidebar-chevron-toggle"
+                />
               </button>
 
               {/* Botão de Fechar Mobile */}
@@ -221,11 +227,17 @@ export default function Sidebar({
             <button
               type="button"
               onClick={handleToggleCollapse}
-              className="text-neutral-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors"
+              className="text-white hover:text-white p-1.5 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors"
               title="Expandir menu lateral"
               aria-label="Expandir menu lateral"
+              data-sidebar-toggle-collapse="true"
             >
-              <ProjectIcon name="ChevronRight" size={18} />
+              <ProjectIcon
+                name="ChevronRight"
+                size={18}
+                colorVariant="white"
+                className="text-white text-[#ffffff] sidebar-chevron-toggle"
+              />
             </button>
           </div>
         )}

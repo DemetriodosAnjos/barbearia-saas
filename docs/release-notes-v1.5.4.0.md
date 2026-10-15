@@ -22,6 +22,9 @@
   - **Theme Dark**: O texto da versão utiliza a cor branca pura **`#ffffff`**, garantindo legibilidade e contraste absoluto sobre o fundo escuro do rodapé.
   - Regras de CSS com especificidade dedicada via seletor `[data-sidebar-version]` e classe `.sidebar-version-text` adicionadas em `src/index.css`.
 
+### 3. Botão Expandir/Recolher (Ícone Chevron Left/Right)
+- **Cor Unificada**: Alterada a cor dos ícones `ChevronLeft` e `ChevronRight` nos botões de recolher e expandir para **`#ffffff` (branco puro)** tanto no modo claro quanto escuro, com especificidade máxima aplicada via `src/index.css`.
+
 ---
 
 ## 📋 Arquivos Afetados
