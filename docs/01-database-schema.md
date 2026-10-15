@@ -146,18 +146,35 @@ Mapeamento oficial das colunas da tabela `public.profiles` e metadados sincroniz
 
 ---
 
-## 5. Tabela: `clients` (Cadastro de Clientes)
+## 5. Tabela: `clients` (Cadastro de Clientes, Prontuários e Retenção)
 
-| Nome da Coluna | Tipo de Dado | Descrição |
-|---|---|---|
-| `id` | `text` / `uuid` | ID do cliente. |
-| `barbershop_id` | `uuid` | Barbearia proprietária (Multi-tenant). |
-| `name` | `text` | Nome completo do cliente. |
-| `phone` | `text` | WhatsApp com DDD `(XX) XXXXX-XXXX`. |
-| `email` | `text` | E-mail opcional. |
-| `notes` | `text` | Histórico e preferências do cliente. |
-| `is_vip` | `boolean` | Indicador de cliente fidelizado. |
-| `created_at` | `timestamp with time zone` | Data de inclusão. |
+Mapeamento completo das **21 colunas SQL oficiais** da tabela `public.clients` no Supabase:
+
+| Nome da Coluna | Tipo de Dado (PostgreSQL) | Obrigatório | Descrição / Regra |
+|---|---|---|---|
+| `id` | `text` | Sim | Identificador único do cliente (ex: `'cli-17290001'` ou UUID). |
+| `barbershop_id` | `text` / `uuid` | Não | ID da barbearia proprietária para isolamento multi-tenant. |
+| `name` | `text` | Sim | Nome completo do cliente. |
+| `phone` | `text` | Sim | WhatsApp com DDD `(XX) XXXXX-XXXX` para confirmações e lembretes preditivos. |
+| `email` | `text` | Não | E-mail para recibos e comunicações. |
+| `cpf` | `text` | Não | CPF do cliente para notas fiscais e identificação única. |
+| `birth_date` | `date` | Não | Data de nascimento no formato `YYYY-MM-DD`. |
+| `notes` | `text` | Não | Observações gerais do prontuário (ex: estilo de corte habitual). |
+| `technical_notes` | `jsonb` | Não | Ficha técnica detalhada em JSON (`cutSpecs`, `beardSpecs`, `allergyAlert`, histórico de lâminas). |
+| `frequency_days` | `integer` | Não | Intervalo habitual de retorno em dias (padrão: `18`). Usado para recall preditivo. |
+| `is_vip` | `boolean` | Sim | Indicador de cliente VIP / fidelizado (padrão: `false`). |
+| `total_visits` | `integer` | Sim | Quantidade total de atendimentos concluídos (padrão: `0`). |
+| `total_spent` | `numeric(10,2)` | Sim | Total gasto acumulado pelo cliente (LTV) (padrão: `0.00`). |
+| `average_ticket` | `numeric(10,2)` | Sim | Ticket médio por atendimento (padrão: `0.00`). |
+| `preferred_barber` | `text` | Não | Barbeiro preferido do cliente para agendamento direto (padrão: `'Barbeiro Geral'`). |
+| `status` | `text` | Sim | Status da carteira: `'active'`, `'vip'`, `'at_risk'` (padrão: `'active'`). |
+| `last_visit` | `date` | Não | Data da última visita ou atendimento realizado. |
+| `loyalty_stamps` | `integer` | Não | Selos acumulados no programa de fidelidade (padrão: `0`). |
+| `subscription` | `jsonb` | Não | Dados de assinatura de clube de corte/barba se aplicável. |
+| `created_at` | `timestamptz` | Sim | Data e hora de cadastro no sistema (padrão: `now()`). |
+| `updated_at` | `timestamptz` | Sim | Data e hora da última atualização cadastral (padrão: `now()`). |
+
+> **Nota de Resiliência:** A tabela possui Row Level Security (RLS) habilitado com política permissiva `clients_all_access_policy` para leitura e escrita, garantindo que usuários operando a barbearia mantenham acesso contínuo aos dados tanto em ambiente com token anon quanto autenticado. O frontend mantém espelhamento instantâneo em `safeStorage` (`saas_clients_cache`), assegurando retenção de dados mesmo em caso de latência ou oscilação de rede.
 
 ---
 

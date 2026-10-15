@@ -734,12 +734,32 @@ export default function App() {
   const [services, setServices] = useState([]);
   const [products, setProducts] = useState([]);
   const [barbers, setBarbers] = useState([]);
-  const [clients, setClients] = useState([]);
+  const [clients, setClients] = useState(() => {
+    try {
+      const cached = safeStorage.getItem("saas_clients_cache");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return [];
+  });
   const [appointments, setAppointments] = useState([]);
   const [comandas, setComandas] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [connectionError, setConnectionError] = useState(null);
   const [contractNotice, setContractNotice] = useState(null);
+
+  // Sincronização reativa e persistência de Clientes no cache local
+  const handleUpdateClients = useCallback((updatedClients) => {
+    const list = Array.isArray(updatedClients) ? updatedClients : [];
+    setClients(list);
+    try {
+      safeStorage.setItem("saas_clients_cache", JSON.stringify(list));
+    } catch {}
+  }, []);
 
   // Handlers reativos para Serviços
   const handleAddService = useCallback((newServ) => {
@@ -815,17 +835,37 @@ export default function App() {
       const barbersResult = validateBarbersContract(barbersRes.data || []);
       const appointmentsResult = validateAppointmentsContract(appointmentsRes.data || []);
 
-      setServices(servicesResult.data);
-      setBarbers(barbersResult.data);
-      if (clientsRes?.data) {
-        setClients(clientsRes.data);
-      }
       setServices(servicesResult.data || []);
       setBarbers(barbersResult.data || []);
-      if (clientsRes?.data) {
-        setClients(clientsRes.data);
-      }
       setAppointments(appointmentsResult.data || []);
+
+      // Sincronização resiliente de clientes: mescla dados do banco com o cache local
+      if (clientsRes?.data && Array.isArray(clientsRes.data)) {
+        const dbClients = clientsRes.data;
+        setClients((prevCached) => {
+          const map = new Map();
+          // 1. Registros oficiais retornados pelo Supabase
+          dbClients.forEach((c) => {
+            if (c?.id) map.set(c.id, c);
+            else if (c?.phone) map.set(c.phone, c);
+          });
+          // 2. Preserva clientes recém-cadastrados no cache local que ainda não sincronizaram
+          if (Array.isArray(prevCached)) {
+            prevCached.forEach((c) => {
+              if (c?.id && !map.has(c.id)) {
+                map.set(c.id, c);
+              }
+            });
+          }
+          const merged = Array.from(map.values());
+          try {
+            safeStorage.setItem("saas_clients_cache", JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      } else if (clientsRes?.error) {
+        console.warn("Aviso na leitura de public.clients do Supabase (preservando cache local):", clientsRes.error.message || clientsRes.error);
+      }
 
       if (productsRes?.data && productsRes.data.length > 0) {
         const productsResult = validateProductsContract(productsRes.data);
@@ -1090,7 +1130,7 @@ export default function App() {
               appointments={appointments}
               onUpdateAppointments={setAppointments}
               clients={clients}
-              onUpdateClients={setClients}
+              onUpdateClients={handleUpdateClients}
               comandas={comandas}
               onUpdateComandas={setComandas}
               services={services}

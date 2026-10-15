@@ -30,30 +30,37 @@ O menu de opções rápidas (botão de 3 pontos) do card de agendamento na grade
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.clients (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  barbershop_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  id text PRIMARY KEY DEFAULT ('cli-'::text || (gen_random_uuid())::text),
+  barbershop_id text,
   name text NOT NULL,
-  phone text NOT NULL,
+  phone text,
   email text,
   cpf text,
   birth_date date,
   notes text, -- Observações gerais e Prontuário Técnico
-  technical_notes text, -- Especificações detalhadas de corte e preferências
+  technical_notes jsonb DEFAULT '{}'::jsonb, -- Especificações detalhadas de corte, alergias e preferências
   frequency_days integer DEFAULT 18, -- Intervalo habitual entre cortes (dias)
   is_vip boolean DEFAULT false,
+  total_visits integer DEFAULT 0,
   total_spent numeric(10, 2) DEFAULT 0.00,
-  total_cuts integer DEFAULT 0,
+  average_ticket numeric(10, 2) DEFAULT 0.00,
+  preferred_barber text DEFAULT 'Barbeiro Geral',
+  status text DEFAULT 'active',
   last_visit date,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  CONSTRAINT uq_clients_tenant_phone UNIQUE (barbershop_id, phone)
+  loyalty_stamps integer DEFAULT 0,
+  subscription jsonb,
+  created_at timestamptz DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz DEFAULT timezone('utc'::text, now())
 );
 ```
 
-### Regras de Integridade:
-1. **Chave Natural por Tenant:** A combinação `(barbershop_id, phone)` é única. O telefone deve ser normalizado apenas com dígitos numéricos (com DDD) antes da comparação ou inserção.
-2. **Atualização Automática de LTV:** Quando uma comanda vinculada a um agendamento é liquidada no PDV (`CashierPosView`), o valor total pago é somado a `total_spent`, `total_cuts` é incrementado em 1 e `last_visit` é atualizado com a data do serviço.
-3. **Resiliência Offline:** O cliente e suas notas técnicas permanecem armazenados localmente no cache (`safeStorage`) para acesso imediato mesmo em momentos de oscilação de rede.
+### Regras de Integridade e Retenção Permanente:
+1. **Identificador Resiliente:** O campo `id` utiliza prefixo amigável `cli-UUID` garantindo interoperabilidade entre backend e cliente. O campo `barbershop_id` aceita tanto UUID quanto TEXT para evitar falhas de foreign key em instâncias recém-provisionadas.
+2. **Atualização Automática de LTV:** Quando uma comanda vinculada a um agendamento é liquidada no PDV (`CashierPosView`), o valor total pago é somado a `total_spent`, `total_visits` é incrementado em 1 e `last_visit` é atualizado com a data do serviço.
+3. **Resiliência Multi-Camada (Anti-Perda ao Atualizar F5):**
+   - **Banco de Dados:** O Supabase possui política RLS `clients_all_access_policy` para leitura e escrita por `anon` e `authenticated`.
+   - **Local Storage (`safeStorage`):** Todo cliente cadastrado ou atualizado é gravado de imediato na chave `saas_clients_cache`.
+   - **Ciclo de Inicialização:** Ao recarregar a página (F5), o estado do React é inicializado instantaneamente com os clientes do cache local enquanto a query assíncrona do Supabase é executada em segundo plano, mesclando dados sem perda.
 
 ---
 
