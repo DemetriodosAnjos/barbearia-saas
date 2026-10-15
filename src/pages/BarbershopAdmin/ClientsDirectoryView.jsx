@@ -16,6 +16,7 @@ import Alert from "../../components/ui/Alert";
 import { SafeHtml } from "../../components/ui/SafeHtml";
 import ClientHistoryTimeline from "../../components/loyalty/ClientHistoryTimeline";
 import { validateSchema, SCHEMAS } from "../../utils/inputValidator";
+import { buildClientBookingUrl } from "../../utils/publicBookingUrl";
 import {
   Users,
   ArrowLeft,
@@ -413,12 +414,12 @@ export default function ClientsDirectoryView({
       client.frequencyDays - (client.daysSinceLastVisit || 0),
     );
 
-    // [Variável: formata o identificador do barbeiro preferido real do cliente]
-    const barberParam = encodeURIComponent(client.preferredBarber || "geral");
-
-    // [Link dinâmico: aponta para a agenda oficial do barbeiro preferido sem mock fixo de carlos]
-    const origin = window.location.origin;
-    const customLink = `${origin}/?screen=client-app&barbeiro=${barberParam}&cliente=${encodeURIComponent(client.name)}&telefone=${encodeURIComponent(client.phone)}`;
+    // [Link dinâmico e seguro: aponta para a URL pública real preservando subpastas do GitHub Pages (/barbearia-saas/)]
+    const customLink = buildClientBookingUrl({
+      barber: client.preferredBarber || "geral",
+      clientName: client.name,
+      clientPhone: client.phone,
+    });
 
     // Mensagem humanizada pronta com o link funcional
     const prebuiltMsg =

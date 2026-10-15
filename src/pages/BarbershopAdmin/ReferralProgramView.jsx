@@ -6,6 +6,7 @@ import { referralStyles } from "./ReferralProgramView.styles";
 import Button from "../../components/ui/Button";
 import ProjectIcon from "../../components/ui/ProjectIcon";
 import { SafeHtml } from "../../components/ui/SafeHtml";
+import { getAppBaseUrl } from "../../utils/publicBookingUrl";
 
 // [Função componente: consome o tenant real sem dados fictícios de fallback]
 export default function ReferralProgramView({ tenant, onBack }) {
@@ -14,9 +15,9 @@ export default function ReferralProgramView({ tenant, onBack }) {
   const [referrals, setReferrals] = useState([]);
   const [isLoadingReferrals, setIsLoadingReferrals] = useState(false);
 
-  // [Link dinâmico: resolve a URL oficial usando o origin atual e o slug real do tenant]
+  // [Link dinâmico: resolve a URL oficial usando o origin atual e o slug real do tenant preservando subpastas]
   const tenantSlug = tenant?.slug || tenant?.id || "barbearia";
-  const referralLink = `${window.location.origin}/?convite=${tenantSlug}`;
+  const referralLink = `${getAppBaseUrl()}/?convite=${tenantSlug}`;
 
   // [Efeito de ciclo de vida: busca indicações reais registradas para este tenant]
   useEffect(() => {

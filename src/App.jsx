@@ -35,6 +35,8 @@ export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const urlScreen = urlParams.get("screen");
   const urlBarber = urlParams.get("barbeiro");
+  const urlClientName = urlParams.get("cliente");
+  const urlClientPhone = urlParams.get("telefone");
   const pathname = typeof window !== "undefined" ? window.location.pathname : "";
 
   // 1. Auditoria Imediata Anti-Bypass no Inicializador de Rota
@@ -78,7 +80,8 @@ export default function App() {
   const initialScreen = (() => {
     if (storageAudit.tamperingDetected) return "login";
     if (urlScreen) return urlScreen;
-    if (urlBarber) return "login";
+    // Se a URL contiver parâmetros de agendamento público (barbeiro, cliente, telefone), abre direto a tela do cliente
+    if (urlBarber || urlClientName || urlClientPhone) return "client-app";
 
     try {
       const savedUserStr = safeStorage.getItem("saas_auth_user");
@@ -1202,6 +1205,20 @@ export default function App() {
               tenant={tenant}
               services={services}
               barbers={barbers}
+              initialBarberId={
+                (() => {
+                  if (!urlBarber) return "";
+                  const match = barbers.find(
+                    (b) =>
+                      b.id === urlBarber ||
+                      b.name?.toLowerCase() === urlBarber.toLowerCase() ||
+                      b.name?.toLowerCase().includes(urlBarber.toLowerCase())
+                  );
+                  return match ? match.id : "";
+                })()
+              }
+              initialClientName={urlClientName ? decodeURIComponent(urlClientName) : ""}
+              initialClientPhone={urlClientPhone ? decodeURIComponent(urlClientPhone) : ""}
               onFinishBooking={handleClientBookingFinished}
               onGoToLogin={handleGoToLogin}
             />

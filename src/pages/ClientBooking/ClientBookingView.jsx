@@ -85,6 +85,25 @@ export default function ClientBookingView({
   const [clientPhone, setClientPhone] = useState(initialClientPhone);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
+  // Sincroniza dados iniciais passados via URL pública ou props
+  useEffect(() => {
+    if (initialClientName) {
+      setClientName(initialClientName);
+    }
+  }, [initialClientName]);
+
+  useEffect(() => {
+    if (initialClientPhone) {
+      setClientPhone(initialClientPhone);
+    }
+  }, [initialClientPhone]);
+
+  useEffect(() => {
+    if (initialBarberId && (!selectedBarberId || selectedBarberId === "any")) {
+      setSelectedBarberId(initialBarberId);
+    }
+  }, [initialBarberId]);
+
   // Trava de horários passados no dia de hoje
   const isSelectedDateToday = () => {
     if (!bookingDate) return false;
