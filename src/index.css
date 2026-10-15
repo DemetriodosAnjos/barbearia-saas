@@ -767,15 +767,51 @@ html:not(.dark) [class*="submenuList"] {
   border-left-color: #E4E4E7 !important;
 }
 
-/* Item pai quando submenu filho está ativo */
-html:not(.dark) .sidebar-parent-active {
-  color: #059669 !important;
+/* Item pai (Menu Financeiro) no estado ativo:
+   - Fundo ativo (e hover): #262626 (Background container)
+   - Texto e Ícone (e hover): #ffffff (branco - texto e ícone)
+   - Efeito "aceso": #059669 (verde) */
+html:not(.dark) .sidebar-parent-active,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"] {
+  background-color: #262626 !important;
+  color: #ffffff !important;
   font-weight: 600 !important;
+  border-color: rgba(5, 150, 105, 0.45) !important;
+  box-shadow: inset 4px 0 0 #059669, 0 4px 14px rgba(5, 150, 105, 0.32) !important;
 }
 
-html:not(.dark) .sidebar-parent-active svg {
-  color: #059669 !important;
-  stroke: #059669 !important;
+html:not(.dark) .sidebar-parent-active span,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"] span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .sidebar-parent-active svg,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"] svg,
+html:not(.dark) .sidebar-parent-active .sidebar-chevron,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"] .sidebar-chevron {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Estado HOVER no menu Financeiro ativo: Mantém fundo #262626, texto/ícone #ffffff e efeito aceso #059669 */
+html:not(.dark) .sidebar-parent-active:hover,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"]:hover {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  box-shadow: inset 4px 0 0 #059669, 0 4px 16px rgba(5, 150, 105, 0.45) !important;
+}
+
+html:not(.dark) .sidebar-parent-active:hover span,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"]:hover span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .sidebar-parent-active:hover svg,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"]:hover svg,
+html:not(.dark) .sidebar-parent-active:hover .sidebar-chevron,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"]:hover .sidebar-chevron {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 /* ======================================================== */

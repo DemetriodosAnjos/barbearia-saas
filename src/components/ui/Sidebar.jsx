@@ -273,7 +273,7 @@ export default function Sidebar({
                     className={`
                       ${sidebarStyles.navItem}
                       sidebar-nav-item group
-                      ${isParentOfActive ? "text-amber-400 font-semibold sidebar-parent-active" : `${sidebarStyles.navItemInactive} sidebar-nav-item-inactive`}
+                      ${isParentOfActive ? `${sidebarStyles.navItemActive} sidebar-nav-item-active sidebar-parent-active` : `${sidebarStyles.navItemInactive} sidebar-nav-item-inactive`}
                     `}
                   >
                     <span className={sidebarStyles.navItemIcon}>

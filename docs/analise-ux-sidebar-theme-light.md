@@ -38,12 +38,12 @@ Aplicado às badges dos menus *Agenda de Atendimento*, *Clientes & Prontuários 
 - **Valor da TAG no menu "Agenda de Atendimento"**: `"2 hoje"` em `#ffffff` (Branco)
 - **Valor da TAG nos menus "Clientes & Prontuários Técnicos" e "Indique & Ganhe"**: Texto/número em `#ffffff` com fundo `#059669` tanto em repouso quanto em hover.
 
-### 3.3. Evento de Clique / Botão Ativo (Item Selecionado)
-Quando um item de menu ou submenu está ativo (selecionado):
+### 3.3. Evento de Clique / Botão Ativo (Item Selecionado & Menu Financeiro)
+Quando um item de menu, submenu ou o menu **Financeiro** está ativo (selecionado):
 - **Background Container**: `#262626` (Cinza Escuro Premium)
-- **Texto e Ícone**: `#ffffff` (Branco Puro)
+- **Texto e Ícone**: `#ffffff` (Branco Puro - inclui ícones e seta chevron)
 - **Efeito "Aceso"**: Borda lateral esquerda iluminada em `#059669` (verde esmeralda) com brilho exterior sutil (`box-shadow: inset 4px 0 0 #059669, 0 4px 14px rgba(5, 150, 105, 0.32)` e `border: 1px solid rgba(5, 150, 105, 0.45)`).
-- **Estado Hover no Botão Ativo**: Mantém com segurança o fundo `#262626`, texto/ícone em `#ffffff` e o efeito aceso `#059669`.
+- **Estado Hover no Botão Ativo (e Financeiro Ativo)**: Mantém com segurança o fundo `#262626`, texto/ícone em `#ffffff` e o efeito aceso `#059669` (`box-shadow: inset 4px 0 0 #059669, 0 4px 16px rgba(5, 150, 105, 0.45)`).
 
 ---
 
