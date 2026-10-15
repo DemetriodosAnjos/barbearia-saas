@@ -352,19 +352,7 @@ html:not(.dark) textarea::placeholder {
   color: #a1a1aa !important;            /* text-zinc-400 */
 }
 
-/* 16. Itens de Navegação / Sidebar Ativa no Modo Claro */
-html:not(.dark) .bg-amber-500\/10.text-amber-400,
-html:not(.dark) .bg-amber-500\/15.text-amber-400,
-html:not(.dark) [class*="navItemActive"] {
-  background-color: #ecfdf5 !important; /* bg-emerald-50 */
-  color: #047857 !important;            /* text-emerald-700 */
-  border-color: #a7f3d0 !important;      /* border-emerald-200 */
-}
-
-html:not(.dark) .bg-amber-500\/10.text-amber-400 svg,
-html:not(.dark) .bg-amber-500\/15.text-amber-400 svg {
-  color: #059669 !important;            /* text-emerald-600 */
-}
+/* 16. Itens de Navegação / Sidebar Ativa no Modo Claro: Especificado na Seção 19.7 Oficial */
 
 /* 17. Sombras Suaves para Profundidade no Modo Claro */
 html:not(.dark) .shadow-2xl,
@@ -610,6 +598,158 @@ html:not(.dark) [data-sidebar-plan-link]:hover [data-sidebar-plan-tag],
 html:not(.dark) [data-sidebar-plan-tag]:hover {
   background-color: #D1FAE5 !important;
   color: #047857 !important;
+}
+
+/* ======================================================== */
+/* 19.7. REFINAMENTO DO MENU LATERAL (SIDEBAR) - THEME LIGHT */
+/* ======================================================== */
+
+/* 1. Itens Inativos em Repouso */
+html:not(.dark) .sidebar-nav-item-inactive,
+html:not(.dark) .sidebar-sub-item-inactive,
+html:not(.dark) .sidebar-collapsed-inactive {
+  color: #55555E !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+html:not(.dark) .sidebar-nav-item-inactive svg,
+html:not(.dark) .sidebar-sub-item-inactive svg,
+html:not(.dark) .sidebar-collapsed-inactive svg {
+  color: #71717A !important;
+  stroke: #71717A !important;
+}
+
+/* 2. ESTADO HOVER (PARA ITENS NÃO ATIVOS):
+   - Fundo: #ECFDF5 (Background container)
+   - Texto: #059669 (verde)
+   - Ícone: #059669 (verde) */
+html:not(.dark) .sidebar-nav-item-inactive:hover,
+html:not(.dark) .sidebar-sub-item-inactive:hover,
+html:not(.dark) .sidebar-collapsed-inactive:hover,
+html:not(.dark) [data-sidebar-active="false"]:hover {
+  background-color: #ECFDF5 !important;
+  color: #059669 !important;
+  border-color: #A7F3D0 !important;
+}
+
+html:not(.dark) .sidebar-nav-item-inactive:hover span,
+html:not(.dark) .sidebar-sub-item-inactive:hover span,
+html:not(.dark) .sidebar-collapsed-inactive:hover span,
+html:not(.dark) [data-sidebar-active="false"]:hover span {
+  color: #059669 !important;
+}
+
+html:not(.dark) .sidebar-nav-item-inactive:hover svg,
+html:not(.dark) .sidebar-sub-item-inactive:hover svg,
+html:not(.dark) .sidebar-collapsed-inactive:hover svg,
+html:not(.dark) [data-sidebar-active="false"]:hover svg,
+html:not(.dark) .sidebar-nav-item:hover .sidebar-chevron {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* 3. TAGS / BADGES DOS MENUS (Agenda de Atendimento, Clientes & Prontuários Técnicos, Indique & Ganhe):
+   - TAG Background: #059669 (verde - container BG)
+   - TAG texto: #ffffff (Branco) */
+html:not(.dark) .sidebar-nav-badge,
+html:not(.dark) [data-sidebar-badge],
+html:not(.dark) [class*="navItemBadge"] {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.35) !important;
+}
+
+html:not(.dark) .sidebar-nav-badge *,
+html:not(.dark) [data-sidebar-badge] *,
+html:not(.dark) [class*="navItemBadge"] * {
+  color: #ffffff !important;
+}
+
+/* Ponto badge indicador no modo encolhido */
+html:not(.dark) .sidebar-collapsed-item [class*="bg-amber-500"],
+html:not(.dark) .sidebar-collapsed-badge {
+  background-color: #059669 !important;
+  box-shadow: 0 0 6px rgba(5, 150, 105, 0.6) !important;
+}
+
+/* 4. EVENTO CLIQUE BOTÃO ATIVO:
+   - Fundo ativo (e hover): #262626 (Background container)
+   - Texto e Ícone: #ffffff (branco - texto e ícone)
+   - Efeito "aceso": #059669 (verde) */
+html:not(.dark) .sidebar-nav-item-active,
+html:not(.dark) .sidebar-sub-item-active,
+html:not(.dark) .sidebar-collapsed-active,
+html:not(.dark) [data-sidebar-active="true"] {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  border-color: rgba(5, 150, 105, 0.45) !important;
+  box-shadow: inset 4px 0 0 #059669, 0 4px 14px rgba(5, 150, 105, 0.32) !important;
+}
+
+html:not(.dark) .sidebar-nav-item-active span,
+html:not(.dark) .sidebar-sub-item-active span,
+html:not(.dark) .sidebar-collapsed-active span,
+html:not(.dark) [data-sidebar-active="true"] span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .sidebar-nav-item-active svg,
+html:not(.dark) .sidebar-sub-item-active svg,
+html:not(.dark) .sidebar-collapsed-active svg,
+html:not(.dark) [data-sidebar-active="true"] svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Estado HOVER no BOTÃO ATIVO: Mantém fundo #262626, texto/ícone #ffffff e efeito aceso #059669 */
+html:not(.dark) .sidebar-nav-item-active:hover,
+html:not(.dark) .sidebar-sub-item-active:hover,
+html:not(.dark) .sidebar-collapsed-active:hover,
+html:not(.dark) [data-sidebar-active="true"]:hover {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  box-shadow: inset 4px 0 0 #059669, 0 4px 16px rgba(5, 150, 105, 0.45) !important;
+}
+
+html:not(.dark) .sidebar-nav-item-active:hover span,
+html:not(.dark) .sidebar-sub-item-active:hover span,
+html:not(.dark) .sidebar-collapsed-active:hover span,
+html:not(.dark) [data-sidebar-active="true"]:hover span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .sidebar-nav-item-active:hover svg,
+html:not(.dark) .sidebar-sub-item-active:hover svg,
+html:not(.dark) .sidebar-collapsed-active:hover svg,
+html:not(.dark) [data-sidebar-active="true"]:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Preservação da TAG sobre botão ativo no Light */
+html:not(.dark) .sidebar-nav-item-active .sidebar-nav-badge,
+html:not(.dark) [data-sidebar-active="true"] [data-sidebar-badge] {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+/* Submenu container (linha divisória vertical) */
+html:not(.dark) [class*="submenuList"] {
+  border-left-color: #E4E4E7 !important;
+}
+
+/* Item pai quando submenu filho está ativo */
+html:not(.dark) .sidebar-parent-active {
+  color: #059669 !important;
+  font-weight: 600 !important;
+}
+
+html:not(.dark) .sidebar-parent-active svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
 }
 
 /* ======================================================== */

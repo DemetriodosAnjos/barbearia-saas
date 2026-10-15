@@ -240,16 +240,19 @@ export default function Sidebar({
                     }
                     if (onClose) onClose();
                   }}
+                  data-sidebar-item={item.id}
+                  data-sidebar-active={isActive ? "true" : "false"}
                   className={`
                     ${sidebarStyles.navItemCollapsed}
-                    ${isActive ? sidebarStyles.navItemActive : sidebarStyles.navItemInactive}
+                    sidebar-collapsed-item group
+                    ${isActive ? `${sidebarStyles.navItemActive} sidebar-collapsed-active` : `${sidebarStyles.navItemInactive} sidebar-collapsed-inactive`}
                   `}
                 >
                   <span className={sidebarStyles.navItemIcon}>
                     {renderItemIcon(item.icon)}
                   </span>
                   {item.badge && (
-                    <span className="w-2 h-2 rounded-full bg-amber-500 absolute top-2 right-2 ring-2 ring-neutral-900" />
+                    <span className="w-2 h-2 rounded-full bg-amber-500 absolute top-2 right-2 ring-2 ring-neutral-900 sidebar-collapsed-badge" />
                   )}
                 </button>
               );
@@ -265,9 +268,12 @@ export default function Sidebar({
                   <button
                     type="button"
                     onClick={() => toggleSubmenu(item.id)}
+                    data-sidebar-item={item.id}
+                    data-sidebar-active={isParentOfActive ? "true" : "false"}
                     className={`
                       ${sidebarStyles.navItem}
-                      ${isParentOfActive ? "text-amber-400 font-semibold" : sidebarStyles.navItemInactive}
+                      sidebar-nav-item group
+                      ${isParentOfActive ? "text-amber-400 font-semibold sidebar-parent-active" : `${sidebarStyles.navItemInactive} sidebar-nav-item-inactive`}
                     `}
                   >
                     <span className={sidebarStyles.navItemIcon}>
@@ -281,6 +287,7 @@ export default function Sidebar({
                     <svg
                       className={`
                         ${sidebarStyles.chevronIcon}
+                        sidebar-chevron transition-colors
                         ${isExpanded ? sidebarStyles.chevronExpanded : ""}
                       `}
                       fill="none"
@@ -310,9 +317,12 @@ export default function Sidebar({
                               if (onSelect) onSelect(child.id);
                               if (onClose) onClose();
                             }}
+                            data-sidebar-subitem={child.id}
+                            data-sidebar-active={isChildActive ? "true" : "false"}
                             className={`
                               ${sidebarStyles.subItem}
-                              ${isChildActive ? sidebarStyles.subItemActive : sidebarStyles.subItemInactive}
+                              sidebar-sub-item group
+                              ${isChildActive ? `${sidebarStyles.subItemActive} sidebar-sub-item-active` : `${sidebarStyles.subItemInactive} sidebar-sub-item-inactive`}
                             `}
                           >
                             <span className="text-sm shrink-0">
@@ -339,9 +349,12 @@ export default function Sidebar({
                   if (onSelect) onSelect(item.id);
                   if (onClose) onClose();
                 }}
+                data-sidebar-item={item.id}
+                data-sidebar-active={isDirectActive ? "true" : "false"}
                 className={`
                   ${sidebarStyles.navItem}
-                  ${isDirectActive ? sidebarStyles.navItemActive : sidebarStyles.navItemInactive}
+                  sidebar-nav-item group
+                  ${isDirectActive ? `${sidebarStyles.navItemActive} sidebar-nav-item-active` : `${sidebarStyles.navItemInactive} sidebar-nav-item-inactive`}
                 `}
               >
                 <span className={sidebarStyles.navItemIcon}>
@@ -349,7 +362,10 @@ export default function Sidebar({
                 </span>
                 <span className={sidebarStyles.navItemLabel}>{item.label}</span>
                 {item.badge && (
-                  <span className={sidebarStyles.navItemBadge}>
+                  <span
+                    data-sidebar-badge={item.id}
+                    className={`${sidebarStyles.navItemBadge} sidebar-nav-badge`}
+                  >
                     {item.badge}
                   </span>
                 )}

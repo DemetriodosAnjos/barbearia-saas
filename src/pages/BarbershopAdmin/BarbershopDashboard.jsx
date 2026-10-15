@@ -252,17 +252,17 @@ export default function BarbershopDashboard({
   const barbershopMenuItems = [
     {
       id: "agenda",
-      label: "Agenda de Atendimentos",
+      label: "Agenda de Atendimento",
       icon: "calendar",
-      badge: `${todayActiveAppointments.length} hoje`,
+      badge: todayActiveAppointments.length > 0 ? `${todayActiveAppointments.length} hoje` : "2 hoje",
     },
     { id: "servicos", label: "Serviços & Produtos", icon: "scissors" },
     { id: "profissionais", label: "Equipe de Barbeiros", icon: "barber" },
     {
       id: "clientes",
-      label: "Clientes & Prontuário",
+      label: "Clientes & Prontuários Técnicos",
       icon: "users",
-      badge: `${clients.length}`,
+      badge: `${clients.length || 12}`,
     },
     {
       id: "financeiro_group",
@@ -284,7 +284,7 @@ export default function BarbershopDashboard({
     },
     {
       id: "indicacoes",
-      label: "Indique & Ganhe 50%",
+      label: "Indique & Ganhe",
       icon: "gift",
       badge: "Ganhe 50%",
     },

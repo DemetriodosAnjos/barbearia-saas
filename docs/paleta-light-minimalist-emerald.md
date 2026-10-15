@@ -99,4 +99,29 @@ Refinamento da paleta de cores clara aplicado ao topo da barra lateral de navega
 | **TAG Planos (Borda)** | `border-amber-500/30` | `Border: #A7F3D0` | `#A7F3D0` (Verde suave discreto) |
 | **TAG Planos (Texto)** | `text-amber-300` | `Color: #059669` | `#059669` (Verde escuro de alta legibilidade) |
 
+---
+
+## 8. Refinamento Oficial dos Menus e Submenus da Sidebar (Theme Light)
+
+Refinamento da paleta de cores clara aplicado à navegação do menu lateral (`Sidebar.jsx`), abrangendo menus de clique único, acordeões/submenus, badges informativos e estados interativos de foco/ativo.
+
+### 8.1. Tabela Comparativa de Tokens de Navegação
+
+| Elemento / Estado | Versão DARK (Preservada) | Versão LIGHT (Refinada) | Especificação & Código Hex |
+| :--- | :--- | :--- | :--- |
+| **Item Inativo (Repouso)** | `text-neutral-400` / Transparente | `Color: #55555E` / Transparente | Texto e ícone em cinza neutro elegante (#55555E / #71717A) |
+| **Item Inativo (Hover)** | `hover:bg-neutral-800/60` / `text-neutral-100` | `BG: #ECFDF5` / `Color: #059669` | Fundo suave verde esmeralda (#ECFDF5), texto e ícone em verde (#059669) |
+| **Botão Ativo (Clique)** | `bg-amber-500/10 text-amber-400` | `BG: #262626` / `Color: #ffffff` | Fundo escuro premium (#262626) com texto e ícone brancos (#ffffff) |
+| **Efeito "Aceso" (Ativo)** | Borda âmbar suave | `box-shadow: inset 4px 0 0 #059669, 0 4px 14px rgba(5,150,105,0.32)` | Traço lateral esquerdo iluminado e glow verde (#059669) de alto destaque |
+| **Hover no Botão Ativo** | `bg-amber-500/15 text-amber-300` | `BG: #262626` / `Color: #ffffff` | Mantém o fundo escuro (#262626), texto/ícone brancos (#ffffff) e efeito aceso verde |
+| **TAGs / Badges (Geral)** | `bg-amber-600 text-white` | `BG: #059669` / `Color: #ffffff` | Fundo verde esmeralda (#059669) com texto branco (#ffffff) |
+| **TAG "Agenda de Atendimento"**| `bg-amber-600 text-white` | `BG: #059669` / `Texto: "2 hoje" #ffffff` | Badge de contagem em destaque (#059669) com texto branco |
+| **TAG "Clientes & Prontuários"**| `bg-amber-600 text-white` | `BG: #059669` / `Texto: #ffffff` | Badge cadastral com fundo verde esmeralda (#059669) |
+| **TAG "Indique & Ganhe"** | `bg-amber-600 text-white` | `BG: #059669` / `Texto: #ffffff` | Badge promocional com fundo verde esmeralda (#059669) |
+
+### 8.2. Preservação Estrita da Versão Dark
+- Todas as regras acima são isoladas sob `html:not(.dark)`.
+- No tema escuro (`html.dark`), a navegação continua utilizando o padrão Âmbar Nobre (`bg-amber-500/10`, `text-amber-400`, `bg-amber-600`).
+
+
 
