@@ -633,10 +633,12 @@ html:not(.dark) [data-sidebar-active="false"]:hover {
   border-color: #A7F3D0 !important;
 }
 
-html:not(.dark) .sidebar-nav-item-inactive:hover span,
+html:not(.dark) .sidebar-nav-item-inactive:hover > span:not(.sidebar-nav-badge):not([data-sidebar-badge]):not([class*="navItemBadge"]),
+html:not(.dark) .sidebar-nav-item-inactive:hover [class*="navItemLabel"],
 html:not(.dark) .sidebar-sub-item-inactive:hover span,
 html:not(.dark) .sidebar-collapsed-inactive:hover span,
-html:not(.dark) [data-sidebar-active="false"]:hover span {
+html:not(.dark) [data-sidebar-active="false"]:hover > span:not(.sidebar-nav-badge):not([data-sidebar-badge]):not([class*="navItemBadge"]),
+html:not(.dark) [data-sidebar-active="false"]:hover [class*="navItemLabel"] {
   color: #059669 !important;
 }
 
@@ -651,10 +653,24 @@ html:not(.dark) .sidebar-nav-item:hover .sidebar-chevron {
 
 /* 3. TAGS / BADGES DOS MENUS (Agenda de Atendimento, Clientes & Prontuários Técnicos, Indique & Ganhe):
    - TAG Background: #059669 (verde - container BG)
-   - TAG texto: #ffffff (Branco) */
+   - TAG texto/número: #ffffff (Branco puro) inclusive no estado hover */
 html:not(.dark) .sidebar-nav-badge,
 html:not(.dark) [data-sidebar-badge],
-html:not(.dark) [class*="navItemBadge"] {
+html:not(.dark) [class*="navItemBadge"],
+html:not(.dark) .sidebar-nav-item:hover .sidebar-nav-badge,
+html:not(.dark) .sidebar-nav-item-inactive:hover .sidebar-nav-badge,
+html:not(.dark) .sidebar-nav-item-active:hover .sidebar-nav-badge,
+html:not(.dark) .sidebar-nav-item:hover [data-sidebar-badge],
+html:not(.dark) .sidebar-nav-item-inactive:hover [data-sidebar-badge],
+html:not(.dark) .sidebar-nav-item-active:hover [data-sidebar-badge],
+html:not(.dark) .sidebar-nav-item:hover [class*="navItemBadge"],
+html:not(.dark) .sidebar-nav-item-inactive:hover [class*="navItemBadge"],
+html:not(.dark) .sidebar-nav-item-active:hover [class*="navItemBadge"],
+html:not(.dark) [data-sidebar-active]:hover .sidebar-nav-badge,
+html:not(.dark) [data-sidebar-active]:hover [data-sidebar-badge],
+html:not(.dark) [data-sidebar-active]:hover [class*="navItemBadge"],
+html:not(.dark) .sidebar-nav-badge:hover,
+html:not(.dark) [data-sidebar-badge]:hover {
   background-color: #059669 !important;
   color: #ffffff !important;
   font-weight: 700 !important;
@@ -664,7 +680,17 @@ html:not(.dark) [class*="navItemBadge"] {
 
 html:not(.dark) .sidebar-nav-badge *,
 html:not(.dark) [data-sidebar-badge] *,
-html:not(.dark) [class*="navItemBadge"] * {
+html:not(.dark) [class*="navItemBadge"] *,
+html:not(.dark) .sidebar-nav-item:hover .sidebar-nav-badge *,
+html:not(.dark) .sidebar-nav-item-inactive:hover .sidebar-nav-badge *,
+html:not(.dark) .sidebar-nav-item-active:hover .sidebar-nav-badge *,
+html:not(.dark) .sidebar-nav-item:hover [data-sidebar-badge] *,
+html:not(.dark) .sidebar-nav-item-inactive:hover [data-sidebar-badge] *,
+html:not(.dark) .sidebar-nav-item-active:hover [data-sidebar-badge] *,
+html:not(.dark) [data-sidebar-active]:hover .sidebar-nav-badge *,
+html:not(.dark) [data-sidebar-active]:hover [data-sidebar-badge] *,
+html:not(.dark) .sidebar-nav-badge:hover *,
+html:not(.dark) [data-sidebar-badge]:hover * {
   color: #ffffff !important;
 }
 

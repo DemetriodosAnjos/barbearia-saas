@@ -364,7 +364,7 @@ export default function Sidebar({
                 {item.badge && (
                   <span
                     data-sidebar-badge={item.id}
-                    className={`${sidebarStyles.navItemBadge} sidebar-nav-badge`}
+                    className={`${sidebarStyles.navItemBadge} sidebar-nav-badge text-white! group-hover:text-white! group-focus:text-white!`}
                   >
                     {item.badge}
                   </span>

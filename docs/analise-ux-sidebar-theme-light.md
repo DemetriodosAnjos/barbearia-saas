@@ -34,9 +34,9 @@ Quando o cursor do mouse passa por cima de qualquer menu ou submenu inativo:
 ### 3.2. TAGs / Badges Informativas
 Aplicado às badges dos menus *Agenda de Atendimento*, *Clientes & Prontuários Técnicos* e *Indique & Ganhe*:
 - **TAG Background Container**: `#059669` (Verde Esmeralda)
-- **TAG Texto**: `#ffffff` (Branco Puro)
+- **TAG Texto / Número**: `#ffffff` (Branco Puro) **inclusive no estado hover** do botão e da própria tag.
 - **Valor da TAG no menu "Agenda de Atendimento"**: `"2 hoje"` em `#ffffff` (Branco)
-- **Valor da TAG nos menus "Clientes & Prontuários Técnicos" e "Indique & Ganhe"**: Texto em `#ffffff` com fundo `#059669`
+- **Valor da TAG nos menus "Clientes & Prontuários Técnicos" e "Indique & Ganhe"**: Texto/número em `#ffffff` com fundo `#059669` tanto em repouso quanto em hover.
 
 ### 3.3. Evento de Clique / Botão Ativo (Item Selecionado)
 Quando um item de menu ou submenu está ativo (selecionado):
