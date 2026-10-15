@@ -932,6 +932,22 @@ html.dark .sidebar-brand-title {
   color: #f5f5f5 !important;
 }
 
+/* Versão do Sistema no Rodapé do Sidebar: Light #059669 (verde) / Dark #ffffff (branco) */
+[data-sidebar-version],
+.sidebar-version-text {
+  color: #059669;
+}
+
+html:not(.dark) [data-sidebar-version],
+html:not(.dark) .sidebar-version-text {
+  color: #059669 !important;
+}
+
+html.dark [data-sidebar-version],
+html.dark .sidebar-version-text {
+  color: #ffffff !important;
+}
+
 /* ======================================================== */
 /* REMOVE ÍCONE NATIVO ESCURO DE CALENDÁRIO                 */
 /* Mantém exclusivamente o ícone da biblioteca Lucide em branco #ffffff */

@@ -65,7 +65,7 @@ export const sidebarStyles = {
   userWrapper: "flex items-center gap-3 text-left overflow-hidden min-w-0",
   userInfo: "flex flex-col truncate min-w-0",
   userName: "text-xs font-semibold text-neutral-200 truncate",
-  userVersion: "text-[11px] font-mono font-bold text-amber-400 truncate mt-0.5",
+  userVersion: "text-[11px] font-mono font-bold text-[#059669] dark:text-[#ffffff] truncate mt-0.5",
   logoutButton:
     "text-neutral-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-neutral-800/80 transition-colors cursor-pointer shrink-0",
 };

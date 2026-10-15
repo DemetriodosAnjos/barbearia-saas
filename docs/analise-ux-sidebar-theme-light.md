@@ -43,7 +43,11 @@ Quando um item de menu, submenu ou o menu **Financeiro** está ativo (selecionad
 - **Background Container**: `#262626` (Cinza Escuro Premium)
 - **Texto e Ícone**: `#ffffff` (Branco Puro - inclui ícones e seta chevron)
 - **Efeito "Aceso"**: Borda lateral esquerda iluminada em `#059669` (verde esmeralda) com brilho exterior sutil (`box-shadow: inset 4px 0 0 #059669, 0 4px 14px rgba(5, 150, 105, 0.32)` e `border: 1px solid rgba(5, 150, 105, 0.45)`).
-- **Estado Hover no Botão Ativo (e Financeiro Ativo)**: Mantém com segurança o fundo `#262626`, texto/ícone em `#ffffff` e o efeito aceso `#059669` (`box-shadow: inset 4px 0 0 #059669, 0 4px 16px rgba(5, 150, 105, 0.45)`).
+### 3.4. Rodapé e Indicador de Versão (`SaaS V1.5.4.0`)
+- **Remoção de Duplicidades**: A `DIV` contendo o nome do gestor (`Demetrio A L dos Anjos`) e o botão com ícone de logout (`Sair`) foi removida da base da Sidebar, tanto no modo expandido quanto no recolhido, simplificando a área e evitando poluição visual (o logout permanece acessível no menu suspenso do Avatar do Navbar).
+- **Indicador de Versão Centralizado**:
+  - **Theme Light**: Texto `SaaS V1.5.4.0` configurado com a cor **`#059669`** (Verde Esmeralda).
+  - **Theme Dark**: Texto `SaaS V1.5.4.0` configurado com a cor **`#ffffff`** (Branco Puro).
 
 ---
 
@@ -52,3 +56,6 @@ Quando um item de menu, submenu ou o menu **Financeiro** está ativo (selecionad
 - **Texto e Ícone Branco (`#ffffff`) sobre o Fundo do Botão Ativo (`#262626`)**: Contraste de **11.9:1** (Nível AAA).
 - **Texto Verde (`#059669`) sobre o Fundo Hover (`#ECFDF5`)**: Contraste de **4.64:1** (Nível AA aprovado).
 - **Texto Branco (`#ffffff`) sobre a TAG Verde (`#059669`)**: Contraste de **4.64:1** (Nível AA aprovado).
+- **Texto Branco (`#ffffff`) da Versão sobre Fundo Dark (`#171717` / `#262626`)**: Contraste de **15.2:1** (Nível AAA).
+- **Texto Verde (`#059669`) da Versão sobre Fundo Light (`#ffffff` / `#F4F4F5`)**: Contraste de **4.55:1** (Nível AA aprovado).
+
