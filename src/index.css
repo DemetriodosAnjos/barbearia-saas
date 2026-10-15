@@ -506,10 +506,21 @@ html:not(.dark) .avatar-dropdown-item:focus span {
   color: #ffffff !important;
 }
 
+/* ÍCONES: Meu Perfil, Configurações da Barbearia, Suporte & Ajuda, Sair da plataforma -> Hover #ffffff (branca) */
+.avatar-dropdown-item:hover [data-user-dropdown-icon],
+.avatar-dropdown-item:hover [data-user-dropdown-icon] svg,
+.avatar-dropdown-item:hover svg,
+.avatar-dropdown-item:focus [data-user-dropdown-icon],
+.avatar-dropdown-item:focus [data-user-dropdown-icon] svg,
+.avatar-dropdown-item:focus svg,
 html:not(.dark) .avatar-dropdown-item:hover [data-user-dropdown-icon],
-html:not(.dark) .avatar-dropdown-item:hover svg {
-  color: #059669 !important;
-  stroke: #059669 !important;
+html:not(.dark) .avatar-dropdown-item:hover [data-user-dropdown-icon] svg,
+html:not(.dark) .avatar-dropdown-item:hover svg,
+html:not(.dark) .avatar-dropdown-item:focus [data-user-dropdown-icon],
+html:not(.dark) .avatar-dropdown-item:focus [data-user-dropdown-icon] svg,
+html:not(.dark) .avatar-dropdown-item:focus svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 /* ICONES: E-mail & Senha, Meu perfil, Configurações da Barbearia, Suporte & Ajuda -> Color #059669 (verde) */
@@ -624,11 +635,34 @@ html.dark .avatar-user-role {
   color: #FFB900 !important;
 }
 
-/* ICONES Dark: Color #FFC21F (amarelo) */
+/* ICONES Dark: Color #FFC21F (amarelo) em repouso */
 html.dark [data-user-dropdown-icon],
 html.dark [data-user-dropdown-icon] svg {
   color: #FFC21F !important;
   stroke: #FFC21F !important;
+}
+
+/* ÍCONES Dark no hover do menu Usuario / Administrador: #ffffff (branca) */
+html.dark .avatar-dropdown-item:hover [data-user-dropdown-icon],
+html.dark .avatar-dropdown-item:hover [data-user-dropdown-icon] svg,
+html.dark .avatar-dropdown-item:hover svg,
+html.dark .avatar-dropdown-item:focus [data-user-dropdown-icon],
+html.dark .avatar-dropdown-item:focus [data-user-dropdown-icon] svg,
+html.dark .avatar-dropdown-item:focus svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html.dark .avatar-dropdown-item:hover,
+html.dark .avatar-dropdown-item:focus {
+  background-color: #3f3f46 !important;
+}
+
+html.dark .avatar-dropdown-item:hover span,
+html.dark .avatar-dropdown-item:focus span,
+html.dark .avatar-dropdown-item:hover [data-user-dropdown-text],
+html.dark .avatar-dropdown-item:focus [data-user-dropdown-text] {
+  color: #ffffff !important;
 }
 
 /* TEXTOS Dark: neutral-300 / neutral-400 / red-400 */

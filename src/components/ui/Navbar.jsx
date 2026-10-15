@@ -463,10 +463,10 @@ export default function Navbar({
                     if (onProfileClick) onProfileClick();
                     setIsUserMenuOpen(false);
                   }}
-                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item`}
+                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item group`}
                 >
-                  <ProjectIcon name="User" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F]" data-user-dropdown-icon="perfil" />
-                  <span className="text-[#55555E] dark:text-neutral-300" data-user-dropdown-text="perfil">Meu Perfil</span>
+                  <ProjectIcon name="User" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white transition-colors" data-user-dropdown-icon="perfil" />
+                  <span className="text-[#55555E] dark:text-neutral-300 group-hover:text-white group-focus:text-white transition-colors" data-user-dropdown-text="perfil">Meu Perfil</span>
                 </button>
 
                 <button
@@ -476,10 +476,10 @@ export default function Navbar({
                     if (onSettingsClick) onSettingsClick();
                     setIsUserMenuOpen(false);
                   }}
-                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item`}
+                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item group`}
                 >
-                  <ProjectIcon name="Settings" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F]" data-user-dropdown-icon="configuracoes" />
-                  <span className="text-[#55555E] dark:text-neutral-300" data-user-dropdown-text="configuracoes">Configurações da Barbearia</span>
+                  <ProjectIcon name="Settings" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white transition-colors" data-user-dropdown-icon="configuracoes" />
+                  <span className="text-[#55555E] dark:text-neutral-300 group-hover:text-white group-focus:text-white transition-colors" data-user-dropdown-text="configuracoes">Configurações da Barbearia</span>
                 </button>
 
                 <button
@@ -489,10 +489,10 @@ export default function Navbar({
                     if (onSupportClick) onSupportClick();
                     setIsUserMenuOpen(false);
                   }}
-                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item`}
+                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item group`}
                 >
-                  <ProjectIcon name="MessageSquare" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F]" data-user-dropdown-icon="suporte" />
-                  <span className="text-[#55555E] dark:text-neutral-300" data-user-dropdown-text="suporte">Suporte & Ajuda</span>
+                  <ProjectIcon name="MessageSquare" size={15} className="mr-2 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white transition-colors" data-user-dropdown-icon="suporte" />
+                  <span className="text-[#55555E] dark:text-neutral-300 group-hover:text-white group-focus:text-white transition-colors" data-user-dropdown-text="suporte">Suporte & Ajuda</span>
                 </button>
 
                 <div className={navbarStyles.dropdownDivider} data-user-dropdown-divider="true" />
@@ -505,10 +505,10 @@ export default function Navbar({
                     setIsUserMenuOpen(false);
                     setIsLogoutModalOpen(true);
                   }}
-                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item text-[#55555E] dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50/60 dark:hover:bg-red-950/30`}
+                  className={`${navbarStyles.dropdownItem} avatar-dropdown-item group text-[#55555E] dark:text-red-400 hover:text-white dark:hover:text-white`}
                 >
-                  <ProjectIcon name="LogOut" size={15} colorVariant="danger" className="mr-2" />
-                  <span className="text-[#55555E] dark:text-red-400" data-user-dropdown-text="sair">Sair da Plataforma</span>
+                  <ProjectIcon name="LogOut" size={15} colorVariant="danger" className="mr-2 group-hover:text-white group-focus:text-white transition-colors" data-user-dropdown-icon="sair" />
+                  <span className="text-[#55555E] dark:text-red-400 group-hover:text-white group-focus:text-white transition-colors" data-user-dropdown-text="sair">Sair da Plataforma</span>
                 </button>
               </div>
             )}

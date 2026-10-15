@@ -70,7 +70,8 @@ Refinamento da paleta de cor clara aplicado ao botão de usuário ativo e ao men
 | **AVATAR ("DE")** | `bg-neutral-800` / `#FFB900` | `BG #F4F4F5` | Permanece na cor cinza claro (#F4F4F5) com stroke #D4D4D8 |
 | **Título do Profissional** | `Color #e5e5e5` (`neutral-200`) | `Color #059669` (verde) | "Demetrio A L dos Anjos" em verde esmeralda de alta legibilidade |
 | **Cargo / Papel** | `Color #FFB900` (âmbar nobre) | `Color #55555E` / `#A1A1AA` | "Administrador" em tom de cinza neutro balanceado |
-| **Ícones do Menu** | `Color #FFC21F` (amarelo) | `Color #059669` (verde) | Ícones: *E-mail & Senha*, *Meu perfil*, *Configurações da Barbearia*, *Suporte & Ajuda* |
+| **Ícones do Menu (Repouso)** | `Color #FFC21F` (amarelo) | `Color #059669` (verde) | Ícones: *E-mail & Senha*, *Meu perfil*, *Configurações da Barbearia*, *Suporte & Ajuda* |
+| **Ícones do Menu (Hover)** | `Color #ffffff` (branca) | `Color #ffffff` (branca) | Quando o mouse passa por cima: *Meu Perfil*, *Configurações da Barbearia*, *Suporte & Ajuda*, *Sair da Plataforma* transicionam para branco puro (#ffffff) |
 | **Textos do Menu** | `Color #d4d4d8` / `text-red-400` | `Color #55555E` (hover: `#ffffff`) | Textos: *E-mail & Senha*, *Meu perfil*, *Configurações da Barbearia*, *Suporte & Ajuda*, *Sair da Plataforma* |
 | **Hover nos Itens do Menu** | `hover:bg-neutral-800` | `hover:bg-[#262626]` | Quando o mouse passa por cima das opções do menu |
 | **Bordas e Divisores** | `border-neutral-800` (`#262626`) | `border-[#E4E4E7]` / `border-[#D4D4D8]` | Traços refinados em zinc-200 e zinc-300 |
