@@ -131,9 +131,13 @@ export function normalizeClientRecord(c) {
 export default function ClientsDirectoryView({
   clientsList = [],
   onUpdateClients,
+  onUpdateClient,
   onNavigateToBooking,
   onBack,
   tenant,
+  barbers = [],
+  appointments = [],
+  onUpdateAppointments,
 }) {
   // [Estado: inicializado com a lista normalizada da barbearia ou do cache local seguro]
   const [clients, setClients] = useState(() => {
@@ -164,6 +168,212 @@ export default function ClientsDirectoryView({
 
   // Modal de Prontuário Técnico
   const [selectedClientForRecord, setSelectedClientForRecord] = useState(null);
+
+  // Modal de Edição Completa de Cliente (Nome, Telefone, Total Gasto R$, Barbeiro Preferido e Frequência Habitual)
+  const [editingClient, setEditingClient] = useState(null);
+  const [fullEditForm, setFullEditForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    cpf: "",
+    totalSpent: "0,00",
+    frequencyDays: "18",
+    preferredBarber: "",
+    notes: "",
+  });
+  const [isSavingFullEdit, setIsSavingFullEdit] = useState(false);
+  const [fullEditError, setFullEditError] = useState("");
+
+  const handleOpenFullEditClient = (client) => {
+    if (!client) return;
+    setFullEditError("");
+    const rawSpent = Number(client.totalSpent ?? client.total_spent ?? 0);
+    const safeSpent = Number.isFinite(rawSpent) ? rawSpent : 0;
+    const rawFreq = Number(client.frequencyDays ?? client.frequency_days ?? 18);
+    const safeFreq = rawFreq > 0 ? rawFreq : 18;
+
+    const defaultBarber =
+      client.preferredBarber ||
+      client.preferred_barber ||
+      (barbers && barbers.length > 0 ? barbers[0].name : "Barbeiro Geral");
+
+    setFullEditForm({
+      name: client.name || "",
+      phone: client.phone || "",
+      email: client.email || "",
+      cpf: client.cpf || "",
+      totalSpent: safeSpent.toFixed(2).replace(".", ","),
+      frequencyDays: String(safeFreq),
+      preferredBarber: defaultBarber,
+      notes: client.notes || client.technicalNotes?.cutSpecs || "",
+    });
+    setEditingClient(client);
+  };
+
+  const handleSaveFullEditClient = async () => {
+    if (!editingClient) return;
+    const trimmedName = (fullEditForm.name || "").trim();
+    if (!trimmedName) {
+      setFullEditError("O nome do cliente é obrigatório.");
+      return;
+    }
+    const cleanPhone = (fullEditForm.phone || "").trim();
+    if (!cleanPhone) {
+      setFullEditError("O telefone/WhatsApp do cliente é obrigatório.");
+      return;
+    }
+
+    setIsSavingFullEdit(true);
+    setFullEditError("");
+
+    try {
+      const sanitizedName = DOMPurify.sanitize(trimmedName, { ALLOWED_TAGS: [] });
+      const sanitizedPhone = DOMPurify.sanitize(cleanPhone, { ALLOWED_TAGS: [] });
+      const sanitizedEmail = DOMPurify.sanitize((fullEditForm.email || "").trim(), { ALLOWED_TAGS: [] });
+      const sanitizedCpf = DOMPurify.sanitize((fullEditForm.cpf || "").trim(), { ALLOWED_TAGS: [] });
+      const sanitizedNotes = DOMPurify.sanitize((fullEditForm.notes || "").trim(), { ALLOWED_TAGS: [] });
+      const selectedBarber = fullEditForm.preferredBarber || "Barbeiro Geral";
+
+      // Parse de Total Gasto (R$) com suporte a formato livre digitado pelo gestor
+      const cleanSpentStr = String(fullEditForm.totalSpent || "0")
+        .replace(/R\$/g, "")
+        .replace(/\s/g, "")
+        .replace(/\./g, "")
+        .replace(",", ".");
+      const parsedSpent = parseFloat(cleanSpentStr);
+      const safeSpent = Number.isFinite(parsedSpent) ? Math.max(0, parsedSpent) : 0;
+
+      // Parse de Frequência Habitual (validado entre 1 e 365 dias)
+      const parsedFreq = parseInt(fullEditForm.frequencyDays, 10);
+      const safeFreq = Number.isFinite(parsedFreq)
+        ? Math.min(365, Math.max(1, parsedFreq))
+        : 18;
+
+      const oldPhone = editingClient.phone;
+      const oldName = editingClient.name;
+
+      const existingTechNotes =
+        typeof editingClient.technical_notes === "object" && editingClient.technical_notes
+          ? editingClient.technical_notes
+          : typeof editingClient.technicalNotes === "object" && editingClient.technicalNotes
+          ? editingClient.technicalNotes
+          : {};
+
+      const updatedRecord = normalizeClientRecord({
+        ...editingClient,
+        name: sanitizedName,
+        phone: sanitizedPhone,
+        email: sanitizedEmail,
+        cpf: sanitizedCpf,
+        totalSpent: safeSpent,
+        total_spent: safeSpent,
+        frequencyDays: safeFreq,
+        frequency_days: safeFreq,
+        preferredBarber: selectedBarber,
+        preferred_barber: selectedBarber,
+        notes: sanitizedNotes,
+        technical_notes: {
+          ...existingTechNotes,
+          total_spent: safeSpent,
+          frequency_days: safeFreq,
+          preferred_barber: selectedBarber,
+          notes: sanitizedNotes,
+          cutSpecs: sanitizedNotes || existingTechNotes.cutSpecs,
+        },
+        technicalNotes: {
+          ...existingTechNotes,
+          cutSpecs: sanitizedNotes || existingTechNotes.cutSpecs,
+        },
+      });
+
+      // 1. Atualiza lista de clientes local
+      const updatedList = clients.map((c) =>
+        c.id === editingClient.id ? updatedRecord : c
+      );
+      setClients(updatedList);
+
+      if (onUpdateClients) {
+        onUpdateClients(updatedList);
+      }
+
+      // 2. Persistência em cache local
+      try {
+        safeStorage.setItem("saas_clients_cache", JSON.stringify(updatedList));
+        safeStorage.setItem("barbearia_saas_clients_v2", JSON.stringify(updatedList));
+      } catch {}
+
+      // 3. Sincroniza em cascata nos agendamentos ativos na Agenda
+      const cleanDigitsOldPhone = (oldPhone || "").replace(/\D/g, "");
+      const cleanDigitsNewPhone = (sanitizedPhone || "").replace(/\D/g, "");
+      const cleanOldName = (oldName || "").trim().toLowerCase();
+
+      if (onUpdateAppointments && Array.isArray(appointments) && appointments.length > 0) {
+        const updatedAppts = appointments.map((appt) => {
+          const aPhone = (appt.clientPhone || appt.client_phone || "").replace(/\D/g, "");
+          const aName = (appt.clientName || appt.client_name || "").trim().toLowerCase();
+          const matches =
+            (cleanDigitsOldPhone && aPhone === cleanDigitsOldPhone) ||
+            (cleanDigitsNewPhone && aPhone === cleanDigitsNewPhone) ||
+            (cleanOldName && aName === cleanOldName) ||
+            (editingClient.id && (appt.clientId === editingClient.id || appt.client_id === editingClient.id));
+
+          if (matches) {
+            return {
+              ...appt,
+              clientName: sanitizedName,
+              clientPhone: sanitizedPhone,
+              client_name: sanitizedName,
+              client_phone: sanitizedPhone,
+            };
+          }
+          return appt;
+        });
+        onUpdateAppointments(updatedAppts);
+      }
+
+      // 4. Se houver handler central onUpdateClient
+      if (onUpdateClient) {
+        onUpdateClient(updatedRecord, {
+          syncAppointments: true,
+          oldPhone,
+          oldName,
+        });
+      }
+
+      // 5. Persistência no Supabase
+      try {
+        if (
+          editingClient.id &&
+          !String(editingClient.id).startsWith("cli-mock") &&
+          !String(editingClient.id).startsWith("temp-")
+        ) {
+          await supabase
+            .from("clients")
+            .update({
+              name: sanitizedName,
+              phone: sanitizedPhone,
+              email: sanitizedEmail,
+              cpf: sanitizedCpf,
+              total_spent: safeSpent,
+              frequency_days: safeFreq,
+              preferred_barber: selectedBarber,
+              notes: sanitizedNotes,
+              technical_notes: updatedRecord.technical_notes,
+            })
+            .eq("id", editingClient.id);
+        }
+      } catch (dbErr) {
+        console.warn("Aviso na atualização do cliente no Supabase:", dbErr);
+      }
+
+      setEditingClient(null);
+    } catch (err) {
+      console.error("Erro ao salvar cadastro do cliente:", err);
+      setFullEditError("Erro ao salvar os dados do cliente.");
+    } finally {
+      setIsSavingFullEdit(false);
+    }
+  };
 
   // Modal de Cadastro de Novo Cliente
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
@@ -785,6 +995,16 @@ export default function ClientsDirectoryView({
               icon: "Bell",
               onClick: (row) => handleOpenRecallModal(row),
             },
+            // AÇÃO DE EDIÇÃO CADASTRAL COMPLETA (LÁPIS/EDIT3)
+            {
+              label: "Editar Cadastro Completo do Cliente",
+              icon: "Edit3",
+              iconSize: 16,
+              className:
+                "w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white dark:hover:text-amber-400 [html:not(.dark)_&]:hover:text-emerald-700 hover:bg-neutral-800 dark:hover:bg-neutral-800 [html:not(.dark)_&]:hover:bg-zinc-100 transition-colors cursor-pointer",
+              onClick: (row) => handleOpenFullEditClient(row),
+            },
+            // AÇÃO DE PRONTUÁRIO & FICHA TÉCNICA (ARQUIVO)
             {
               label: "Abrir Prontuário & Ficha Técnica",
               icon: "FileText",
@@ -1098,6 +1318,143 @@ export default function ClientsDirectoryView({
             />
           </div>
         </div>
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* MODAL 4: EDIÇÃO CADASTRAL COMPLETA DE CLIENTE            */}
+      {/* ======================================================== */}
+      <Modal
+        isOpen={!!editingClient}
+        size="lg"
+        onClose={() => setEditingClient(null)}
+        title={`Editar Cadastro de Cliente: ${editingClient?.name || ""}`}
+        footer={
+          <div className="w-full flex items-center justify-between gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setEditingClient(null)}
+              disabled={isSavingFullEdit}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveFullEditClient}
+              disabled={isSavingFullEdit}
+              className="bg-amber-600 hover:bg-amber-500 font-bold dark:bg-amber-600 dark:hover:bg-amber-500 [html:not(.dark)_&]:bg-[#059669] [html:not(.dark)_&]:hover:bg-[#047857]"
+            >
+              {isSavingFullEdit ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </div>
+        }
+      >
+        {editingClient && (
+          <div className="space-y-4 text-left text-xs">
+            <p className="text-neutral-400 [html:not(.dark)_&]:text-zinc-600">
+              Altere os dados cadastrais, métricas financeiras e preferências do cliente com sincronização imediata no Supabase e na agenda de atendimentos.
+            </p>
+
+            {fullEditError && (
+              <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-red-300 text-xs font-semibold">
+                {fullEditError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <Input
+                label="Nome Completo *"
+                value={fullEditForm.name}
+                onChange={(e) =>
+                  setFullEditForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="Ex: Carlos Eduardo Silveira"
+                required
+              />
+
+              <Input
+                label="WhatsApp / Celular com DDD *"
+                value={fullEditForm.phone}
+                onChange={(e) =>
+                  setFullEditForm((prev) => ({ ...prev, phone: e.target.value }))
+                }
+                mask="phone"
+                placeholder="(00) 00000-0000"
+                required
+              />
+
+              <Input
+                label="Total Gasto (R$ - Saldo Acumulado)"
+                value={fullEditForm.totalSpent}
+                onChange={(e) =>
+                  setFullEditForm((prev) => ({ ...prev, totalSpent: e.target.value }))
+                }
+                placeholder="0,00"
+                helperText="Campo financeiro livre para ajuste manual pelo gestor"
+              />
+
+              <Select
+                label="Barbeiro Preferido"
+                value={fullEditForm.preferredBarber}
+                onChange={(e) =>
+                  setFullEditForm((prev) => ({ ...prev, preferredBarber: e.target.value }))
+                }
+                options={[
+                  ...(barbers && barbers.length > 0
+                    ? barbers.map((b) => ({
+                        value: b.name,
+                        label: `${b.name} (${b.role || "Barbeiro"})`,
+                      }))
+                    : [
+                        { value: "Barbeiro Geral", label: "Barbeiro Geral" },
+                        { value: "Carlos Gestor", label: "Carlos Gestor" },
+                        { value: "Marcos Navalha", label: "Marcos Navalha" },
+                      ]),
+                ]}
+              />
+
+              <Input
+                label="Frequência Habitual (em dias)"
+                type="number"
+                min="1"
+                max="365"
+                value={fullEditForm.frequencyDays}
+                onChange={(e) =>
+                  setFullEditForm((prev) => ({ ...prev, frequencyDays: e.target.value }))
+                }
+                placeholder="18"
+                helperText="Intervalo habitual entre atendimentos (usado no lembrete preditivo)"
+              />
+
+              <Input
+                label="CPF do Cliente (Opcional)"
+                value={fullEditForm.cpf}
+                onChange={(e) =>
+                  setFullEditForm((prev) => ({ ...prev, cpf: e.target.value }))
+                }
+                mask="cpf"
+                placeholder="000.000.000-00"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-neutral-300 [html:not(.dark)_&]:text-zinc-800 block">
+                Prontuário Técnico / Ficha de Corte:
+              </label>
+              <textarea
+                rows={3}
+                value={fullEditForm.notes}
+                onChange={(e) =>
+                  setFullEditForm((prev) => ({ ...prev, notes: e.target.value }))
+                }
+                placeholder="Ex: Fade alto na navalha, tesoura no topo sem diminuir muito. Alergia a álcool pós-barba."
+                className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-neutral-100 text-xs focus:outline-none focus:border-amber-500 leading-relaxed font-sans [html:not(.dark)_&]:bg-zinc-50 [html:not(.dark)_&]:border-zinc-300 [html:not(.dark)_&]:text-zinc-900"
+              />
+              <span className="text-[10px] text-neutral-500 [html:not(.dark)_&]:text-zinc-500">
+                Observações de estilo, lâmina, pente e cuidados técnicos consultados em atendimentos futuros.
+              </span>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -209,16 +209,17 @@ export default function Table({
                               onClick={() => act.onClick(row)}
                               title={act.label}
                               className={
-                                act.isDanger
+                                act.className ||
+                                (act.isDanger
                                   ? tableStyles.actionBtnDanger
-                                  : tableStyles.actionBtn
+                                  : tableStyles.actionBtn)
                               }
                             >
                               {typeof act.icon === "string" ? (
                                 <ProjectIcon
                                   name={act.icon}
-                                  size={15}
-                                  colorVariant={act.isDanger ? "danger" : "amber"}
+                                  size={act.iconSize || 15}
+                                  colorVariant={act.colorVariant || (act.isDanger ? "danger" : "amber")}
                                 />
                               ) : (
                                 act.icon

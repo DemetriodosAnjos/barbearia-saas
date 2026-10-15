@@ -17,6 +17,7 @@ import Select from "../../components/ui/Select";
 import ProjectIcon from "../../components/ui/ProjectIcon";
 import { SafeHtml } from "../../components/ui/SafeHtml";
 import MercadoPagoCheckoutModal from "../../components/payments/MercadoPagoCheckoutModal";
+import { safeStorage } from "../../utils/safeStorage";
 
 // [Função componente: consome serviços reais sem catálogo fictício de fallback]
 export default function ScheduleView({
@@ -29,6 +30,7 @@ export default function ScheduleView({
   onAddService,
   clients = [],
   onUpdateClients,
+  onUpdateClient,
   onNavigateToClients,
   onNavigateToCashier,
   onBack,
@@ -81,6 +83,198 @@ export default function ScheduleView({
   const [quickServiceName, setQuickServiceName] = useState("");
   const [quickServicePrice, setQuickServicePrice] = useState("");
   const [quickServiceDuration, setQuickServiceDuration] = useState("30");
+
+  // Modal de Edição Rápida de Cliente em Atendimento (Nome e Telefone com foco automático e sincronização em cascata)
+  const [isQuickEditClientOpen, setIsQuickEditClientOpen] = useState(false);
+  const [quickEditClientForm, setQuickEditClientForm] = useState({
+    name: "",
+    phone: "",
+    originalName: "",
+    originalPhone: "",
+  });
+  const [isSavingQuickEditClient, setIsSavingQuickEditClient] = useState(false);
+  const [quickEditClientError, setQuickEditClientError] = useState("");
+
+  const handleOpenQuickEditClient = (appt) => {
+    if (!appt) return;
+    setQuickEditClientError("");
+    setQuickEditClientForm({
+      name: appt.clientName || appt.client_name || "",
+      phone: appt.clientPhone || appt.client_phone || "",
+      originalName: appt.clientName || appt.client_name || "",
+      originalPhone: appt.clientPhone || appt.client_phone || "",
+    });
+    setIsQuickEditClientOpen(true);
+  };
+
+  const handleSaveQuickEditClient = async () => {
+    const trimmedName = (quickEditClientForm.name || "").trim();
+    if (!trimmedName) {
+      setQuickEditClientError("O nome do cliente é obrigatório.");
+      return;
+    }
+    const cleanPhone = (quickEditClientForm.phone || "").trim();
+    setIsSavingQuickEditClient(true);
+    setQuickEditClientError("");
+
+    try {
+      const sanitizedName = DOMPurify.sanitize(trimmedName, { ALLOWED_TAGS: [] });
+      const sanitizedPhone = DOMPurify.sanitize(cleanPhone, { ALLOWED_TAGS: [] });
+      const oldPhone = quickEditClientForm.originalPhone;
+      const oldName = quickEditClientForm.originalName;
+
+      // 1. Atualiza selectedAppointment imediatamente no modal atual
+      const updatedSelected = {
+        ...selectedAppointment,
+        clientName: sanitizedName,
+        clientPhone: sanitizedPhone,
+        client_name: sanitizedName,
+        client_phone: sanitizedPhone,
+      };
+      setSelectedAppointment(updatedSelected);
+
+      // 2. Propaga para todos os agendamentos na grade (agenda)
+      const cleanDigitsOldPhone = (oldPhone || "").replace(/\D/g, "");
+      const cleanDigitsNewPhone = (sanitizedPhone || "").replace(/\D/g, "");
+      const cleanOldName = (oldName || "").trim().toLowerCase();
+
+      const updatedAppts = currentAppointments.map((appt) => {
+        const aPhone = (appt.clientPhone || appt.client_phone || "").replace(/\D/g, "");
+        const aName = (appt.clientName || appt.client_name || "").trim().toLowerCase();
+        const matches =
+          (cleanDigitsOldPhone && aPhone === cleanDigitsOldPhone) ||
+          (cleanDigitsNewPhone && aPhone === cleanDigitsNewPhone) ||
+          (cleanOldName && aName === cleanOldName) ||
+          appt.id === selectedAppointment.id;
+
+        if (matches) {
+          return {
+            ...appt,
+            clientName: sanitizedName,
+            clientPhone: sanitizedPhone,
+            client_name: sanitizedName,
+            client_phone: sanitizedPhone,
+          };
+        }
+        return appt;
+      });
+
+      if (onUpdateAppointments) {
+        onUpdateAppointments(updatedAppts);
+      }
+
+      // 3. Atualiza ou insere na base de clientes (Supabase + local cache)
+      const existingClient = clients.find((c) => {
+        const cPhone = (c.phone || "").replace(/\D/g, "");
+        const cName = (c.name || "").trim().toLowerCase();
+        return (
+          (cleanDigitsOldPhone && cPhone === cleanDigitsOldPhone) ||
+          (cleanDigitsNewPhone && cPhone === cleanDigitsNewPhone) ||
+          (cleanOldName && cName === cleanOldName)
+        );
+      });
+
+      const updatedClientRecord = existingClient
+        ? {
+            ...existingClient,
+            name: sanitizedName,
+            phone: sanitizedPhone,
+          }
+        : {
+            id: `cli-${Date.now()}`,
+            name: sanitizedName,
+            phone: sanitizedPhone,
+            barbershop_id: tenant?.id,
+            status: "active",
+            frequency_days: 18,
+            frequencyDays: 18,
+            total_spent: 0,
+            totalSpent: 0,
+            total_visits: 1,
+            totalVisits: 1,
+            preferred_barber: selectedAppointment?.barberName || "Barbeiro Geral",
+            preferredBarber: selectedAppointment?.barberName || "Barbeiro Geral",
+          };
+
+      const updatedClientsList = existingClient
+        ? clients.map((c) => (c.id === existingClient.id ? updatedClientRecord : c))
+        : [updatedClientRecord, ...clients];
+
+      if (onUpdateClients) {
+        onUpdateClients(updatedClientsList);
+      }
+
+      if (onUpdateClient) {
+        onUpdateClient(updatedClientRecord, {
+          syncAppointments: true,
+          oldPhone,
+          oldName,
+        });
+      }
+
+      try {
+        safeStorage.setItem("saas_clients_cache", JSON.stringify(updatedClientsList));
+        safeStorage.setItem("barbearia_saas_clients_v2", JSON.stringify(updatedClientsList));
+      } catch {}
+
+      // 4. Persiste no Supabase
+      try {
+        if (
+          selectedAppointment.id &&
+          !String(selectedAppointment.id).startsWith("mock-") &&
+          !String(selectedAppointment.id).startsWith("temp-") &&
+          !String(selectedAppointment.id).startsWith("apt-")
+        ) {
+          await supabase
+            .from("appointments")
+            .update({
+              client_name: sanitizedName,
+              client_phone: sanitizedPhone,
+            })
+            .eq("id", selectedAppointment.id);
+        }
+
+        if (
+          existingClient?.id &&
+          !String(existingClient.id).startsWith("cli-mock") &&
+          !String(existingClient.id).startsWith("temp-")
+        ) {
+          await supabase
+            .from("clients")
+            .update({
+              name: sanitizedName,
+              phone: sanitizedPhone,
+            })
+            .eq("id", existingClient.id);
+        } else if (tenant?.id) {
+          await supabase
+            .from("clients")
+            .upsert(
+              [
+                {
+                  barbershop_id: tenant.id,
+                  name: sanitizedName,
+                  phone: sanitizedPhone,
+                  status: "active",
+                  frequency_days: 18,
+                  preferred_barber: selectedAppointment?.barberName || "Barbeiro Geral",
+                },
+              ],
+              { onConflict: "barbershop_id,phone" }
+            );
+        }
+      } catch (dbErr) {
+        console.warn("Aviso na persistência Supabase (contingência local ativa):", dbErr);
+      }
+
+      setIsQuickEditClientOpen(false);
+    } catch (err) {
+      console.error("Erro ao salvar cliente na edição rápida:", err);
+      setQuickEditClientError("Ocorreu um erro ao salvar o cliente.");
+    } finally {
+      setIsSavingQuickEditClient(false);
+    }
+  };
 
   // 1. Abertura do Modal de Detalhes
   const handleOpenDetails = (appt) => {
@@ -803,9 +997,22 @@ export default function ScheduleView({
                 {/* CardInfo #01: Título 'Cliente Agendado', Nome, Telefone, Tag Status e Link 'Cancelar horário' */}
                 <div className="relative p-4 bg-neutral-950 border border-neutral-800 rounded-2xl flex justify-between items-start">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-neutral-500">
-                      Cliente Agendado
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-neutral-500">
+                        Cliente Agendado
+                      </span>
+                      {selectedAppointment.status !== "completed" &&
+                        selectedAppointment.status !== "cancelled" && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenQuickEditClient(selectedAppointment)}
+                            className="text-xs font-semibold text-amber-400 hover:text-amber-300 dark:text-amber-400 dark:hover:text-amber-300 [html:not(.dark)_&]:text-[#059669] [html:not(.dark)_&]:hover:text-[#047857] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded px-1"
+                            title="Editar nome e telefone do cliente agendado"
+                          >
+                            Editar
+                          </button>
+                        )}
+                    </div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2 mt-0.5">
                       <SafeHtml html={selectedAppointment.clientName} />
                       {selectedAppointment.isVip && (
@@ -1368,6 +1575,73 @@ export default function ScheduleView({
               className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-neutral-100 text-xs focus:outline-none focus:border-amber-500 leading-relaxed font-sans"
             />
           </div>
+        </div>
+      </Modal>
+
+      {/* MODAL 7: EDIÇÃO RÁPIDA DE CLIENTE EM ATENDIMENTO (COMPACTO E SOBREPOSTO) */}
+      <Modal
+        isOpen={isQuickEditClientOpen}
+        size="sm"
+        onClose={() => setIsQuickEditClientOpen(false)}
+        title="Editar Dados do Cliente"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <Button
+              variant="secondary"
+              onClick={() => setIsQuickEditClientOpen(false)}
+              disabled={isSavingQuickEditClient}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveQuickEditClient}
+              disabled={isSavingQuickEditClient}
+              className="bg-amber-600 hover:bg-amber-500 font-bold dark:bg-amber-600 dark:hover:bg-amber-500 [html:not(.dark)_&]:bg-[#059669] [html:not(.dark)_&]:hover:bg-[#047857]"
+            >
+              {isSavingQuickEditClient ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-left text-xs">
+          <p className="text-neutral-400 [html:not(.dark)_&]:text-zinc-600">
+            Atualize o nome e WhatsApp do cliente. As alterações são sincronizadas imediatamente na agenda atual e no banco de dados:
+          </p>
+
+          {quickEditClientError && (
+            <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-red-300 text-xs font-semibold">
+              {quickEditClientError}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <Input
+              label="Nome do Cliente *"
+              value={quickEditClientForm.name}
+              onChange={(e) =>
+                setQuickEditClientForm((prev) => ({ ...prev, name: e.target.value }))
+              }
+              placeholder="Ex: João da Silva"
+              autoFocus
+              required
+            />
+
+            <Input
+              label="Celular / WhatsApp com DDD *"
+              value={quickEditClientForm.phone}
+              onChange={(e) =>
+                setQuickEditClientForm((prev) => ({ ...prev, phone: e.target.value }))
+              }
+              mask="phone"
+              placeholder="(00) 00000-0000"
+              required
+            />
+          </div>
+
+          <p className="text-[11px] text-neutral-500 dark:text-neutral-500 [html:not(.dark)_&]:text-zinc-500">
+            Foco automático no nome. Edita com agilidade sem perder o contexto do atendimento atual.
+          </p>
         </div>
       </Modal>
     </div>

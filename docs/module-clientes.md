@@ -84,3 +84,26 @@ O Prontuário é composto pelas seguintes camadas de informação:
 ## 5. Auditoria de Privacidade e LGPD
 - **Consentimento e Prontuário:** As notas técnicas são de uso restrito da equipe de barbeiros para atendimento personalizado.
 - **Anonimização:** Em conformidade com o motor LGPD do SaaS (`lgpdPurgeEngine.ts`), clientes inativos há mais de 24 meses ou com solicitação de exclusão passam por rotina de anonimização (substituição de nome por `CLIENTE_ANONIMIZADO_UUID`, hash do telefone com pepper e limpeza de e-mail e notas pessoais).
+
+---
+
+## 6. Edição Rápida no Atendimento e Gestão Completa Cadastral (v1.5.3.8)
+
+### 6.1 Edição Rápida no Modal "Detalhes do Atendimento" (`ScheduleView.jsx`)
+- **Acesso Operacional:** Link `"Editar"` discretamente posicionado à direita do rótulo `"Cliente Agendado"` (estilizado em verde esmeralda `text-[#059669]` no modo claro e âmbar `text-amber-400` no modo escuro, com foco acessível).
+- **Modal Sobreposto (`QuickClientEditModal`):** Diálogo compacto (`size="sm"`) com foco automático no campo Nome e máscara de telefone, permitindo que recepcionistas e barbeiros corrijam digitação errada sem fechar o atendimento em andamento.
+- **Sincronização em Cascata Imediata:**
+  1. Atualiza `selectedAppointment` no modal ativo em tempo real.
+  2. Propaga novo Nome e Telefone para todos os agendamentos ativos na grade da Agenda.
+  3. Atualiza ou insere o registro na base de clientes no Supabase (`public.clients`) e sincroniza com os caches locais (`saas_clients_cache` e `barbearia_saas_clients_v2`).
+
+### 6.2 Gestão Completa em "Clientes & Prontuários Técnicos" (`ClientsDirectoryView.jsx`)
+- **Ação na Tabela:** Ícone de edição (`Edit3` / 16px) integrado na coluna de Ações, posicionado ergonomicamente entre o Sino de Lembrete Preditivo e o Arquivo de Prontuário Técnico.
+- **Botão de Ação Padronizado:** Botão circular compacto (`w-8 h-8 rounded-lg`) com hover sutil adaptativo para temas claro e escuro.
+- **Formulário Cadastral Completo (`FullClientEditModal`):**
+  - **Nome Completo e Telefone:** Validados e mascarados com DDD.
+  - **Total Gasto (R$):** Campo financeiro livre para ajuste direto de saldo acumulado pelo administrador.
+  - **Barbeiro Preferido:** Select populado dinamicamente com os barbeiros da barbearia.
+  - **Frequência Habitual:** Validação de intervalo de retorno (1 a 365 dias).
+  - **Prontuário e Ficha Técnica:** Edição de especificações de corte e alertas de sensibilidade.
+- **Persistência Integrada:** Gravado no Supabase (`public.clients`), atualiza métricas de carteira e reflete na lista de agendamentos.

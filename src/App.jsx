@@ -758,7 +758,98 @@ export default function App() {
     setClients(list);
     try {
       safeStorage.setItem("saas_clients_cache", JSON.stringify(list));
+      safeStorage.setItem("barbearia_saas_clients_v2", JSON.stringify(list));
     } catch {}
+  }, []);
+
+  // Sincronização centralizada de Cliente individual com cascata nos Agendamentos e Supabase
+  const handleUpdateClient = useCallback(async (clientData, options = {}) => {
+    if (!clientData) return;
+    const { syncAppointments = true, oldPhone, oldName } = options;
+    const cleanId = clientData.id;
+    const cleanPhone = (clientData.phone || "").replace(/\D/g, "");
+    const cleanOldPhone = (oldPhone || "").replace(/\D/g, "");
+    const targetName = (clientData.name || "").trim();
+    const oldTargetName = (oldName || "").trim().toLowerCase();
+
+    // 1. Atualiza lista de clientes em memória
+    setClients((prev) => {
+      let found = false;
+      const updated = prev.map((c) => {
+        const cPhone = (c.phone || "").replace(/\D/g, "");
+        if (
+          (cleanId && c.id === cleanId) ||
+          (cleanPhone && cPhone === cleanPhone) ||
+          (cleanOldPhone && cPhone === cleanOldPhone)
+        ) {
+          found = true;
+          return { ...c, ...clientData };
+        }
+        return c;
+      });
+      const finalList = found ? updated : [clientData, ...updated];
+      try {
+        safeStorage.setItem("saas_clients_cache", JSON.stringify(finalList));
+        safeStorage.setItem("barbearia_saas_clients_v2", JSON.stringify(finalList));
+      } catch {}
+      return finalList;
+    });
+
+    // 2. Sincroniza em cascata nos agendamentos ativos na Agenda
+    if (syncAppointments) {
+      setAppointments((prevAppts) => {
+        return prevAppts.map((appt) => {
+          const apptPhone = (appt.clientPhone || appt.client_phone || "").replace(/\D/g, "");
+          const apptName = (appt.clientName || appt.client_name || "").trim().toLowerCase();
+          const matches =
+            (cleanPhone && apptPhone === cleanPhone) ||
+            (cleanOldPhone && apptPhone === cleanOldPhone) ||
+            (oldTargetName && apptName === oldTargetName) ||
+            (cleanId && (appt.clientId === cleanId || appt.client_id === cleanId));
+
+          if (matches) {
+            return {
+              ...appt,
+              clientName: targetName || appt.clientName,
+              clientPhone: clientData.phone || appt.clientPhone,
+              client_name: targetName || appt.client_name,
+              client_phone: clientData.phone || appt.client_phone,
+            };
+          }
+          return appt;
+        });
+      });
+    }
+
+    // 3. Persistência no Supabase
+    try {
+      if (cleanId && !String(cleanId).startsWith("temp-") && !String(cleanId).startsWith("cli-mock")) {
+        await supabase
+          .from("clients")
+          .update({
+            name: clientData.name,
+            phone: clientData.phone,
+            ...(clientData.email !== undefined ? { email: clientData.email } : {}),
+            ...(clientData.cpf !== undefined ? { cpf: clientData.cpf } : {}),
+            ...(clientData.birthDate !== undefined || clientData.birth_date !== undefined
+              ? { birth_date: clientData.birthDate || clientData.birth_date }
+              : {}),
+            ...(clientData.totalSpent !== undefined || clientData.total_spent !== undefined
+              ? { total_spent: Number(clientData.totalSpent ?? clientData.total_spent ?? 0) }
+              : {}),
+            ...(clientData.frequencyDays !== undefined || clientData.frequency_days !== undefined
+              ? { frequency_days: Number(clientData.frequencyDays ?? clientData.frequency_days ?? 18) }
+              : {}),
+            ...(clientData.preferredBarber !== undefined || clientData.preferred_barber !== undefined
+              ? { preferred_barber: clientData.preferredBarber || clientData.preferred_barber }
+              : {}),
+            ...(clientData.notes !== undefined ? { notes: clientData.notes } : {}),
+          })
+          .eq("id", cleanId);
+      }
+    } catch (err) {
+      console.warn("Aviso na atualização do cliente no Supabase:", err);
+    }
   }, []);
 
   // Handlers reativos para Serviços
@@ -1131,6 +1222,7 @@ export default function App() {
               onUpdateAppointments={setAppointments}
               clients={clients}
               onUpdateClients={handleUpdateClients}
+              onUpdateClient={handleUpdateClient}
               comandas={comandas}
               onUpdateComandas={setComandas}
               services={services}

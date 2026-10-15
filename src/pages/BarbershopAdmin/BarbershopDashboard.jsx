@@ -33,6 +33,7 @@ export default function BarbershopDashboard({
   onUpdateAppointments,
   clients = [],
   onUpdateClients,
+  onUpdateClient,
   comandas = [],
   onUpdateComandas,
   services = [],
@@ -480,6 +481,7 @@ export default function BarbershopDashboard({
                       onAddService={onAddService}
                       clients={clients}
                       onUpdateClients={onUpdateClients}
+                      onUpdateClient={onUpdateClient}
                       onNavigateToClients={() => setActiveMenuTab("clientes")}
                       onNavigateToCashier={() => setActiveMenuTab("caixa")}
                     />
@@ -519,15 +521,19 @@ export default function BarbershopDashboard({
               </ErrorBoundary>
             )}
 
-            {/* 4. CLIENTES: Consome 'clients' e 'onUpdateClients' */}
+            {/* 4. CLIENTES: Consome 'clients', 'onUpdateClients', 'onUpdateClient' e 'barbers' */}
             {activeMenuTab === "clientes" && (
               <ErrorBoundary componentName="Diretório de Clientes">
                 <ClientsDirectoryView
                   clientsList={clients}
                   onUpdateClients={onUpdateClients}
+                  onUpdateClient={onUpdateClient}
                   onNavigateToBooking={() => setActiveMenuTab("agenda")}
                   onBack={() => setActiveMenuTab("agenda")}
                   tenant={tenant}
+                  barbers={barbers}
+                  appointments={appointments}
+                  onUpdateAppointments={onUpdateAppointments}
                 />
               </ErrorBoundary>
             )}
