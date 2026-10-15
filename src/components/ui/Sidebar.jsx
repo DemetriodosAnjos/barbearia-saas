@@ -41,6 +41,14 @@ export default function Sidebar({
   // Estado para controlar quais submenus estão abertos (Acordeão)
   const [expandedMenus, setExpandedMenus] = useState({});
 
+  // Estado para controlar qual menu pai foi clicado / está ativo
+  const [activeParentMenu, setActiveParentMenu] = useState(() => {
+    const parent = items.find(
+      (item) => item.children && item.children.some((c) => c.id === activeItem)
+    );
+    return parent ? parent.id : null;
+  });
+
   // Estado interno de encolhimento do sidebar no desktop
   const [internalCollapsed, setInternalCollapsed] = useState(() => {
     try {
@@ -69,11 +77,20 @@ export default function Sidebar({
 
   // 1. AUTO-EXPANSÃO INTELIGENTE: Se o activeItem for um filho, abre o pai sozinho!
   useEffect(() => {
-    items.forEach((item) => {
-      if (item.children && item.children.some((c) => c.id === activeItem)) {
-        setExpandedMenus((prev) => ({ ...prev, [item.id]: true }));
-      }
-    });
+    const parent = items.find(
+      (item) => item.children && item.children.some((c) => c.id === activeItem)
+    );
+    if (parent) {
+      setExpandedMenus((prev) => ({ ...prev, [parent.id]: true }));
+      setActiveParentMenu(parent.id);
+    } else {
+      setActiveParentMenu((current) => {
+        const stillParent = items.find(
+          (item) => item.id === current && item.children?.some((c) => c.id === activeItem)
+        );
+        return stillParent ? current : null;
+      });
+    }
   }, [activeItem, items]);
 
   const toggleSubmenu = (menuId) => {
@@ -221,7 +238,11 @@ export default function Sidebar({
               hasChildren && item.children.some((c) => c.id === activeItem);
             const isExpanded = Boolean(expandedMenus[item.id]);
             const isDirectActive = activeItem === item.id;
-            const isActive = isDirectActive || isParentOfActive;
+            const isParentActive =
+              isParentOfActive ||
+              activeParentMenu === item.id ||
+              (Boolean(expandedMenus[item.id]) && item.id === "financeiro_group");
+            const isActive = isDirectActive || isParentActive;
 
             // ==========================================
             // MODO ENCOLHIDO: APENAS COLUNA DE ÍCONES
@@ -234,8 +255,10 @@ export default function Sidebar({
                   title={item.label}
                   onClick={() => {
                     if (hasChildren) {
+                      setActiveParentMenu(item.id);
                       if (onSelect) onSelect(item.children[0].id);
                     } else {
+                      setActiveParentMenu(null);
                       if (onSelect) onSelect(item.id);
                     }
                     if (onClose) onClose();
@@ -267,13 +290,16 @@ export default function Sidebar({
                   {/* Botão Pai que expande/recolhe */}
                   <button
                     type="button"
-                    onClick={() => toggleSubmenu(item.id)}
+                    onClick={() => {
+                      toggleSubmenu(item.id);
+                      setActiveParentMenu(item.id);
+                    }}
                     data-sidebar-item={item.id}
-                    data-sidebar-active={isParentOfActive ? "true" : "false"}
+                    data-sidebar-active={isParentActive ? "true" : "false"}
                     className={`
                       ${sidebarStyles.navItem}
                       sidebar-nav-item group
-                      ${isParentOfActive ? `${sidebarStyles.navItemActive} sidebar-nav-item-active sidebar-parent-active` : `${sidebarStyles.navItemInactive} sidebar-nav-item-inactive`}
+                      ${isParentActive ? `${sidebarStyles.navItemActive} sidebar-nav-item-active sidebar-parent-active` : `${sidebarStyles.navItemInactive} sidebar-nav-item-inactive`}
                     `}
                   >
                     <span className={sidebarStyles.navItemIcon}>
@@ -314,6 +340,7 @@ export default function Sidebar({
                             key={child.id}
                             type="button"
                             onClick={() => {
+                              setActiveParentMenu(item.id);
                               if (onSelect) onSelect(child.id);
                               if (onClose) onClose();
                             }}
@@ -346,6 +373,7 @@ export default function Sidebar({
                 key={item.id}
                 type="button"
                 onClick={() => {
+                  setActiveParentMenu(null);
                   if (onSelect) onSelect(item.id);
                   if (onClose) onClose();
                 }}
