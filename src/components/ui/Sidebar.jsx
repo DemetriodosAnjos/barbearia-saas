@@ -125,22 +125,29 @@ export default function Sidebar({
             <div className={sidebarStyles.brandWrapper}>
               <div
                 className={sidebarStyles.brandLogo}
+                data-sidebar-brand-logo="true"
                 onClick={handleToggleCollapse}
                 title="Recolher menu lateral"
               >
-                <ProjectIcon name="Scissors" size={20} colorVariant="amber" />
+                <ProjectIcon name="Scissors" size={20} colorVariant="white" className="text-white" />
               </div>
               <div className={sidebarStyles.brandInfo}>
-                <span className={sidebarStyles.brandTitle}>{tenantName}</span>
+                <span className={sidebarStyles.brandTitle} data-sidebar-brand-title="true">
+                  {tenantName}
+                </span>
                 {/* Link TRIAL para abrir modal de planos */}
                 <button
                   type="button"
                   onClick={onOpenPlansModal}
-                  className="text-[11px] font-semibold text-amber-500 hover:text-amber-400 uppercase tracking-wider mt-0.5 cursor-pointer text-left flex items-center gap-1 transition-colors group no-underline hover:no-underline"
+                  data-sidebar-plan-link="true"
+                  className="text-[11px] font-semibold text-[#059669] hover:text-[#047857] dark:text-amber-500 dark:hover:text-amber-400 uppercase tracking-wider mt-0.5 cursor-pointer text-left flex items-center gap-1 transition-colors group no-underline hover:no-underline sidebar-plan-link"
                   title="Abrir planos e fazer upgrade (Escolha o plano ideal para a sua barbearia)"
                 >
-                  <span className="truncate">{tenantPlan || "TRIAL"}</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 group-hover:bg-amber-500/30">
+                  <span className="truncate" data-sidebar-plan-text="true">{tenantPlan || "TRIAL"}</span>
+                  <span
+                    data-sidebar-plan-tag="true"
+                    className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30 group-hover:bg-[#d1fae5] dark:group-hover:bg-amber-500/30 transition-colors sidebar-plan-tag"
+                  >
                     Planos
                   </span>
                 </button>
@@ -187,10 +194,11 @@ export default function Sidebar({
           <div className={sidebarStyles.headerCollapsed}>
             <div
               className={sidebarStyles.brandLogo}
+              data-sidebar-brand-logo="true"
               onClick={handleToggleCollapse}
               title={`Expandir menu (${tenantName})`}
             >
-              <ProjectIcon name="Scissors" size={20} colorVariant="amber" />
+              <ProjectIcon name="Scissors" size={20} colorVariant="white" className="text-white" />
             </div>
 
             <button

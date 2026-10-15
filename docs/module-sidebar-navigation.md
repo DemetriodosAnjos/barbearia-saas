@@ -17,11 +17,21 @@ A barra lateral de navegação (`src/components/ui/Sidebar.jsx` e `Sidebar.style
 - **Persistência de Preferência:**
   - A preferência do operador é armazenada em `localStorage` (`barbearia_sidebar_collapsed`) para manter o estado entre recarregamentos e navegação.
 
-### 2.2 Link de Plano "TRIAL" / Upgrade
-- **Ação Direta:**
-  - O indicador de plano no cabeçalho da Sidebar (ex: `TRIAL`) atua como link interativo na cor Âmbar (`text-amber-500 hover:text-amber-400`).
+### 2.2 Topo da Sidebar: Avatar, Identidade Visual e Link de Plano "TRIAL" / Upgrade
+- **Avatar de Marca (Logo com Tesoura):**
+  - **Versão Light:** Container com fundo verde `#059669` (`bg-[#059669]`), sombra esmeralda suave, e ícone vetorial da Tesoura (`Scissors`) em branco puro `#ffffff`.
+  - **Versão Dark:** Container com fundo âmbar nobre `#d97706` (`bg-amber-600`) e ícone branco `#ffffff`.
+  - Ao clicar no avatar, atua como gatilho acessível para alternar entre recolhimento e expansão do menu.
+- **Título da Barbearia (ex: "Barbearia dos Anjos"):**
+  - **Versão Light:** Texto na cor `#18181B` (`text-[#18181B]`), proporcionando máxima nitidez e conformidade WCAG AAA.
+  - **Versão Dark:** Mantido integralmente na cor clara original `#f5f5f5` (`text-neutral-100`).
+- **Link do Plano "TRIAL":**
+  - **Versão Light:** Texto na cor verde esmeralda `#059669` (`text-[#059669] hover:text-[#047857]`).
+  - **Versão Dark:** Mantido em tom âmbar nobre `#f59e0b` (`text-amber-500 hover:text-amber-400`).
   - Ao ser clicado, abre diretamente o modal oficial de contratação: `"Escolha o plano ideal para a sua barbearia"`.
-  - Possui a mesma funcionalidade e destino do botão `"Fazer Upgrade / Assinar"` presente na barra superior de contagem regressiva (`TrialBanner.jsx`).
+- **TAG "Planos":**
+  - **Versão Light:** Fundo verde claro `#ECFDF5` (idêntico à tag "Disponível" da Navbar), borda `#A7F3D0` e texto em verde `#059669`.
+  - **Versão Dark:** Fundo translúcido `bg-amber-500/20`, borda `border-amber-500/30` e texto `text-amber-300`.
 
 ### 2.3 Versão Centralizada do Sistema (`metadata.json`)
 - **Carregamento Automático e Centralizado:**

@@ -549,6 +549,58 @@ html:not(.dark) .navbar-menu-button:hover {
   color: #047857 !important;
 }
 
+/* 19.6. REFINAMENTO DO TOPO DO MENU LATERAL (SIDEBAR) NO MODO CLARO */
+/* Avatar (Container do Ícone Tesoura): #059669 (verde container bg) */
+html:not(.dark) [data-sidebar-brand-logo],
+html:not(.dark) .sidebar-brand-logo {
+  background-color: #059669 !important;
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.25) !important;
+}
+
+/* Avatar Ícone (Tesoura): #ffffff (branca) */
+html:not(.dark) [data-sidebar-brand-logo] svg,
+html:not(.dark) .sidebar-brand-logo svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Título da Barbearia (ex: "Barbearia dos Anjos"): #18181B no Modo Claro */
+html:not(.dark) [data-sidebar-brand-title],
+html:not(.dark) .sidebar-brand-title {
+  color: #18181B !important;
+}
+
+/* Link do Texto: Trial em #059669 (verde) */
+html:not(.dark) [data-sidebar-plan-link],
+html:not(.dark) .sidebar-plan-link,
+html:not(.dark) [data-sidebar-plan-text] {
+  color: #059669 !important;
+}
+
+html:not(.dark) [data-sidebar-plan-link]:hover,
+html:not(.dark) [data-sidebar-plan-link]:hover [data-sidebar-plan-text] {
+  color: #047857 !important;
+}
+
+/* TAG Planos: BG #ECFDF5 (verde claro da tag 'Disponivel' na Navbar) e Texto #059669 (verde) */
+html:not(.dark) [data-sidebar-plan-tag],
+html:not(.dark) .sidebar-plan-tag {
+  background-color: #ECFDF5 !important;
+  color: #059669 !important;
+  border-color: #A7F3D0 !important;
+}
+
+html:not(.dark) [data-sidebar-plan-tag] *,
+html:not(.dark) .sidebar-plan-tag * {
+  color: #059669 !important;
+}
+
+html:not(.dark) [data-sidebar-plan-link]:hover [data-sidebar-plan-tag],
+html:not(.dark) [data-sidebar-plan-tag]:hover {
+  background-color: #D1FAE5 !important;
+  color: #047857 !important;
+}
+
 /* ======================================================== */
 /* PRESERVAÇÃO INTEGRAL DA VERSÃO DARK (MANTER AS CORES)    */
 /* ======================================================== */
@@ -600,6 +652,37 @@ html.dark .navbar-menu-button:hover,
 html.dark .navbar-menu-button:hover svg {
   color: #ffffff !important;
   stroke: #ffffff !important;
+}
+
+/* Sidebar Top Header no Modo Escuro (Preservação Integral) */
+html.dark [data-sidebar-brand-logo],
+html.dark .sidebar-brand-logo {
+  background-color: #d97706 !important; /* bg-amber-600 */
+}
+
+html.dark [data-sidebar-brand-logo] svg,
+html.dark .sidebar-brand-logo svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html.dark [data-sidebar-plan-link],
+html.dark .sidebar-plan-link,
+html.dark [data-sidebar-plan-text] {
+  color: #f59e0b !important; /* text-amber-500 */
+}
+
+html.dark [data-sidebar-plan-tag],
+html.dark .sidebar-plan-tag {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  color: #fcd34d !important; /* text-amber-300 */
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Título da Barbearia Dark: Preservar neutral-100 (#f5f5f5) */
+html.dark [data-sidebar-brand-title],
+html.dark .sidebar-brand-title {
+  color: #f5f5f5 !important;
 }
 
 /* ======================================================== */

@@ -15,12 +15,12 @@ export const sidebarStyles = {
     "p-3 border-b border-neutral-800/80 flex flex-col items-center justify-center shrink-0 gap-2 transition-all",
   brandWrapper: "flex items-center gap-3 overflow-hidden min-w-0",
   brandLogo:
-    "w-10 h-10 rounded-xl bg-amber-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-amber-900/40 shrink-0 cursor-pointer",
+    "w-10 h-10 rounded-xl bg-[#059669] dark:bg-amber-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-emerald-950/20 dark:shadow-amber-900/40 shrink-0 cursor-pointer sidebar-brand-logo transition-transform hover:scale-105",
   brandInfo: "flex flex-col text-left truncate min-w-0",
   brandTitle:
-    "text-sm font-bold text-neutral-100 tracking-tight leading-tight truncate",
+    "text-sm font-bold text-[#18181B] dark:text-neutral-100 tracking-tight leading-tight truncate sidebar-brand-title",
   brandPlan:
-    "text-[11px] font-semibold text-amber-500 uppercase tracking-wider mt-0.5",
+    "text-[11px] font-semibold text-[#059669] dark:text-amber-500 uppercase tracking-wider mt-0.5",
   collapseButton:
     "hidden md:flex text-neutral-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors shrink-0 items-center justify-center",
   closeMobileButton:

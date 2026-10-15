@@ -80,3 +80,22 @@ Refinamento da paleta de cor clara aplicado ao botão de usuário ativo e ao men
 - O papel "Administrador" reluz no tom dourado `#FFB900` e os 4 ícones institucionais permanecem em `#FFC21F`.
 - A opção de logout "Sair da Plataforma" preserva a semântica de alerta em vermelho suave (`text-red-400`).
 
+---
+
+## 7. Refinamento Oficial do Topo do Menu Lateral (Sidebar - Theme Light)
+
+Refinamento da paleta de cores clara aplicado ao topo da barra lateral de navegação (`Sidebar.jsx`), mantendo alinhamento estrito com os elementos da Navbar e preservando a identidade visual Dark (Âmbar Nobre).
+
+### 7.1. Tabela Comparativa de Tokens (Topo da Sidebar)
+
+| Elemento do Topo da Sidebar | Versão DARK (Preservada) | Versão LIGHT (Refinada) | Especificação & Código Hex |
+| :--- | :--- | :--- | :--- |
+| **Avatar Container (Fundo)** | `bg-amber-600` (`#d97706`) | `bg-[#059669]` | `#059669` (Verde esmeralda container bg com sombra sutil) |
+| **Avatar Ícone (Tesoura)** | `#ffffff` / Âmbar | `Color: #ffffff` | `#ffffff` (Branca com alto contraste sobre o verde) |
+| **Título da Barbearia** | `text-neutral-100` (`#f5f5f5`) | `Color: #18181B` | Nome da barbearia (ex: "Barbearia dos Anjos") em `#18181B`, com contraste nítido e legível |
+| **Link do Texto (Trial)** | `text-amber-500` (`#f59e0b`) | `Color: #059669` (verde) | `#059669` (hover: `#047857`), abre modal de upgrade |
+| **TAG Planos (Container)** | `bg-amber-500/20` | `BG: #ECFDF5` | `#ECFDF5` (Verde claro idêntico à tag "Disponível" da Navbar) |
+| **TAG Planos (Borda)** | `border-amber-500/30` | `Border: #A7F3D0` | `#A7F3D0` (Verde suave discreto) |
+| **TAG Planos (Texto)** | `text-amber-300` | `Color: #059669` | `#059669` (Verde escuro de alta legibilidade) |
+
+
