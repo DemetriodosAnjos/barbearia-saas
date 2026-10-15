@@ -579,22 +579,22 @@ export default function ProjectIcon({
     IconComponent = LucideIcons.Sparkles;
   }
 
-  // 3. Paleta de Cores Oficial: Âmbar Nobre (--brand-500: #f59e0b) e Tokens de Design
+  // 3. Paleta de Cores: Minimalist Emerald no Light (text-zinc-500 / ativo: text-emerald-600) e Âmbar Nobre no Dark
   const colorStyles = {
-    amber: 'text-amber-500 dark:text-amber-400',
-    'amber-nobre': 'text-amber-500 dark:text-amber-400',
-    'amber-dark': 'text-amber-600 dark:text-amber-500',
-    'amber-light': 'text-amber-400 dark:text-amber-300',
-    gold: 'text-amber-300',
-    brand: 'text-[var(--brand-500,#f59e0b)]',
-    'brand-primary': 'text-[var(--brand-600,#d97706)]',
-    emerald: 'text-emerald-500 dark:text-emerald-400',
-    success: 'text-emerald-500 dark:text-emerald-400',
-    danger: 'text-rose-500 dark:text-rose-400',
-    ruby: 'text-rose-500 dark:text-rose-400',
-    info: 'text-sky-500 dark:text-sky-400',
-    sapphire: 'text-sky-500 dark:text-sky-400',
-    neutral: 'text-neutral-400 dark:text-neutral-500',
+    amber: 'text-emerald-600 dark:text-amber-400',
+    'amber-nobre': 'text-emerald-600 dark:text-amber-400',
+    'amber-dark': 'text-emerald-700 dark:text-amber-500',
+    'amber-light': 'text-emerald-500 dark:text-amber-300',
+    gold: 'text-emerald-600 dark:text-amber-300',
+    brand: 'text-emerald-600 dark:text-[var(--brand-500,#f59e0b)]',
+    'brand-primary': 'text-emerald-600 dark:text-[var(--brand-600,#d97706)]',
+    emerald: 'text-emerald-600 dark:text-emerald-400',
+    success: 'text-emerald-600 dark:text-emerald-400',
+    danger: 'text-rose-600 dark:text-rose-400',
+    ruby: 'text-rose-600 dark:text-rose-400',
+    info: 'text-sky-600 dark:text-sky-400',
+    sapphire: 'text-sky-600 dark:text-sky-400',
+    neutral: 'text-zinc-500 dark:text-neutral-500',
     white: 'text-white',
     inherit: 'text-inherit',
   };

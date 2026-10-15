@@ -155,10 +155,10 @@ export default function Navbar({
           Pular para o conteúdo principal
         </a>
         <header className={navbarStyles.container}>
-        <div className={navbarStyles.leftSection}>
-          <div className={navbarStyles.avatar}>
-            {resolvedUser.avatar}
-          </div>
+          <div className={navbarStyles.leftSection}>
+            <div className={`${navbarStyles.avatar} navbar-avatar`} data-navbar-avatar="true">
+              {resolvedUser.avatar}
+            </div>
           <div className="flex flex-col">
             <span className={navbarStyles.clientGreeting}>Olá, bem-vindo!</span>
             <span className={navbarStyles.clientName}>{resolvedUser.name}</span>
@@ -348,7 +348,11 @@ export default function Navbar({
               <ProjectIcon name="Bell" size={18} colorVariant="neutral" />
             </IconButton>
             {notificationsCount > 0 && (
-              <span className={navbarStyles.notificationBadge}>
+              <span
+                className={`${navbarStyles.notificationBadge} notification-badge !text-white text-white`}
+                data-notification-badge="true"
+                style={{ color: "#ffffff" }}
+              >
                 {notificationsCount}
               </span>
             )}
@@ -362,7 +366,10 @@ export default function Navbar({
               className={navbarStyles.userButton}
               aria-expanded={isUserMenuOpen}
             >
-              <div className={navbarStyles.avatar}>
+              <div
+                className={`${navbarStyles.avatar} navbar-avatar`}
+                data-navbar-avatar="true"
+              >
                 {resolvedUser.avatar}
               </div>
               <div className={navbarStyles.userMeta}>

@@ -435,7 +435,22 @@ export default function BarbershopDashboard({
                 role: "Proprietário",
               }
             }
-            breadcrumbs={["Painel da Barbearia", activeMenuTab.toUpperCase()]}
+            breadcrumbs={[
+              "Painel da Barbearia",
+              {
+                agenda: "Agenda",
+                servicos: "Serviços",
+                profissionais: "Equipe",
+                clientes: "Clientes",
+                caixa: "Frente de Caixa",
+                dashboard_financeiro: "Financeiro",
+                pagamentos: "Pagamentos",
+                indicacoes: "Indicações",
+                perfil: "Meu Perfil",
+                configuracoes: "Configurações",
+                suporte: "Suporte",
+              }[activeMenuTab] || "Agenda",
+            ]}
             barberStatus={barberPresenceStatus}
             onStatusChange={setBarberPresenceStatus}
             notificationsCount={todayActiveAppointments.length}

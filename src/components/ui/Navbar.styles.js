@@ -41,15 +41,15 @@ export const navbarStyles = {
   // Botão de Notificações com Badge Contador
   notificationWrapper: "relative",
   notificationBadge:
-    "absolute -top-1 -right-1 flex items-center justify-center min-w-4 h-4 px-1 text-[10px] font-black text-white bg-amber-600 rounded-full shadow-md",
+    "absolute -top-1 -right-1 flex items-center justify-center min-w-4 h-4 px-1 text-[10px] font-black text-white bg-red-600 rounded-full shadow-md",
   notificationDot:
-    "absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-amber-500 rounded-full ring-2 ring-neutral-900",
+    "absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-600 rounded-full ring-2 ring-white dark:ring-neutral-900",
 
   // Menu de Usuário / Perfil
   userButton:
     "flex items-center gap-2.5 p-1 rounded-xl hover:bg-neutral-800 transition-colors cursor-pointer border border-transparent hover:border-neutral-700",
   avatar:
-    "w-8 h-8 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center text-xs font-bold text-amber-400 shrink-0",
+    "w-8 h-8 rounded-lg bg-zinc-100 dark:bg-neutral-800 border border-[#D4D4D8] dark:border-neutral-700 flex items-center justify-center text-xs font-bold text-zinc-900 dark:text-amber-400 shrink-0",
   userMeta: "hidden lg:flex flex-col text-left",
   userName: "text-xs font-semibold text-neutral-200 leading-tight",
   userRole: "text-[10px] text-neutral-400 leading-tight",

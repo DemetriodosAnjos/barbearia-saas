@@ -39,7 +39,8 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
     <button
       type="button"
       onClick={toggleTheme}
-      className={`${themeToggleStyles.button} ${className}`}
+      data-theme-toggle="true"
+      className={`${themeToggleStyles.button} theme-toggle-btn ${className}`}
       aria-label={`Alternar para modo ${isDark ? "claro" : "escuro"}`}
       title={`Modo Atual: ${isDark ? "Escuro (Dark)" : "Claro (Light)"}`}
     >
@@ -61,13 +62,14 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
       <span
         className={`
           ${themeToggleStyles.iconBox}
-          ${!isDark ? themeToggleStyles.iconActive : themeToggleStyles.iconInactive}
+          ${!isDark ? `${themeToggleStyles.iconActive} theme-toggle-sun-active` : themeToggleStyles.iconInactive}
         `}
       >
         <ProjectIcon
           name="Sun"
           size={14}
-          colorVariant={!isDark ? "amber" : "neutral"}
+          colorVariant={!isDark ? "white" : "neutral"}
+          className={`icon-sun ${!isDark ? "!text-white text-white" : ""}`}
         />
       </span>
 

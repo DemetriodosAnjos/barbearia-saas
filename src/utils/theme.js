@@ -408,6 +408,70 @@ export function setBrandTheme(themeKey = "amber") {
   }
 }
 
+// ========================================================
+// 3. PALETA LIGHT OFICIAL: MINIMALIST EMERALD
+// Clean e Tecnológico (Foco em produtividade SaaS)
+// ========================================================
+export const LIGHT_PALETTE_MINIMALIST_EMERALD = {
+  name: "Minimalist Emerald",
+  subtitle: "Clean e Tecnológico",
+  inspiration:
+    "Foco em produtividade e agendamentos rápidos para softwares de gestão (SaaS puro), usando cinza neutro e verde esmeralda.",
+  tokens: {
+    titles: {
+      element: "Títulos / Textos",
+      tailwind: "text-zinc-900 / text-zinc-600",
+      hex: "#18181b / #52525b",
+    },
+    icons: {
+      element: "Ícones",
+      tailwind: "text-zinc-500 (ativo: text-emerald-600)",
+      hex: "#71717a (#059669)",
+    },
+    badges: {
+      element: "Badges",
+      tailwind: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      hex: "#ecfdf5 / #047857 / #a7f3d0",
+    },
+    btnActive: {
+      element: "Botão Ativo",
+      tailwind: "bg-emerald-600",
+      hex: "#059669",
+    },
+    btnHover: {
+      element: "Botão Hover",
+      tailwind: "hover:bg-emerald-700",
+      hex: "#047857",
+    },
+    btnDisabled: {
+      element: "Botão Desativado",
+      tailwind: "bg-zinc-200 text-zinc-400",
+      hex: "#e4e4e7 / #a1a1aa",
+    },
+    btnTransparent: {
+      element: "Botão Transparente",
+      tailwind:
+        "bg-transparent hover:bg-zinc-100 text-zinc-700 border border-zinc-300",
+      hex: "transparent / #f4f4f5 / #3f3f46 / #d4d4d8",
+    },
+    btnText: {
+      element: "Texto dos Botões",
+      tailwind: "text-white (principal) / text-zinc-700 (transparente)",
+      hex: "#ffffff / #3f3f46",
+    },
+    links: {
+      element: "Links",
+      tailwind: "text-emerald-600 hover:text-emerald-700 underline",
+      hex: "#059669 / #047857",
+    },
+    tags: {
+      element: "Tags",
+      tailwind: "bg-zinc-100 text-zinc-800 border border-zinc-200",
+      hex: "#f4f4f5 / #27272a / #e4e4e7",
+    },
+  },
+};
+
 export function applyThemeMode(mode = "dark") {
   const root = document.documentElement;
   if (mode === "dark") {

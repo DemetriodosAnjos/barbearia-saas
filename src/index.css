@@ -98,31 +98,45 @@ select,
 }
 
 /* ======================================================== */
-/* MODO CLARO GLOBAL (LIGHT MODE AUTOMÁTICO)                */
-/* Ativado quando a tag <html> NÃO tem a classe .dark       */
+/* MODO CLARO GLOBAL - PALETA 3: MINIMALIST EMERALD         */
+/* Inspiração: Clean e Tecnológico (SaaS Foco Produtividade)*/
+/* Cores Dark preservadas integralmente sob a classe .dark  */
 /* ======================================================== */
 
 html:not(.dark) {
   color-scheme: light;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #fafafa;
+  color: #18181b;
+
+  /* Tokens da Paleta 3: Minimalist Emerald */
+  --brand-50: #ecfdf5;
+  --brand-100: #d1fae5;
+  --brand-200: #a7f3d0;
+  --brand-300: #6ee7b7;
+  --brand-400: #34d399;
+  --brand-500: #10b981;
+  --brand-600: #059669;
+  --brand-700: #047857;
+  --brand-800: #065f46;
+  --brand-900: #064e3b;
+  --brand-950: #022c22;
 }
 
 html:not(.dark) body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #fafafa;
+  color: #18181b;
 }
 
-/* 1. Superfícies de Fundo */
+/* 1. Superfícies de Fundo (Zinc Clean) */
 html:not(.dark) .bg-neutral-950,
 html:not(.dark) .bg-neutral-950\/80,
 html:not(.dark) .bg-neutral-950\/70,
 html:not(.dark) .bg-neutral-950\/60,
 html:not(.dark) .bg-neutral-950\/40 {
-  background-color: #f1f5f9 !important; /* Fundo suave */
+  background-color: #f4f4f5 !important; /* bg-zinc-100 (#f4f4f5) */
 }
 
-/* 2. Cartões, Menus e Modais viram Branco Puro com Sombra */
+/* 2. Cartões, Menus, Modais e Sidebar (Branco Puro com Contraste Elegante) */
 html:not(.dark) .bg-neutral-900,
 html:not(.dark) .bg-neutral-900\/95,
 html:not(.dark) .bg-neutral-900\/90,
@@ -136,10 +150,10 @@ html:not(.dark) .bg-neutral-900\/60 {
 html:not(.dark) .bg-neutral-800,
 html:not(.dark) .bg-neutral-800\/80,
 html:not(.dark) .bg-neutral-800\/60 {
-  background-color: #f8fafc !important;
+  background-color: #f4f4f5 !important; /* bg-zinc-100 (#f4f4f5) */
 }
 
-/* 4. Bordas Escuras viram Bordas Claras Elegantes */
+/* 4. Bordas: zinc-200 (#e4e4e7) e zinc-300 (#d4d4d8) */
 html:not(.dark) .border-neutral-800,
 html:not(.dark) .border-neutral-800\/80,
 html:not(.dark) .border-neutral-800\/60,
@@ -147,47 +161,290 @@ html:not(.dark) .border-neutral-800\/40,
 html:not(.dark) .border-neutral-700,
 html:not(.dark) .border-neutral-700\/80,
 html:not(.dark) .border-neutral-700\/60 {
-  border-color: #e2e8f0 !important;
+  border-color: #e4e4e7 !important; /* border-zinc-200 (#e4e4e7) */
 }
 
-/* 5. Tipografia: Textos Brancos viram Escuros Legíveis */
-html:not(.dark) .text-white,
+/* 5. Títulos / Textos Principais (#18181b - text-zinc-900) */
+html:not(.dark) h1,
+html:not(.dark) h2,
+html:not(.dark) h3,
+html:not(.dark) h4,
+html:not(.dark) h5,
+html:not(.dark) h6,
+html:not(.dark) .text-white:not(button):not(button *):not([class*="bg-emerald-600"] *):not([class*="bg-emerald-700"] *):not([class*="bg-amber-600"] *):not([class*="bg-amber-700"] *):not(.notificationBadge):not(.notification-badge):not([data-notification-badge]):not([class*="notificationBadge"]):not([class*="notification"]),
 html:not(.dark) .text-neutral-100,
-html:not(.dark) .text-neutral-200 {
-  color: #0f172a !important; /* Quase preto / Grafite */
+html:not(.dark) .text-neutral-200,
+html:not(.dark) .text-zinc-900 {
+  color: #18181b !important; /* text-zinc-900 (#18181b) */
 }
 
+/* 6. Textos Secundários / Legendas (#52525b - text-zinc-600) */
 html:not(.dark) .text-neutral-300,
-html:not(.dark) .text-neutral-400 {
-  color: #475569 !important; /* Cinza escuro legível */
+html:not(.dark) .text-neutral-400,
+html:not(.dark) .text-zinc-600 {
+  color: #52525b !important; /* text-zinc-600 (#52525b) */
 }
 
-html:not(.dark) .text-neutral-500 {
-  color: #64748b !important;
+/* 7. Textos Atenuados / Muted (#71717a - text-zinc-500) */
+html:not(.dark) .text-neutral-500,
+html:not(.dark) .text-zinc-500 {
+  color: #71717a !important; /* text-zinc-500 (#71717a) */
 }
 
-/* 6. Campos de Texto e Seletores */
+/* 8. Ícones: text-zinc-500 (#71717a) / Ativo: text-emerald-600 (#059669) */
+html:not(.dark) svg.text-neutral-400,
+html:not(.dark) svg.text-neutral-500,
+html:not(.dark) .text-neutral-400 svg,
+html:not(.dark) .text-neutral-500 svg,
+html:not(.dark) [data-color-variant="neutral"] svg {
+  color: #71717a !important; /* text-zinc-500 (#71717a) */
+}
+
+html:not(.dark) svg.text-amber-500,
+html:not(.dark) svg.text-amber-400,
+html:not(.dark) svg.text-amber-600,
+html:not(.dark) .text-amber-500 svg,
+html:not(.dark) .text-amber-400 svg,
+html:not(.dark) [data-color-variant="amber"] svg,
+html:not(.dark) [data-color-variant="brand"] svg,
+html:not(.dark) .icon-active {
+  color: #059669 !important; /* ativo: text-emerald-600 (#059669) */
+}
+
+/* 9. Badges: bg-emerald-50 text-emerald-700 border-emerald-200 (#ecfdf5 / #047857 / #a7f3d0) */
+html:not(.dark) .bg-emerald-950\/40,
+html:not(.dark) .bg-amber-950\/40,
+html:not(.dark) .bg-purple-950\/40,
+html:not(.dark) .badge-emerald,
+html:not(.dark) [data-badge-status] {
+  background-color: #ecfdf5 !important; /* bg-emerald-50 (#ecfdf5) */
+  color: #047857 !important;            /* text-emerald-700 (#047857) */
+  border-color: #a7f3d0 !important;      /* border-emerald-200 (#a7f3d0) */
+}
+
+html:not(.dark) .bg-emerald-950\/40 *,
+html:not(.dark) .bg-amber-950\/40 *,
+html:not(.dark) .bg-purple-950\/40 * {
+  color: #047857 !important;
+}
+
+/* 10. Botão Ativo / Primário: bg-emerald-600 hover:bg-emerald-700 (#059669 / #047857) */
+html:not(.dark) button.bg-amber-700,
+html:not(.dark) button.bg-amber-600,
+html:not(.dark) button.bg-emerald-600,
+html:not(.dark) .btn-primary,
+html:not(.dark) button[data-variant="primary"]:not(:disabled) {
+  background-color: #059669 !important; /* bg-emerald-600 (#059669) */
+  color: #ffffff !important;            /* text-white (#ffffff) */
+  border-color: #059669 !important;
+}
+
+html:not(.dark) button.bg-amber-700:hover,
+html:not(.dark) button.bg-amber-600:hover,
+html:not(.dark) button.bg-emerald-600:hover,
+html:not(.dark) .btn-primary:hover,
+html:not(.dark) button[data-variant="primary"]:not(:disabled):hover {
+  background-color: #047857 !important; /* hover:bg-emerald-700 (#047857) */
+  color: #ffffff !important;
+}
+
+/* Texto dos Botões Principais: text-white (#ffffff) */
+html:not(.dark) button.bg-amber-700 *,
+html:not(.dark) button.bg-amber-600 *,
+html:not(.dark) button.bg-emerald-600 *,
+html:not(.dark) .btn-primary *,
+html:not(.dark) button[data-variant="primary"] * {
+  color: #ffffff !important;
+}
+
+/* 11. Botão Desativado: bg-zinc-200 text-zinc-400 (#e4e4e7 / #a1a1aa) */
+html:not(.dark) button:disabled,
+html:not(.dark) button[disabled],
+html:not(.dark) button[aria-disabled="true"],
+html:not(.dark) button[data-state="disabled"],
+html:not(.dark) .btn-disabled {
+  background-color: #e4e4e7 !important; /* bg-zinc-200 (#e4e4e7) */
+  color: #a1a1aa !important;            /* text-zinc-400 (#a1a1aa) */
+  border-color: #e4e4e7 !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+}
+
+html:not(.dark) button:disabled *,
+html:not(.dark) button[disabled] *,
+html:not(.dark) button[aria-disabled="true"] * {
+  color: #a1a1aa !important;
+}
+
+/* 12. Botão Transparente: bg-transparent hover:bg-zinc-100 text-zinc-700 border border-zinc-300 */
+html:not(.dark) button.bg-transparent:not(:disabled),
+html:not(.dark) button[data-variant="outline"]:not(:disabled),
+html:not(.dark) button[data-variant="ghost"]:not(:disabled),
+html:not(.dark) .btn-transparent:not(:disabled) {
+  background-color: transparent !important;
+  color: #3f3f46 !important;            /* text-zinc-700 (#3f3f46) */
+  border: 1px solid #d4d4d8 !important; /* border-zinc-300 (#d4d4d8) */
+}
+
+html:not(.dark) button.bg-transparent:not(:disabled):hover,
+html:not(.dark) button[data-variant="outline"]:not(:disabled):hover,
+html:not(.dark) button[data-variant="ghost"]:not(:disabled):hover,
+html:not(.dark) .btn-transparent:not(:disabled):hover {
+  background-color: #f4f4f5 !important; /* hover:bg-zinc-100 (#f4f4f5) */
+  color: #3f3f46 !important;
+  border-color: #d4d4d8 !important;
+}
+
+html:not(.dark) button.bg-transparent:not(:disabled) *,
+html:not(.dark) button[data-variant="outline"]:not(:disabled) *,
+html:not(.dark) button[data-variant="ghost"]:not(:disabled) *,
+html:not(.dark) .btn-transparent:not(:disabled) * {
+  color: #3f3f46 !important;
+}
+
+/* 13. Links: text-emerald-600 hover:text-emerald-700 underline (#059669 / #047857) */
+html:not(.dark) a:not([class*="btn"]):not([role="button"]):not(.no-underline),
+html:not(.dark) .link-emerald {
+  color: #059669 !important; /* text-emerald-600 (#059669) */
+  text-decoration-line: underline !important;
+}
+
+html:not(.dark) a:not([class*="btn"]):not([role="button"]):not(.no-underline):hover,
+html:not(.dark) .link-emerald:hover {
+  color: #047857 !important; /* hover:text-emerald-700 (#047857) */
+}
+
+/* 14. Tags: bg-zinc-100 text-zinc-800 border border-zinc-200 (#f4f4f5 / #27272a / #e4e4e7) */
+html:not(.dark) .tag,
+html:not(.dark) [data-tag],
+html:not(.dark) .bg-amber-500\/10.border-amber-500\/40,
+html:not(.dark) [class*="tag-emerald-zinc"] {
+  background-color: #f4f4f5 !important; /* bg-zinc-100 (#f4f4f5) */
+  color: #27272a !important;            /* text-zinc-800 (#27272a) */
+  border: 1px solid #e4e4e7 !important; /* border-zinc-200 (#e4e4e7) */
+}
+
+html:not(.dark) .tag *,
+html:not(.dark) [data-tag] *,
+html:not(.dark) .bg-amber-500\/10.border-amber-500\/40 * {
+  color: #27272a !important;
+}
+
+/* 15. Campos de Entrada (Inputs, Seletores e Textarea) */
 html:not(.dark) input,
 html:not(.dark) select,
 html:not(.dark) textarea {
   background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  color: #18181b !important;            /* text-zinc-900 */
+  border-color: #d4d4d8 !important;      /* border-zinc-300 */
+}
+
+html:not(.dark) input:focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus {
+  border-color: #059669 !important;      /* border-emerald-600 */
+  outline-color: #059669 !important;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2) !important;
 }
 
 html:not(.dark) input::placeholder,
 html:not(.dark) textarea::placeholder {
-  color: #94a3b8 !important;
+  color: #a1a1aa !important;            /* text-zinc-400 */
 }
 
-/* 7. Sombras Suaves para Dar Profundidade no Modo Claro */
+/* 16. Itens de Navegação / Sidebar Ativa no Modo Claro */
+html:not(.dark) .bg-amber-500\/10.text-amber-400,
+html:not(.dark) .bg-amber-500\/15.text-amber-400,
+html:not(.dark) [class*="navItemActive"] {
+  background-color: #ecfdf5 !important; /* bg-emerald-50 */
+  color: #047857 !important;            /* text-emerald-700 */
+  border-color: #a7f3d0 !important;      /* border-emerald-200 */
+}
+
+html:not(.dark) .bg-amber-500\/10.text-amber-400 svg,
+html:not(.dark) .bg-amber-500\/15.text-amber-400 svg {
+  color: #059669 !important;            /* text-emerald-600 */
+}
+
+/* 17. Sombras Suaves para Profundidade no Modo Claro */
 html:not(.dark) .shadow-2xl,
 html:not(.dark) .shadow-xl,
 html:not(.dark) .shadow-lg,
 html:not(.dark) .shadow-md {
   box-shadow:
-    0 10px 25px -5px rgba(15, 23, 42, 0.08),
-    0 8px 10px -6px rgba(15, 23, 42, 0.04) !important;
+    0 4px 6px -1px rgba(24, 24, 27, 0.05),
+    0 2px 4px -2px rgba(24, 24, 27, 0.03) !important;
+}
+
+/* 18. Foco e Acessibilidade (WCAG 2.2 AA) no Modo Claro */
+html:not(.dark) :focus-visible {
+  outline: 2px solid #059669 !important; /* emerald-600 */
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.25) !important;
+}
+
+html:not(.dark) .skip-to-content {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+/* 19. Ajustes Específicos da Navbar no Modo Claro */
+/* 19.1. Theme Toggle: Background Transparente e Stroke #D4D4D8 */
+html:not(.dark) [data-theme-toggle],
+html:not(.dark) .theme-toggle-btn,
+html:not(.dark) .theme-toggle-button {
+  background-color: transparent !important;
+  border-color: #D4D4D8 !important;
+}
+
+/* Theme Toggle no Modo Claro: Elipse verde (#059669) e Ícone Sol branco (#ffffff) */
+html:not(.dark) .theme-toggle-sun-active,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) .theme-toggle-sun-active svg,
+html:not(.dark) .theme-toggle-sun-active .icon-sun,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active svg,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active svg.lucide-sun {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* 19.2. Ícone Alert (Sino): Círculo Vermelho (#dc2626) e Texto Branco (#ffffff) */
+html:not(.dark) .notification-badge,
+html:not(.dark) [data-notification-badge],
+html:not(.dark) span.notification-badge,
+html:not(.dark) span[class*="notificationBadge"] {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+html:not(.dark) .notification-badge,
+html:not(.dark) [data-notification-badge],
+html:not(.dark) .notification-badge *,
+html:not(.dark) [data-notification-badge] *,
+html:not(.dark) span[class*="notificationBadge"],
+html:not(.dark) span[class*="notificationBadge"] * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* 19.3. Avatar - "DE": Texto #18181B e Stroke #D4D4D8 */
+html:not(.dark) .navbar-avatar,
+html:not(.dark) [data-navbar-avatar],
+html:not(.dark) div[class*="navbarStyles-avatar"] {
+  color: #18181b !important;
+  background-color: #f4f4f5 !important;
+  border-color: #D4D4D8 !important;
+}
+
+html:not(.dark) .navbar-avatar *,
+html:not(.dark) [data-navbar-avatar] *,
+html:not(.dark) div[class*="navbarStyles-avatar"] * {
+  color: #18181b !important;
 }
 
 /* ======================================================== */
