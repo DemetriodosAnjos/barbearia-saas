@@ -238,23 +238,27 @@ export default function Navbar({
             />
           </button>
 
-          <div className={navbarStyles.breadcrumbWrapper}>
-            {breadcrumbs.map((crumb, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                {idx > 0 && (
-                  <span className={navbarStyles.breadcrumbSeparator}>/</span>
-                )}
-                <span
-                  className={
-                    idx === breadcrumbs.length - 1
-                      ? navbarStyles.breadcrumbCurrent
-                      : ""
-                  }
-                >
-                  {crumb}
-                </span>
-              </div>
-            ))}
+          <div className={`${navbarStyles.breadcrumbWrapper} navbar-breadcrumbs`}>
+            {breadcrumbs.map((crumb, idx) => {
+              const isCurrent = idx === breadcrumbs.length - 1;
+              return (
+                <div key={idx} className="flex items-center gap-2">
+                  {idx > 0 && (
+                    <span className={navbarStyles.breadcrumbSeparator}>/</span>
+                  )}
+                  <span
+                    className={
+                      isCurrent
+                        ? navbarStyles.breadcrumbCurrent
+                        : "text-zinc-500 dark:text-neutral-400 font-medium navbar-breadcrumb-parent"
+                    }
+                    data-breadcrumb-current={isCurrent ? "true" : undefined}
+                  >
+                    {crumb}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="relative inline-flex items-center">

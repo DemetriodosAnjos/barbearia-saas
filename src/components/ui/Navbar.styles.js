@@ -13,9 +13,10 @@ export const navbarStyles = {
 
   // Breadcrumbs (Caminho da página)
   breadcrumbWrapper:
-    "hidden sm:flex items-center gap-2 text-xs text-neutral-400 font-medium",
-  breadcrumbCurrent: "text-neutral-100 font-semibold",
-  breadcrumbSeparator: "text-neutral-600",
+    "hidden sm:flex items-center gap-2 text-xs font-medium",
+  breadcrumbCurrent:
+    "font-semibold text-[#059669] dark:text-amber-400 navbar-breadcrumb-current",
+  breadcrumbSeparator: "text-zinc-400 dark:text-neutral-600 navbar-breadcrumb-separator",
 
   // Seletor de Filial / Unidade
   branchSelect:

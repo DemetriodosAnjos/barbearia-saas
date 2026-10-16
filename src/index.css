@@ -1321,6 +1321,45 @@ html.dark .profile-back-button:hover * {
   background: transparent !important;
 }
 
+/* ==========================================================================
+   BREADCRUMBS NA NAVBAR (CAMINHO DE NAVEGAÇÃO DO USUÁRIO)
+   - Item Atual (ex: "Meu Perfil" / caminho onde está):
+     * Versão Light: #059669 (verde)
+     * Versão Dark: #fbbf24 (cor padrão âmbar / text-amber-400)
+   - Itens Anteriores (ex: "Painel da Barbearia") e Separador "/":
+     * Cores neutras equilibradas
+   ========================================================================== */
+
+/* Item Ativo (Onde o usuário se encontra) */
+html:not(.dark) .navbar-breadcrumb-current,
+html:not(.dark) [data-breadcrumb-current="true"] {
+  color: #059669 !important;
+  font-weight: 600 !important;
+}
+
+html.dark .navbar-breadcrumb-current,
+html.dark [data-breadcrumb-current="true"] {
+  color: #fbbf24 !important;
+  font-weight: 600 !important;
+}
+
+/* Itens Pais e Separadores */
+html:not(.dark) .navbar-breadcrumb-parent {
+  color: #71717a !important;
+}
+
+html:not(.dark) .navbar-breadcrumb-separator {
+  color: #a1a1aa !important;
+}
+
+html.dark .navbar-breadcrumb-parent {
+  color: #a3a3a3 !important;
+}
+
+html.dark .navbar-breadcrumb-separator {
+  color: #52525b !important;
+}
+
 
 
 
