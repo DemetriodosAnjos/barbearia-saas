@@ -37,7 +37,16 @@
   - **Z-Index Prioritário do Banner (`z-[100]`)**: O componente `TrialBanner.jsx` agora conta com `sticky top-0 z-[100]`, atributo `data-trial-banner="true"` e classe `.trial-banner-top`.
   - **Regra de Especificidade no CSS**: Em `src/index.css`, foi configurada a regra `[data-trial-banner="true"] { position: sticky !important; top: 0 !important; z-index: 100 !important; }`, garantindo que o banner prevaleça sobre todos os elementos da UI.
   - **Deslocamento Dinâmico da Navbar (`top-[41px]` vs `top-0`)**: A `Navbar` foi adaptada para receber a prop `hasTrialBanner`. Quando a barbearia estiver em modo Trial com o banner ativo, a Navbar ancora em `top-[41px]`, garantindo visibilidade simultânea do banner e do cabeçalho sem colisões.
-  - **Modais e Overlays Elevados (`z-[200]`)**: As sobreposições de modais (`Modal.styles.js`, `ActionSpinnerOverlayModal.jsx`) foram atualizadas para `z-[200]` e toasts para `z-[250]`, assegurando que modais de upgrade e alertas cubram a tela inteira quando acionados.
+### 4. Refinamento de UI: Cor do Texto "Conta Google Vinculada" no Componente Meu Perfil (#55555E)
+- **Ajuste Solicitado**: No componente Meu Perfil, padronizar o texto *"Conta Google Vinculada"* para a cor **`#55555E`**.
+- **Solução Implementada**:
+  - `src/pages/BarbershopAdmin/UserProfileView.jsx`:
+    - No cabeçalho de identificação rápida do perfil, a badge de autenticação Google foi atualizada para exibir *"Conta Google Vinculada"* com a cor `#55555E` (Light e Dark) e atributo `data-google-auth-text="true"`.
+    - Na aba *Segurança & Acesso*, o título do card de método de autenticação ativo foi padronizado para *"Conta Google Vinculada"* com a cor `#55555E` quando autenticado via Google SSO.
+  - `src/components/ui/Navbar.jsx`:
+    - No menu suspenso do Avatar do usuário (*dropdown*), o indicador de conta Google vinculada foi harmonizado para utilizar `#55555E` tanto no tema claro quanto no escuro com o atributo `data-user-dropdown-google="true"`.
+  - `src/index.css`:
+    - Regra com máxima especificidade adicionada para os seletores `[data-google-auth-text="true"]` e `[data-user-dropdown-google="true"]` garantindo a renderização consistente da cor `#55555E !important`.
 
 ---
 
@@ -53,6 +62,7 @@
 - `src/components/ui/ActionSpinnerOverlayModal.jsx`
 - `src/components/ToastContainer.tsx`
 - `src/pages/BarbershopAdmin/BarbershopDashboard.jsx`
+- `src/pages/BarbershopAdmin/UserProfileView.jsx`
 - `src/index.css`
 - `docs/module-agenda.md`
 - `docs/module-planos-e-trial-ux.md`

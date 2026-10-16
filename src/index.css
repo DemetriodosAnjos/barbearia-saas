@@ -1031,3 +1031,13 @@ html:not(.dark) input[type="date"]::-webkit-calendar-picker-indicator {
   z-index: 100 !important;
 }
 
+/* ======================================================== */
+/* 21. Conta Google Vinculada: Cor #55555E                  */
+/* ======================================================== */
+[data-google-auth-text="true"],
+[data-user-dropdown-google="true"],
+.text-google-linked {
+  color: #55555E !important;
+}
+
+
