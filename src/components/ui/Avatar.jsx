@@ -19,6 +19,7 @@ export default function Avatar({
   status, // available | in_service | on_break | offline
   isVip = false,
   className = "",
+  showStatusRing = true,
 }) {
   const [hasImageError, setHasImageError] = useState(false);
 
@@ -64,7 +65,7 @@ export default function Avatar({
       {status && avatarStyles.statuses[status] && (
         <span
           className={`
-            ${avatarStyles.statusDot}
+            ${showStatusRing ? avatarStyles.statusDot : avatarStyles.statusDotNoRing}
             ${statusSizeClass}
             ${avatarStyles.statuses[status]}
           `}

@@ -22,6 +22,8 @@ export const avatarStyles = {
   // Pontos de Status Presencial (Bottom-Right)
   statusDot:
     "absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-neutral-950 shadow-xs shrink-0",
+  statusDotNoRing:
+    "absolute -bottom-0.5 -right-0.5 rounded-full shadow-xs shrink-0",
   statusSizes: {
     xs: "w-2 h-2",
     sm: "w-2.5 h-2.5",

@@ -4,19 +4,19 @@ export const profileStyles = {
 
   // Cabeçalho com Cartão de Identificação Rápida
   headerCard:
-    "p-6 bg-neutral-900 border border-neutral-800 rounded-3xl flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 shadow-xl relative overflow-hidden",
+    "p-6 bg-white dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-3xl flex flex-col md:flex-row md:items-stretch justify-between gap-6 shadow-xl relative overflow-hidden",
   profileIdentity:
-    "flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left",
-  avatarWrapper: "relative group cursor-pointer",
+    "flex items-center gap-5 text-left flex-1 min-w-0",
+  avatarWrapper: "relative group cursor-pointer shrink-0",
   avatarOverlay:
     "absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-[10px] text-white font-bold transition-opacity",
 
-  infoGroup: "space-y-1",
+  infoGroup: "space-y-1.5 flex flex-col justify-center min-w-0 flex-1",
   nameTitle:
-    "text-xl font-black text-white flex items-center justify-center sm:justify-start gap-2",
-  displayNameTag: "text-xs text-amber-400 font-semibold",
+    "text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2 truncate",
+  displayNameTag: "text-xs text-zinc-600 dark:text-neutral-400 flex items-center gap-2 flex-wrap",
   roleMeta:
-    "text-xs text-neutral-400 flex items-center justify-center sm:justify-start gap-2 pt-1",
+    "text-xs text-zinc-500 dark:text-neutral-400 flex items-center gap-3 flex-wrap",
 
   // Bloco de Formulários por Aba
   tabContentCard:
