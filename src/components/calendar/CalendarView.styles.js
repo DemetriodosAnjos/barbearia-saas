@@ -1,7 +1,7 @@
 export const calendarViewStyles = {
-  // Contêiner principal da agenda
+  // Contêiner principal da agenda com contexto de empilhamento isolado (isolate z-10)
   container:
-    "w-full bg-neutral-950 border border-neutral-800 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none text-left",
+    "w-full bg-neutral-950 border border-neutral-800 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none text-left relative isolate z-10",
 
   // 1. Barra Superior de Controles (Header da Agenda)
   toolbar:
@@ -27,9 +27,9 @@ export const calendarViewStyles = {
 
   // Régua Horária da Esquerda (Time Gutter)
   timeGutter:
-    "w-16 shrink-0 bg-neutral-900/40 border-r border-neutral-800/80 flex flex-col sticky left-0 z-30 select-none",
+    "w-16 shrink-0 bg-neutral-900/40 border-r border-neutral-800/80 flex flex-col sticky left-0 z-20 select-none",
   timeGutterHeader:
-    "h-[62px] border-b border-neutral-800 bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-neutral-500 uppercase",
+    "h-[62px] border-b border-neutral-800 bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-neutral-500 uppercase sticky top-0 z-30",
   timeGutterSlot:
     "flex items-start justify-center pt-1 text-[11px] font-mono text-neutral-500 border-b border-neutral-800/30",
 

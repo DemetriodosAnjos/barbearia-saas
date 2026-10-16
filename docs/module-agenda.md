@@ -116,3 +116,26 @@ Como de segunda a sábado o horário de almoço configurado era idêntico (ex: `
 1. **Isolamento por Dia da Semana (`currentDate`):** `CalendarView.jsx` agora transmite explicitamente `currentDate` para `BarberTimelineColumn.jsx`. O componente calcula o dia da semana ativo (`dom`, `seg`, `ter`, `qua`, `qui`, `sex`, `sab`) e localiza unicamente o expediente do dia em questão.
 2. **Deduplicação Estrita por Chave Única:** Uma camada com `Set` (`${startTime}-${endTime}`) filtra qualquer intervalo duplicado antes da renderização na grade visual.
 3. **Harmonização no Drag & Drop (`ScheduleView.jsx`):** O cálculo de colisão com almoço ao arrastar cartões também foi ajustado para considerar unicamente a data do agendamento sendo movimentado.
+
+---
+
+## 6. Resolução de Sobreposição de Z-Index: Coluna "Horários" vs Navbar (v1.5.4.1)
+
+### Causa Raiz Identificada
+Durante a rolagem vertical (*scroll*) da página no painel de administração da barbearia (`ScheduleView`), a coluna lateral fixa de horários (`timeGutter` com o cabeçalho `"Horários"` e marcações de horas `08:00`, `09:00`, etc.) passava por cima da barra de navegação superior fixa (`Navbar`).
+
+O problema ocorria devido a:
+1. **Ausência de Contexto de Empilhamento Isolado (`isolate`)**: O contêiner pai da agenda (`calendarViewStyles.container`) não definia contexto de empilhamento local, permitindo que os `z-index` internos dos elementos da régua (`sticky z-30` no `timeGutter`) disputassem empilhamento diretamente no contexto raiz do documento.
+2. **Concorrência de Z-Index no Contexto Global**: A `Navbar` possuía `sticky top-0 z-30` e o `timeGutter` possuía `sticky left-0 z-30`. Como a agenda aparece posteriormente no DOM em relação ao cabeçalho, a regra natural de ordenação do HTML atribuía prioridade de pintura (*painting order*) à coluna da agenda sobre a `Navbar`.
+
+### Correção Aplicada
+1. **Isolamento de Stacking Context (`isolate z-10`)**:
+   - No contêiner principal da agenda (`CalendarView.styles.js -> container`), foi adicionada a classe `relative isolate z-10`.
+   - Com `isolation: isolate`, **todos os elementos internos** da agenda (`timeGutter`, `header`, cards com hover, etc.) têm seus z-indices estritamente confinados à agenda, tratando o componente inteiro como uma única camada com nível `z-10` na árvore global.
+2. **Elevação e Proteção da Navbar (`z-40` e `z-50`)**:
+   - A `Navbar` foi elevada para `sticky top-0 z-40`, garantindo precedência absoluta sobre o bloco da agenda (`z-10`) durante o scroll vertical da página.
+   - O menu suspenso (*dropdownMenu*) da Navbar foi elevado para `z-50`.
+3. **Hierarquia Interna da Régua Horária**:
+   - `timeGutter` ajustado para `sticky left-0 z-20`, fixando-se lateralmente na rolagem horizontal.
+   - `timeGutterHeader` ("Horários") definido com `sticky top-0 z-30`, garantindo que fique acima tanto dos slots verticais quanto dos cabeçalhos dos barbeiros durante o scroll interno bidirecional da grade.
+

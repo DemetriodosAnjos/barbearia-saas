@@ -446,7 +446,7 @@ export default function Sidebar({
                 data-sidebar-version="true"
                 className="text-[11px] font-mono font-bold text-[#059669] dark:text-[#ffffff] tracking-wider sidebar-version-text"
               >
-                SaaS V1.5.4.0
+                SaaS V1.5.4.1
               </span>
             </div>
           </div>
@@ -472,9 +472,9 @@ export default function Sidebar({
             <span
               data-sidebar-version="true"
               className="text-[10px] font-mono font-bold text-[#059669] dark:text-[#ffffff] text-center sidebar-version-text"
-              title="SaaS V1.5.4.0"
+              title="SaaS V1.5.4.1"
             >
-              V1.5.4.0
+              V1.5.4.1
             </span>
           </div>
         )}

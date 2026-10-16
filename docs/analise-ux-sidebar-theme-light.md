@@ -43,11 +43,11 @@ Quando um item de menu, submenu ou o menu **Financeiro** está ativo (selecionad
 - **Background Container**: `#262626` (Cinza Escuro Premium)
 - **Texto e Ícone**: `#ffffff` (Branco Puro - inclui ícones e seta chevron)
 - **Efeito "Aceso"**: Borda lateral esquerda iluminada em `#059669` (verde esmeralda) com brilho exterior sutil (`box-shadow: inset 4px 0 0 #059669, 0 4px 14px rgba(5, 150, 105, 0.32)` e `border: 1px solid rgba(5, 150, 105, 0.45)`).
-### 3.4. Rodapé e Indicador de Versão (`SaaS V1.5.4.0`)
+### 3.4. Rodapé e Indicador de Versão (`SaaS V1.5.4.1`)
 - **Remoção de Duplicidades**: A `DIV` contendo o nome do gestor (`Demetrio A L dos Anjos`) e o botão com ícone de logout (`Sair`) foi removida da base da Sidebar, tanto no modo expandido quanto no recolhido, simplificando a área e evitando poluição visual (o logout permanece acessível no menu suspenso do Avatar do Navbar).
 - **Indicador de Versão Centralizado**:
-  - **Theme Light**: Texto `SaaS V1.5.4.0` configurado com a cor **`#059669`** (Verde Esmeralda).
-  - **Theme Dark**: Texto `SaaS V1.5.4.0` configurado com a cor **`#ffffff`** (Branco Puro).
+  - **Theme Light**: Texto `SaaS V1.5.4.1` configurado com a cor **`#059669`** (Verde Esmeralda).
+  - **Theme Dark**: Texto `SaaS V1.5.4.1` configurado com a cor **`#ffffff`** (Branco Puro).
 
 ### 3.5. Botão Expandir/Recolher (Chevron Left / Chevron Right)
 - **Ícones**: `ChevronLeft` (no cabeçalho expandido) e `ChevronRight` (no cabeçalho recolhido).

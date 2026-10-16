@@ -1,7 +1,7 @@
 export const navbarStyles = {
   // Barra superior fixa com leve transparência (efeito de vidro)
   container:
-    "w-full bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800 px-4 md:px-6 py-3 flex items-center justify-between gap-4 select-none sticky top-0 z-30 text-left",
+    "w-full bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800 px-4 md:px-6 py-3 flex items-center justify-between gap-4 select-none sticky top-0 z-40 text-left",
 
   // Seções Direita e Esquerda
   leftSection: "flex items-center gap-3 md:gap-4 overflow-hidden",
@@ -58,7 +58,7 @@ export const navbarStyles = {
 
   // Dropdown Flutuante (Menu do Usuário / Status)
   dropdownMenu:
-    "absolute right-0 top-full mt-2 w-56 bg-[#F4F4F5] dark:bg-[#262626] border border-[#D4D4D8] dark:border-neutral-700 rounded-xl shadow-2xl py-1.5 z-40 text-left animate-in fade-in zoom-in-95 duration-100",
+    "absolute right-0 top-full mt-2 w-56 bg-[#F4F4F5] dark:bg-[#262626] border border-[#D4D4D8] dark:border-neutral-700 rounded-xl shadow-2xl py-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-100",
   dropdownHeader:
     "px-3.5 py-2.5 border-b border-[#E4E4E7] dark:border-neutral-800",
   dropdownItem:
