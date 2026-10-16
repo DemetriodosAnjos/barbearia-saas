@@ -641,12 +641,12 @@ export default function TrialBanner({
 
   return (
     <>
-      {/* 1. FAIXA DE CONTAGEM REGRESSIVA NO TOPO */}
+      {/* 1. FAIXA DE CONTAGEM REGRESSIVA NO TOPO (MOBILE FIRST) */}
       {showBanner && (
         <div
           data-trial-banner="true"
           className={`
-            w-full px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs select-none shadow-md z-[100] sticky top-0 trial-banner-top
+            w-full px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-2.5 sm:gap-3 text-xs select-none shadow-md z-[100] sticky top-0 trial-banner-top text-center sm:text-left
             ${
               isExpired
                 ? "bg-red-950 border-b border-red-800 text-red-200"
@@ -656,7 +656,7 @@ export default function TrialBanner({
             }
           `}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center sm:justify-start gap-2 text-center sm:text-left">
             {isExpired ? (
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
             ) : (
@@ -680,19 +680,20 @@ export default function TrialBanner({
             </span>
           </div>
 
-          <Button
-            variant="primary"
+          <button
+            type="button"
+            data-trial-upgrade-btn="true"
             onClick={() => {
               setIsModalOpen(true);
               setErrorMessage("");
               setSuccessNotice("");
             }}
-            className="text-xs py-1 px-3 bg-amber-600 hover:bg-amber-500 text-white font-bold cursor-pointer"
+            className="trial-banner-upgrade-btn w-full sm:w-auto text-xs py-1.5 px-3.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold rounded-lg shadow-sm cursor-pointer transition-all flex items-center justify-center shrink-0"
           >
             {isExpired
               ? "Escolher Plano para Liberar"
               : "Fazer Upgrade / Assinar"}
-          </Button>
+          </button>
         </div>
       )}
 

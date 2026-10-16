@@ -1515,6 +1515,44 @@ html:not(.dark) [data-profile-save-divider] {
   border-top-color: #e4e4e7 !important;
 }
 
+/* ==========================================================================
+   BOTÃO UPGRADE / ASSINAR NO BANNER DE TRIAL (MOBILE FIRST)
+   Background: cor âmbar (#d97706 / #b45309 hover)
+   Cor do texto: #ffffff branca
+   ========================================================================== */
+.trial-banner-upgrade-btn,
+[data-trial-upgrade-btn],
+html:not(.dark) .trial-banner-upgrade-btn,
+html:not(.dark) [data-trial-upgrade-btn],
+html.dark .trial-banner-upgrade-btn,
+html.dark [data-trial-upgrade-btn] {
+  background-color: #d97706 !important; /* Âmbar */
+  color: #ffffff !important;            /* Branca */
+  border: 1px solid #d97706 !important;
+  font-weight: 700 !important;
+}
+
+.trial-banner-upgrade-btn:hover,
+[data-trial-upgrade-btn]:hover,
+html:not(.dark) .trial-banner-upgrade-btn:hover,
+html:not(.dark) [data-trial-upgrade-btn]:hover,
+html.dark .trial-banner-upgrade-btn:hover,
+html.dark [data-trial-upgrade-btn]:hover {
+  background-color: #b45309 !important; /* Âmbar Escuro Hover */
+  color: #ffffff !important;
+  border-color: #b45309 !important;
+}
+
+.trial-banner-upgrade-btn *,
+[data-trial-upgrade-btn] *,
+html:not(.dark) .trial-banner-upgrade-btn *,
+html:not(.dark) [data-trial-upgrade-btn] *,
+html.dark .trial-banner-upgrade-btn *,
+html.dark [data-trial-upgrade-btn] * {
+  color: #ffffff !important;
+}
+
+
 
 
 

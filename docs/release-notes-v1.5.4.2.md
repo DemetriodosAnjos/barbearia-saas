@@ -33,3 +33,12 @@
   - Tags ativas no Light Theme com fundo `#ECFDF5`, texto `#059669` e ícone "X" em branco puro `#ffffff`.
 - **Linha Divisória de Salvamento**:
   - Separador superior do botão "Salvar Alterações do Perfil" em cinza claro (`#e4e4e7`).
+
+### 4. Banner de Avaliação (Plano Trial) - Mobile First & Botão de Upgrade
+- **Layout Mobile First**:
+  - Alinhamento responsivo (`flex-col sm:flex-row`) com centralização em telas menores e fluidez horizontal em telas maiores.
+- **Botão "Fazer Upgrade / Assinar"**:
+  - **Background**: Cor **Âmbar** (`#d97706` / hover `#b45309`).
+  - **Cor do texto**: **Branca** (`#ffffff`).
+  - Isolado de sobrescritas globais de cor de botões em modo claro através da classe `.trial-banner-upgrade-btn` e do atributo `[data-trial-upgrade-btn]`.
+
