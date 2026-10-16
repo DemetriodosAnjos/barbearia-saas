@@ -330,7 +330,10 @@ export default function BarbershopSettingsView({
   return (
     <div className={settingsStyles.container}>
       {/* CABEÇALHO */}
-      <div className={settingsStyles.headerCard}>
+      <div
+        className={`${settingsStyles.headerCard} barbershop-settings-header-card`}
+        data-settings-header-card
+      >
         <div>
           <h1 className={settingsStyles.headerTitle}>
             <Settings className="w-5 h-5 text-amber-500 inline-block mr-2" />

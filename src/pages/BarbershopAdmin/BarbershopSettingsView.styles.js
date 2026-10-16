@@ -4,10 +4,10 @@ export const settingsStyles = {
 
   // Cabeçalho da Página de Configurações
   headerCard:
-    "p-6 bg-neutral-900 border border-neutral-800 rounded-3xl flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 shadow-xl",
+    "p-6 bg-[#FFFFFF] dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-3xl flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 shadow-xl",
   headerTitle:
-    "text-xl font-black text-white tracking-tight flex items-center gap-2",
-  headerSubtitle: "text-xs text-neutral-400 leading-relaxed mt-1",
+    "text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2",
+  headerSubtitle: "text-xs text-zinc-600 dark:text-neutral-400 leading-relaxed mt-1",
 
   // Card que envolve o conteúdo da aba
   tabContentCard:

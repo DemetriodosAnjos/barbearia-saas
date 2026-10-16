@@ -1215,6 +1215,25 @@ html:not(.dark) [data-settings-tab][aria-selected="true"]:hover [data-tab-icon] 
   stroke: #059669 !important;
 }
 
+/* ==========================================================================
+   CARD CONTAINER (BRANCO #FFFFFF) PARA VERSÃO LIGHT
+   Preservando as cores da versão DARK intactas
+   ========================================================================== */
+html:not(.dark) .profile-header-card,
+html:not(.dark) [data-profile-header-card],
+html:not(.dark) .barbershop-settings-header-card,
+html:not(.dark) [data-settings-header-card] {
+  background-color: #FFFFFF !important;
+}
+
+html.dark .profile-header-card,
+html.dark [data-profile-header-card],
+html.dark .barbershop-settings-header-card,
+html.dark [data-settings-header-card] {
+  background-color: #171717 !important;
+}
+
+
 
 
 

@@ -7,8 +7,8 @@ Este documento formaliza o refinamento visual e estrutural do cabeçalho de iden
 ---
 
 ## 2. Estrutura Visual do Card Container
-
-O cabeçalho é montado em um card container (`bg-white` no modo Light com fundo `#FFFFFF`; mantendo as cores neutras e escuras no modo Dark).
+ 
+O cabeçalho é montado em um **CARD (Container Branco #FFFFFF)** na versão Light (`bg-[#FFFFFF]` com fundo `#FFFFFF` e bordas sutis `border-zinc-200`; mantendo integralmente as cores neutras e escuras no modo Dark com `dark:bg-neutral-900` e `dark:border-neutral-800`).
 
 ### DIV 1 - Alinhado à Esquerda do Card Container
 1. **Avatar com Elipse Verde**:

@@ -950,7 +950,10 @@ export default function UserProfileView({
   return (
     <div className={profileStyles.container}>
       {/* CABEÇALHO DO PERFIL COM AVATAR EM DESTAQUE */}
-      <div className={profileStyles.headerCard}>
+      <div
+        className={`${profileStyles.headerCard} profile-header-card`}
+        data-profile-header-card
+      >
         {/* DIV 1 - Posição: Alinhado à esquerda do Card Container */}
         <div className="flex items-center gap-5 text-left min-w-0 flex-1">
           {/* Avatar com ação de troca ao passar o mouse */}
