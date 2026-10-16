@@ -1,7 +1,7 @@
 export const modalStyles = {
   // Fundo escurecido
   backdrop:
-    "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs transition-opacity duration-200",
+    "fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs transition-opacity duration-200",
 
   // Base do container
   containerBase:

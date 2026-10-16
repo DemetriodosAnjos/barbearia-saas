@@ -28,14 +28,33 @@
   - Rodapé atualizado para exibir `SaaS V1.5.4.1` no modo expandido e `V1.5.4.1` no modo recolhido (*collapsed*).
   - Preservada a formatação cromática aprovada na v1.5.4.0: verde esmeralda `#059669` no Modo Claro (*Theme Light*) e branco puro `#ffffff` no Modo Escuro (*Theme Dark*).
 
+### 3. Prevalência de Z-Index do Banner de Avaliação (Trial) sobre a Navbar no Scroll
+- **Problema Reportado**: Durante a execução do scroll da página, a `Navbar` estava sobrepondo (passando por cima com seu `z-index`) a barra de contagem regressiva: *"Período de Avaliação: Você tem X dias restantes de Teste Grátis na sua barbearia."*.
+- **Causa Raiz**:
+  - A barra de `TrialBanner` operava com `sticky top-0 z-30`.
+  - A `Navbar` possuía `sticky z-40`, o que fazia com que, ao rolar a página verticalmente, a Navbar passasse por cima do banner.
+- **Solução Implementada**:
+  - **Z-Index Prioritário do Banner (`z-[100]`)**: O componente `TrialBanner.jsx` agora conta com `sticky top-0 z-[100]`, atributo `data-trial-banner="true"` e classe `.trial-banner-top`.
+  - **Regra de Especificidade no CSS**: Em `src/index.css`, foi configurada a regra `[data-trial-banner="true"] { position: sticky !important; top: 0 !important; z-index: 100 !important; }`, garantindo que o banner prevaleça sobre todos os elementos da UI.
+  - **Deslocamento Dinâmico da Navbar (`top-[41px]` vs `top-0`)**: A `Navbar` foi adaptada para receber a prop `hasTrialBanner`. Quando a barbearia estiver em modo Trial com o banner ativo, a Navbar ancora em `top-[41px]`, garantindo visibilidade simultânea do banner e do cabeçalho sem colisões.
+  - **Modais e Overlays Elevados (`z-[200]`)**: As sobreposições de modais (`Modal.styles.js`, `ActionSpinnerOverlayModal.jsx`) foram atualizadas para `z-[200]` e toasts para `z-[250]`, assegurando que modais de upgrade e alertas cubram a tela inteira quando acionados.
+
 ---
 
 ## 📋 Arquivos Afetados
 - `metadata.json`
 - `index.html`
+- `src/components/dashboard/TrialBanner.jsx`
 - `src/components/calendar/CalendarView.styles.js`
+- `src/components/ui/Navbar.jsx`
 - `src/components/ui/Navbar.styles.js`
 - `src/components/ui/Sidebar.jsx`
+- `src/components/ui/Modal.styles.js`
+- `src/components/ui/ActionSpinnerOverlayModal.jsx`
+- `src/components/ToastContainer.tsx`
+- `src/pages/BarbershopAdmin/BarbershopDashboard.jsx`
+- `src/index.css`
 - `docs/module-agenda.md`
+- `docs/module-planos-e-trial-ux.md`
 - `docs/analise-ux-sidebar-theme-light.md`
 - `docs/release-notes-v1.5.4.1.md`

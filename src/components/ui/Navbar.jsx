@@ -25,6 +25,8 @@ export default function Navbar({
   onSupportClick,
   user,
   onLogout,
+  hasTrialBanner = false,
+  className = "",
 }) {
   const resolvedName =
     user?.name ||
@@ -154,7 +156,7 @@ export default function Navbar({
         <a href="#main-content" className="skip-to-content">
           Pular para o conteúdo principal
         </a>
-        <header className={navbarStyles.container}>
+        <header className={`${navbarStyles.container} ${hasTrialBanner ? "top-[41px]" : "top-0"} ${className}`}>
           <div className={navbarStyles.leftSection}>
             <div className={`${navbarStyles.avatar} navbar-avatar`} data-navbar-avatar="true">
               {resolvedUser.avatar}
@@ -218,7 +220,7 @@ export default function Navbar({
       <a href="#main-content" className="skip-to-content">
         Pular para o conteúdo principal
       </a>
-      <header className={navbarStyles.container}>
+      <header className={`${navbarStyles.container} ${hasTrialBanner ? "top-[41px]" : "top-0"} ${className}`}>
         {/* Lado Esquerdo: Hambúrguer Mobile + Breadcrumbs + Seletor de Filial */}
         <div className={navbarStyles.leftSection}>
           <button

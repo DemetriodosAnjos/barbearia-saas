@@ -73,6 +73,8 @@ export default function BarbershopDashboard({
         : (tenant?.trialDaysLeft ?? 7))
     : 0;
 
+  const hasTrialBanner = Boolean(isCurrentTrial && realDaysLeft !== undefined && realDaysLeft !== null);
+
   // Sincroniza o status ativo do plano da barbearia a partir do Supabase e escuta alterações em tempo real
   useEffect(() => {
     let isMounted = true;
@@ -430,6 +432,7 @@ export default function BarbershopDashboard({
           <Navbar
             variant="admin"
             tenant={tenant}
+            hasTrialBanner={hasTrialBanner}
             user={
               user || {
                 name: tenant?.name ? `Gestor ${DOMPurify.sanitize(tenant.name)}` : "Administrador",

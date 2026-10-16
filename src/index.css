@@ -1019,3 +1019,15 @@ html:not(.dark) input[type="date"]::-webkit-calendar-picker-indicator {
   --brand-600: #2563eb;
   --brand-700: #1d4ed8;
 }
+
+/* ======================================================== */
+/* 20. Banner de Período de Avaliação / Trial (Z-Index 100) */
+/* Prevalência absoluta sobre a Navbar e elementos da UI   */
+/* ======================================================== */
+[data-trial-banner="true"],
+.trial-banner-top {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+

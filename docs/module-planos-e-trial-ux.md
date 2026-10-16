@@ -101,3 +101,13 @@ O componente visual do topo (`TrialBanner`):
 ### 3. `src/pages/SuperAdmin/SuperAdminDashboard.jsx`
 - Disponibiliza a opção `{ value: "trial", label: "Plano de Teste (Trial Grátis 7 Dias - Exclusivo SuperAdmin)" }` no seletor de planos.
 - Ao salvar a transição para Trial, recalcula `trial_ends_at`, `trial_days_left: 7`, `status: "trial"` e sincroniza as tabelas `tenants`, `barbershops` e o cache do navegador (`safeStorage`).
+
+### 4. Hierarquia de Z-Index e Prevalência do Banner de Trial no Scroll (v1.5.4.1)
+- **Problema de Sobreposição:** Anteriormente, a `Navbar` (`sticky top-0 z-40`) sobrepunha a barra de contagem regressiva de Trial (`TrialBanner` com `z-30`) durante o scroll vertical da página.
+- **Prevalência Absoluta do Banner (`z-[100]`):**
+  - O contêiner de contagem regressiva (`TrialBanner.jsx`) recebeu `sticky top-0 z-[100]`, `data-trial-banner="true"` e a classe `.trial-banner-top`.
+  - Regra CSS com máxima especificidade adicionada em `src/index.css` (`z-index: 100 !important`).
+- **Harmonização do Scroll com a Navbar:**
+  - A `Navbar` foi ajustada para receber a prop `hasTrialBanner`. Quando o banner de teste estiver ativo, a Navbar adota deslocamento `top-[41px]`, garantindo que ambos fiquem visíveis e fixos no topo sem colisão durante toda a rolagem.
+  - Modais globais (`Modal.styles.js`, `ActionSpinnerOverlayModal.jsx`) operam com `z-[200]` para sobrepor adequadamente todos os elementos da tela ao serem acionados.
+

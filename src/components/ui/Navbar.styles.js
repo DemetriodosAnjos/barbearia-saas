@@ -1,7 +1,7 @@
 export const navbarStyles = {
   // Barra superior fixa com leve transparência (efeito de vidro)
   container:
-    "w-full bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800 px-4 md:px-6 py-3 flex items-center justify-between gap-4 select-none sticky top-0 z-40 text-left",
+    "w-full bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800 px-4 md:px-6 py-3 flex items-center justify-between gap-4 select-none sticky z-40 text-left",
 
   // Seções Direita e Esquerda
   leftSection: "flex items-center gap-3 md:gap-4 overflow-hidden",

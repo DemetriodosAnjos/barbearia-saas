@@ -644,8 +644,9 @@ export default function TrialBanner({
       {/* 1. FAIXA DE CONTAGEM REGRESSIVA NO TOPO */}
       {showBanner && (
         <div
+          data-trial-banner="true"
           className={`
-            w-full px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs select-none shadow-md z-30 sticky top-0
+            w-full px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs select-none shadow-md z-[100] sticky top-0 trial-banner-top
             ${
               isExpired
                 ? "bg-red-950 border-b border-red-800 text-red-200"
