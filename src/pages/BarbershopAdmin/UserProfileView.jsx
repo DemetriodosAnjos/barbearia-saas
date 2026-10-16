@@ -721,6 +721,8 @@ export default function UserProfileView({
         bio: professionalData.bio.trim(),
         pix_key: cleanPixKey,
         pixKey: cleanPixKey,
+        pix_type: professionalData.pixType || "CPF",
+        pixType: professionalData.pixType || "CPF",
         instagram: professionalData.instagram.trim(),
         specialties: professionalData.specialties,
         avatar_url: personalData.avatarSrc || user?.user_metadata?.avatar_url || "",
@@ -753,6 +755,7 @@ export default function UserProfileView({
           city: cleanCity || null,
           state: cleanState || null,
           pix_key: cleanPixKey || null,
+          pix_type: professionalData.pixType || "CPF",
           bio: professionalData.bio.trim() || null,
           instagram: professionalData.instagram.trim() || null,
           specialties: professionalData.specialties || [],
@@ -940,6 +943,28 @@ export default function UserProfileView({
     }
   };
 
+  const pixTypeOptions = [
+    { value: "CPF", label: "CPF" },
+    { value: "Celular", label: "Celular" },
+    { value: "E-mail", label: "E-mail" },
+    { value: "Aleatória", label: "Aleatória" },
+  ];
+
+  const getPixPlaceholder = (type) => {
+    switch (type) {
+      case "CPF":
+        return "000.000.000-00";
+      case "Celular":
+        return "(11) 99999-9999";
+      case "E-mail":
+        return "seuemail@exemplo.com";
+      case "Aleatória":
+        return "Chave aleatória (EVP)";
+      default:
+        return "Seu CPF, Celular, E-mail ou Aleatória";
+    }
+  };
+
   const profileTabs = [
     { id: "pessoal", label: "Dados Pessoais", icon: <ProjectIcon name="User" size={16} colorVariant="inherit" /> },
     { id: "contato", label: "Contato & Endereço", icon: <ProjectIcon name="MapPin" size={16} colorVariant="inherit" /> },
@@ -1121,7 +1146,14 @@ export default function UserProfileView({
         </Alert>
       )}
 
-      <div className={profileStyles.tabContentCard}>
+      <div
+        className={
+          activeTab === "profissional"
+            ? "space-y-6"
+            : `${profileStyles.tabContentCard} profile-tab-content-card`
+        }
+        data-profile-tab-content-card={activeTab !== "profissional" ? "true" : undefined}
+      >
         {/* ======================================================== */}
         {/* 1. DADOS PESSOAIS & IDENTIFICAÇÃO                        */}
         {/* ======================================================== */}
@@ -1130,7 +1162,12 @@ export default function UserProfileView({
             <div>
               <h3 className={profileStyles.sectionTitle}>
                 <span className="flex items-center gap-2">
-                  <ProjectIcon name="User" size={18} className="text-amber-500" />
+                  <ProjectIcon
+                    name="User"
+                    size={18}
+                    className="profile-section-icon text-[#059669] dark:text-amber-500"
+                    data-profile-section-icon
+                  />
                   Dados Pessoais & Identificação
                 </span>
               </h3>
@@ -1228,7 +1265,12 @@ export default function UserProfileView({
             <div>
               <h3 className={profileStyles.sectionTitle}>
                 <span className="flex items-center gap-2">
-                  <ProjectIcon name="MapPin" size={18} className="text-amber-500" />
+                  <ProjectIcon
+                    name="MapPin"
+                    size={18}
+                    className="profile-section-icon text-[#059669] dark:text-amber-500"
+                    data-profile-section-icon
+                  />
                   Contato & Endereço Residencial
                 </span>
               </h3>
@@ -1392,36 +1434,47 @@ export default function UserProfileView({
         {/* 3. MÓDULO PROFISSIONAL & CHAVE PIX DE COMISSÃO           */}
         {/* ======================================================== */}
         {activeTab === "profissional" && (
-          <div className="space-y-4">
-            <div>
-              <h3 className={profileStyles.sectionTitle}>
-                <span className="flex items-center gap-2">
-                  <ProjectIcon name="Scissors" size={18} className="text-amber-500" />
-                  Perfil Profissional & Repasse Financeiro
-                </span>
-              </h3>
-              <p className={profileStyles.sectionSubtitle}>
-                Dados para o fechamento de comissões semanais e portfólio para
-                os clientes.
-              </p>
-            </div>
-
-            {/* Chave Pix para Recebimento de Comissões */}
-            <div className="p-4 bg-emerald-950/20 border border-emerald-800/40 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <ProjectIcon name="DollarSign" size={15} colorVariant="inherit" />
-                  Chave PIX para Recebimento de Comissões
-                </span>
-                <span className="text-[10px] text-neutral-400">
-                  Repasse automático pelo gestor
-                </span>
+          <div className="space-y-6">
+            {/* CONTAINER 1: Cadastre sua chave PIX */}
+            <div
+              className="p-6 md:p-8 bg-white dark:bg-neutral-900/90 border border-zinc-200 dark:border-neutral-800 rounded-3xl space-y-5 shadow-sm profile-tab-content-card profile-pix-container"
+              data-profile-pix-container
+            >
+              <div>
+                <h3 className={profileStyles.sectionTitle}>
+                  <span className="flex items-center gap-2">
+                    <ProjectIcon
+                      name="Scissors"
+                      size={18}
+                      className="profile-section-icon text-[#059669] dark:text-amber-500"
+                      data-profile-section-icon
+                    />
+                    Cadastre sua chave PIX
+                  </span>
+                </h3>
+                <p className={profileStyles.sectionSubtitle}>
+                  Chave usada para recebimento dos atendimentos e comandas.
+                </p>
               </div>
 
-              <div className={profileStyles.gridTwoCols}>
+              {/* Grid com Inputs: Tipo de Chave, Chave PIX e Instagram */}
+              <div className={profileStyles.gridThreeCols}>
+                <Select
+                  label="Tipo de Chave"
+                  value={professionalData.pixType || "CPF"}
+                  onChange={(e) =>
+                    setProfessionalData({
+                      ...professionalData,
+                      pixType: e.target.value,
+                    })
+                  }
+                  options={pixTypeOptions}
+                  placeholder=""
+                />
+
                 <Input
                   label="Chave PIX Cadastrada"
-                  placeholder="Seu CPF, E-mail, Aleatória ou Telefone"
+                  placeholder={getPixPlaceholder(professionalData.pixType)}
                   value={professionalData.pixKey}
                   onChange={(e) => {
                     const nextKey = e.target.value;
@@ -1437,7 +1490,7 @@ export default function UserProfileView({
                 />
 
                 <Input
-                  label="Instagram Profissional (@)"
+                  label="Instagram Profissional"
                   placeholder="@seunome_barber"
                   value={professionalData.instagram}
                   onChange={(e) =>
@@ -1450,48 +1503,87 @@ export default function UserProfileView({
               </div>
             </div>
 
-            {/* Biografia Curta */}
-            <div className="space-y-1.5 text-left">
-              <label className="text-xs font-bold text-neutral-300">
-                Apresentação Profissional / Biografia (Até 250 caracteres)
-              </label>
-              <textarea
-                rows={3}
-                maxLength={250}
-                value={professionalData.bio}
-                onChange={(e) =>
+            {/* CONTAINER 2: Perfil Profissional */}
+            <div
+              className="p-6 md:p-8 bg-white dark:bg-neutral-900/90 border border-zinc-200 dark:border-neutral-800 rounded-3xl space-y-5 shadow-sm profile-tab-content-card profile-portfolio-container"
+              data-profile-portfolio-container
+            >
+              <div>
+                <h3 className="text-base font-bold text-[#18181B] dark:text-white flex items-center gap-2">
+                  <span className="flex items-center gap-2">
+                    <ProjectIcon
+                      name="User"
+                      size={18}
+                      className="profile-section-icon text-[#059669] dark:text-amber-500"
+                      data-profile-section-icon
+                    />
+                    Perfil Profissional
+                  </span>
+                </h3>
+                <p className="text-xs text-[#18181B] dark:text-neutral-400 leading-relaxed -mt-1">
+                  Crie seu perfil profissional que ficará visível aos clientes
+                </p>
+              </div>
+
+              {/* Biografia Curta */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-semibold text-[#18181B] dark:text-neutral-300">
+                  Apresentação Profissional / Biografia
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={250}
+                  value={professionalData.bio}
+                  onChange={(e) =>
+                    setProfessionalData({
+                      ...professionalData,
+                      bio: e.target.value,
+                    })
+                  }
+                  placeholder="Conte um pouco sobre sua trajetória, estilo de atendimento e cortes favoritos..."
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-white dark:bg-neutral-950 border border-zinc-300 dark:border-neutral-800 text-[#18181B] dark:text-neutral-200 placeholder-zinc-400 dark:placeholder-neutral-500 focus:outline-none focus:border-emerald-500 dark:focus:border-amber-500 transition-colors"
+                />
+                <p className="text-[10px] font-mono text-right text-[#18181B] dark:text-neutral-500">
+                  {professionalData.bio.length} / 250 caracteres
+                </p>
+              </div>
+
+              {/* Especialidades com TagInput (Rótulo, Tags e Sugestões centralizados) */}
+              <TagInput
+                label="Especialidades de Atendimento (Tags Ativas)"
+                tags={professionalData.specialties}
+                onChange={(newTags) =>
                   setProfessionalData({
                     ...professionalData,
-                    bio: e.target.value,
+                    specialties: newTags,
                   })
                 }
-                className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-neutral-950 border border-neutral-800 text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+                placeholder="Escreva sua especialidade e aperte TAB"
+                suggestions={[
+                  "Massoterapia",
+                  "Degradê Navalhado",
+                  "Barboterapia",
+                  "Platinado / Nevou",
+                  "Sobrancelha",
+                  "Visagismo",
+                ]}
               />
-              <p className={profileStyles.bioCounter}>
-                {professionalData.bio.length} / 250 caracteres
-              </p>
-            </div>
 
-            {/* Especialidades com TagInput (Rótulo, Tags e Sugestões centralizados) */}
-            <TagInput
-              label="Especialidades de Atendimento (Tags Ativas)"
-              tags={professionalData.specialties}
-              onChange={(newTags) =>
-                setProfessionalData({
-                  ...professionalData,
-                  specialties: newTags,
-                })
-              }
-              placeholder="Escreva sua especialidade e aperte TAB"
-              suggestions={[
-                "Massoterapia",
-                "Degradê Navalhado",
-                "Barboterapia",
-                "Platinado / Nevou",
-                "Sobrancelha",
-                "Visagismo",
-              ]}
-            />
+              {/* Botão Salvar Alterações para a Aba Profissional */}
+              <div
+                className="flex items-center justify-end pt-4 border-t border-zinc-200 dark:border-neutral-800 profile-save-divider"
+                data-profile-save-divider
+              >
+                <Button
+                  variant="primary"
+                  isLoading={isSaving}
+                  onClick={handleSaveProfile}
+                  className="text-xs py-2.5 px-6 font-bold shadow-md"
+                >
+                  Salvar Alterações do Perfil
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1503,7 +1595,12 @@ export default function UserProfileView({
             <div>
               <h3 className={profileStyles.sectionTitle}>
                 <span className="flex items-center gap-2">
-                  <ProjectIcon name="Lock" size={18} className="text-amber-500" />
+                  <ProjectIcon
+                    name="Lock"
+                    size={18}
+                    className="profile-section-icon text-[#059669] dark:text-amber-500"
+                    data-profile-section-icon
+                  />
                   Segurança & Autenticação
                 </span>
               </h3>
@@ -1525,7 +1622,7 @@ export default function UserProfileView({
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                     </svg>
                   ) : (
-                    <ProjectIcon name="Lock" size={20} className="text-amber-500" />
+                    <ProjectIcon name="Lock" size={20} className="text-[#059669] dark:text-amber-500" />
                   )}
                 </div>
                 <div>
@@ -1533,7 +1630,7 @@ export default function UserProfileView({
                     <p className={`text-xs font-bold ${isGoogleAuth ? "text-[#55555E] dark:text-[#55555E]" : "text-white"}`} data-google-auth-text="true">
                       {isGoogleAuth ? "Conta Google Vinculada" : "Login por E-mail e Senha"}
                     </p>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/15 text-[#059669] border border-emerald-500/30 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30">
                       Função: {roleLabel.split("&")[0].trim()}
                     </span>
                   </div>
@@ -1674,12 +1771,12 @@ export default function UserProfileView({
                     disabled={isLoadingSessions}
                     onClick={() => loadActiveSessions({ showSpinner: true, registerPresence: false })}
                     title="Atualizar lista de dispositivos conectados"
-                    className="p-1 rounded text-neutral-400 hover:text-amber-400 hover:bg-neutral-900 transition-colors cursor-pointer"
+                    className="p-1 rounded text-neutral-400 hover:text-[#059669] dark:hover:text-amber-400 hover:bg-neutral-900 transition-colors cursor-pointer"
                   >
                     <ProjectIcon
                       name="RefreshCw"
                       size={13}
-                      className={isLoadingSessions ? "animate-spin text-amber-500" : ""}
+                      className={isLoadingSessions ? "animate-spin text-[#059669] dark:text-amber-500" : "text-[#059669] dark:text-amber-500"}
                     />
                   </button>
                 </div>
@@ -1726,7 +1823,7 @@ export default function UserProfileView({
                         <ProjectIcon
                           name={session.isMobile ? "Smartphone" : "Laptop"}
                           size={18}
-                          className="text-amber-500"
+                          className="text-[#059669] dark:text-amber-500"
                         />
                       </div>
                       <div className={profileStyles.sessionInfo}>
@@ -1822,17 +1919,19 @@ export default function UserProfileView({
           </div>
         </Modal>
 
-        {/* BOTÃO SALVAR ALTERAÇÕES */}
-        <div className={profileStyles.footerActions}>
-          <Button
-            variant="primary"
-            isLoading={isSaving}
-            onClick={handleSaveProfile}
-            className="text-xs py-2.5 px-6 font-bold shadow-md"
-          >
-            Salvar Alterações do Perfil
-          </Button>
-        </div>
+        {/* BOTÃO SALVAR ALTERAÇÕES (Para abas de container único) */}
+        {activeTab !== "profissional" && (
+          <div className={profileStyles.footerActions}>
+            <Button
+              variant="primary"
+              isLoading={isSaving}
+              onClick={handleSaveProfile}
+              className="text-xs py-2.5 px-6 font-bold shadow-md"
+            >
+              Salvar Alterações do Perfil
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

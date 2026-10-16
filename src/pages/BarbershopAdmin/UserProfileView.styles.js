@@ -20,16 +20,16 @@ export const profileStyles = {
 
   // Bloco de Formulários por Aba
   tabContentCard:
-    "p-6 bg-neutral-900/90 border border-neutral-800 rounded-3xl space-y-6 shadow-xl",
-  sectionTitle: "text-base font-bold text-white flex items-center gap-2",
-  sectionSubtitle: "text-xs text-neutral-400 leading-relaxed -mt-1",
+    "p-6 bg-white dark:bg-neutral-900/90 border border-zinc-200 dark:border-neutral-800 rounded-3xl space-y-6 shadow-xl",
+  sectionTitle: "text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2",
+  sectionSubtitle: "text-xs text-zinc-600 dark:text-neutral-400 leading-relaxed -mt-1",
 
   // Linhas e Grades de Formulário
   gridTwoCols: "grid grid-cols-1 sm:grid-cols-2 gap-4",
   gridThreeCols: "grid grid-cols-1 sm:grid-cols-3 gap-4",
 
   // Contador de Caracteres da Bio
-  bioCounter: "text-[10px] font-mono text-right text-neutral-500",
+  bioCounter: "text-[10px] font-mono text-right text-zinc-500 dark:text-neutral-500",
 
   // Lista de Sessões / Dispositivos Conectados
   sessionItem:
@@ -42,5 +42,5 @@ export const profileStyles = {
 
   // Rodapé com Botão Salvar
   footerActions:
-    "flex items-center justify-end gap-3 pt-4 border-t border-neutral-800",
+    "flex items-center justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-neutral-800",
 };

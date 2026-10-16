@@ -1360,6 +1360,162 @@ html.dark .navbar-breadcrumb-separator {
   color: #52525b !important;
 }
 
+/* ==========================================================================
+   CONTAINER PAI DAS ABAS DO PERFIL (DIV PAI #FFFFFF BRANCO NO MODO CLARO)
+   ========================================================================== */
+html:not(.dark) .profile-tab-content-card,
+html:not(.dark) [data-profile-tab-content-card] {
+  background-color: #ffffff !important;
+  border-color: #e4e4e7 !important;
+}
+
+html.dark .profile-tab-content-card,
+html.dark [data-profile-tab-content-card] {
+  background-color: rgba(23, 23, 23, 0.9) !important;
+  border-color: #262626 !important;
+}
+
+/* ==========================================================================
+   CONTAINERS SEPARADOS DA ABA PERFIL & CHAVE PIX (LIGHT THEME)
+   Container 1: Cadastre sua chave PIX
+   Container 2: Perfil Profissional
+   ========================================================================== */
+html:not(.dark) .profile-pix-container,
+html:not(.dark) [data-profile-pix-container],
+html:not(.dark) .profile-portfolio-container,
+html:not(.dark) [data-profile-portfolio-container] {
+  background-color: #ffffff !important;
+  border: 1px solid #e4e4e7 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.dark .profile-pix-container,
+html.dark [data-profile-pix-container],
+html.dark .profile-portfolio-container,
+html.dark [data-profile-portfolio-container] {
+  background-color: rgba(23, 23, 23, 0.9) !important;
+  border: 1px solid #262626 !important;
+}
+
+/* ==========================================================================
+   ÍCONES DO PERFIL: LIGHT #059669 (VERDE) / DARK AMBER (#f59e0b)
+   ========================================================================== */
+html:not(.dark) .profile-section-icon,
+html:not(.dark) [data-profile-section-icon],
+html:not(.dark) .profile-section-icon svg,
+html:not(.dark) [data-profile-section-icon] svg,
+html:not(.dark) [data-profile-pix-container] .profile-section-icon,
+html:not(.dark) [data-profile-pix-container] .profile-section-icon svg,
+html:not(.dark) [data-profile-portfolio-container] .profile-section-icon,
+html:not(.dark) [data-profile-portfolio-container] .profile-section-icon svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+html.dark .profile-section-icon,
+html.dark [data-profile-section-icon],
+html.dark .profile-section-icon svg,
+html.dark [data-profile-section-icon] svg,
+html.dark [data-profile-pix-container] .profile-section-icon,
+html.dark [data-profile-pix-container] .profile-section-icon svg,
+html.dark [data-profile-portfolio-container] .profile-section-icon,
+html.dark [data-profile-portfolio-container] .profile-section-icon svg {
+  color: #f59e0b !important;
+  stroke: #f59e0b !important;
+}
+
+/* ==========================================================================
+   CONTAINER 2: REFINAMENTO PERFIL PROFISSIONAL & TAGS ATIVAS (LIGHT THEME)
+   ========================================================================== */
+/* Textos no modo claro para #18181B */
+html:not(.dark) [data-profile-portfolio-container] h3,
+html:not(.dark) [data-profile-portfolio-container] p,
+html:not(.dark) [data-profile-portfolio-container] label {
+  color: #18181B;
+}
+
+/* Área de Tags Ativas no Perfil: Container transparente e contorno cinza claro */
+html:not(.dark) .profile-active-tags-container,
+html:not(.dark) [data-active-tags-section] {
+  background-color: transparent !important;
+  border-color: #e4e4e7 !important;
+}
+
+html:not(.dark) [data-active-tags-header] {
+  color: #18181B !important;
+}
+
+html:not(.dark) [data-active-tags-subtitle] {
+  color: #18181B !important;
+}
+
+/* Tags Ativas: Fundo #ECFDF5 e Texto #059669 */
+html:not(.dark) .profile-tag-item,
+html:not(.dark) [data-profile-tag-item] {
+  background-color: #ECFDF5 !important;
+  color: #059669 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html:not(.dark) .profile-tag-item > span,
+html:not(.dark) [data-profile-tag-item] > span {
+  color: #059669 !important;
+}
+
+/* Ícone X (Lucide): Cor #ffffff (Branco) */
+html:not(.dark) .profile-tag-remove-btn,
+html:not(.dark) [data-profile-tag-remove] {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) .profile-tag-remove-btn svg,
+html:not(.dark) [data-profile-tag-remove] svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Sugestões rápidas (Light Theme):
+   Background: transparente
+   Contorno (stroke): Cor #171719
+   Fonte: Cor #171719
+   HOVER:
+   Background: transparente
+   Contorno (stroke): Cor: #059669 (verde)
+   Fonte: Cor: #059669 (verde) */
+html:not(.dark) .profile-suggestion-btn,
+html:not(.dark) [data-profile-suggestion-btn] {
+  background-color: transparent !important;
+  border: 1px solid #171719 !important;
+  color: #171719 !important;
+  transition: all 150ms ease-in-out;
+}
+
+html:not(.dark) .profile-suggestion-btn span,
+html:not(.dark) [data-profile-suggestion-btn] span {
+  color: #171719 !important;
+  transition: color 150ms ease-in-out;
+}
+
+html:not(.dark) .profile-suggestion-btn:hover,
+html:not(.dark) [data-profile-suggestion-btn]:hover {
+  background-color: transparent !important;
+  border-color: #059669 !important;
+  color: #059669 !important;
+}
+
+html:not(.dark) .profile-suggestion-btn:hover span,
+html:not(.dark) [data-profile-suggestion-btn]:hover span {
+  color: #059669 !important;
+}
+
+/* Linha divisória antes do botão Salvar Alterações: Cinza claro */
+html:not(.dark) .profile-save-divider,
+html:not(.dark) [data-profile-save-divider] {
+  border-top-color: #e4e4e7 !important;
+}
+
+
 
 
 

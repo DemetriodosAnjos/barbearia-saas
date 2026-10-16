@@ -74,7 +74,7 @@ export default function TagInput({
       {availableSuggestions.length > 0 && (
         <div className={tagInputStyles.suggestionsSection}>
           <p className={tagInputStyles.suggestionsHeader}>
-            <ProjectIcon name="Lightbulb" size={13} colorVariant="amber" />
+            <ProjectIcon name="Lightbulb" size={13} className="text-[#059669] dark:text-amber-400" />
             <span>Sugestões rápidas (clique para adicionar):</span>
           </p>
 
@@ -84,7 +84,8 @@ export default function TagInput({
                 key={sug}
                 type="button"
                 onClick={() => addTag(sug)}
-                className={tagInputStyles.suggestionBtn}
+                className={`${tagInputStyles.suggestionBtn} profile-suggestion-btn`}
+                data-profile-suggestion-btn
                 title={`Adicionar ${sug}`}
               >
                 <span>+</span>
@@ -96,10 +97,21 @@ export default function TagInput({
       )}
 
       {/* 3. TAGS ATIVAS DO PROFISSIONAL (PASSA PARA BAIXO) */}
-      <div className={tagInputStyles.activeSection}>
+      <div
+        className={`${tagInputStyles.activeSection} profile-active-tags-container`}
+        data-active-tags-section
+      >
         <div className={tagInputStyles.activeHeader}>
-          <span>Tags Ativas no Perfil</span>
-          <span className="text-[10px] text-neutral-500 font-normal lowercase">
+          <span
+            className="text-[#18181B] dark:text-amber-400 font-bold uppercase tracking-wider"
+            data-active-tags-header
+          >
+            TAGS ATIVAS NO PERFIL
+          </span>
+          <span
+            className="text-[10px] text-[#18181B] dark:text-neutral-500 font-normal lowercase"
+            data-active-tags-subtitle
+          >
             visíveis na agenda do cliente
           </span>
         </div>
@@ -107,15 +119,25 @@ export default function TagInput({
         <div className={tagInputStyles.tagsGrid}>
           {tags.length > 0 ? (
             tags.map((tag) => (
-              <span key={tag} className={tagInputStyles.tag}>
+              <span
+                key={tag}
+                className={`${tagInputStyles.tag} profile-tag-item`}
+                data-profile-tag-item
+              >
                 <span>{tag}</span>
                 <button
                   type="button"
                   onClick={() => removeTag(tag)}
-                  className={tagInputStyles.removeBtn}
+                  className={`${tagInputStyles.removeBtn} profile-tag-remove-btn`}
+                  data-profile-tag-remove
                   title={`Remover ${tag}`}
                 >
-                  <ProjectIcon name="X" size={10} colorVariant="inherit" />
+                  <ProjectIcon
+                    name="X"
+                    size={10}
+                    className="text-white dark:text-inherit"
+                    colorVariant="inherit"
+                  />
                 </button>
               </span>
             ))

@@ -22,7 +22,7 @@ export const tabsStyles = {
   // Botão da Aba - Variante 'profile' (Componente Meu Perfil)
   tabProfile: {
     base: "profile-tab-item group flex items-center gap-2 pb-3 px-1 text-sm font-semibold transition-all duration-150 border-b-2 -mb-[2px] cursor-pointer focus:outline-none",
-    active: "profile-tab-active border-[#059669] dark:border-amber-500 dark:text-amber-400 font-bold",
+    active: "profile-tab-active border-[#059669] text-[#059669] dark:border-amber-500 dark:text-amber-400 font-bold",
     inactive: "profile-tab-inactive border-[#52525B] dark:border-transparent dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:border-neutral-700 hover:border-[#059669]",
   },
 
