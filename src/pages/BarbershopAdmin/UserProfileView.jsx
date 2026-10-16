@@ -1048,7 +1048,8 @@ export default function UserProfileView({
         tabs={profileTabs}
         activeTab={activeTab}
         onChange={setActiveTab}
-        variant="line"
+        variant="profile"
+        className="profile-tabs"
       />
 
       {/* CONTEÚDO DA ABA ATIVA */}

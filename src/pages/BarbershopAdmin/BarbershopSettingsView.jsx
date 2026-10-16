@@ -305,11 +305,26 @@ export default function BarbershopSettingsView({
   };
 
   const settingsTabs = [
-    { id: "estabelecimento", label: "Estabelecimento", icon: "building2" },
-    { id: "agendamento", label: "Regras de Agenda", icon: "clock" },
-    { id: "horarios", label: "Funcionamento", icon: "calendar" },
-    { id: "whatsapp", label: "Notificações WhatsApp", icon: "messageSquare" },
-    { id: "financeiro", label: "Políticas & Sinal", icon: "creditCard" },
+    {
+      id: "estabelecimento",
+      label: "Estabelecimento",
+      icon: <Building2 className="w-4 h-4 shrink-0" aria-hidden="true" />,
+    },
+    {
+      id: "agendamento",
+      label: "Regras de Agenda",
+      icon: <Clock className="w-4 h-4 shrink-0" aria-hidden="true" />,
+    },
+    {
+      id: "horarios",
+      label: "Funcionamento",
+      icon: <Calendar className="w-4 h-4 shrink-0" aria-hidden="true" />,
+    },
+    {
+      id: "whatsapp",
+      label: "Notificação WhatsApp",
+      icon: <MessageSquare className="w-4 h-4 shrink-0" aria-hidden="true" />,
+    },
   ];
 
   return (
@@ -341,15 +356,17 @@ export default function BarbershopSettingsView({
         )}
       </div>
 
-      {/* NAVEGAÇÃO ENTRE AS 5 ABAS */}
+      {/* NAVEGAÇÃO ENTRE AS ABAS */}
       <Tabs
         tabs={settingsTabs}
         activeTab={activeTab}
         onChange={(tabId) => {
           setActiveTab(tabId);
           setSuccessMessage("");
+          setErrorMessage("");
         }}
-        variant="line"
+        variant="settings"
+        className="settings-tabs barbershop-settings-tabs"
       />
 
       {/* CONTEÚDO DA ABA ATIVA */}

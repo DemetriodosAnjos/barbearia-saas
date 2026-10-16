@@ -1040,4 +1040,181 @@ html:not(.dark) input[type="date"]::-webkit-calendar-picker-indicator {
   color: #55555E !important;
 }
 
+/* ======================================================== */
+/* 22. Componente Meu Perfil: Refinamento de Abas e Estados  */
+/* ======================================================== */
+
+/* LINE (Abaixo dos títulos: Dados Pessoais, Contato & Endereço, Perfil & Chave PIX, Segurança & Acesso) */
+/* DEFAULT: #52525B */
+html:not(.dark) .profile-tab-item,
+html:not(.dark) [data-profile-tab] {
+  border-bottom: 2px solid #52525B !important;
+  transition: all 150ms ease-in-out;
+}
+
+/* HOVER: #059669 (verde) */
+html:not(.dark) .profile-tab-item:hover,
+html:not(.dark) [data-profile-tab]:hover {
+  border-bottom-color: #059669 !important;
+}
+
+/* ATIVO: #059669 (verde) */
+html:not(.dark) .profile-tab-item.profile-tab-active,
+html:not(.dark) .profile-tab-item[aria-selected="true"],
+html:not(.dark) [data-profile-tab][aria-selected="true"] {
+  border-bottom-color: #059669 !important;
+}
+
+/* TITULOS (Dados Pessoais, Contato & Endereço, Perfil & Chave PIX, Segurança & Acesso) */
+/* DEFAULT: #52525B */
+html:not(.dark) .profile-tab-item .profile-tab-title,
+html:not(.dark) [data-profile-tab] [data-tab-title] {
+  color: #52525B !important;
+  transition: color 150ms ease-in-out;
+}
+
+/* HOVER: #262626 */
+html:not(.dark) .profile-tab-item:hover .profile-tab-title,
+html:not(.dark) [data-profile-tab]:hover [data-tab-title] {
+  color: #262626 !important;
+}
+
+/* ATIVO: #059669 (verde) */
+html:not(.dark) .profile-tab-item.profile-tab-active .profile-tab-title,
+html:not(.dark) .profile-tab-item[aria-selected="true"] .profile-tab-title,
+html:not(.dark) .profile-tab-item.profile-tab-active:hover .profile-tab-title,
+html:not(.dark) .profile-tab-item[aria-selected="true"]:hover .profile-tab-title,
+html:not(.dark) [data-profile-tab][aria-selected="true"] [data-tab-title],
+html:not(.dark) [data-profile-tab][aria-selected="true"]:hover [data-tab-title] {
+  color: #059669 !important;
+  font-weight: 700 !important;
+}
+
+/* ICONES (Dados Pessoais, Contato & Endereço, Perfil & Chave PIX, Segurança & Acesso) */
+/* DEFAULT: #52525B */
+html:not(.dark) .profile-tab-item .profile-tab-icon,
+html:not(.dark) .profile-tab-item .profile-tab-icon svg,
+html:not(.dark) [data-profile-tab] [data-tab-icon],
+html:not(.dark) [data-profile-tab] [data-tab-icon] svg {
+  color: #52525B !important;
+  stroke: #52525B !important;
+  transition: color 150ms ease-in-out, stroke 150ms ease-in-out;
+}
+
+/* HOVER: #262626 */
+html:not(.dark) .profile-tab-item:hover .profile-tab-icon,
+html:not(.dark) .profile-tab-item:hover .profile-tab-icon svg,
+html:not(.dark) [data-profile-tab]:hover [data-tab-icon],
+html:not(.dark) [data-profile-tab]:hover [data-tab-icon] svg {
+  color: #262626 !important;
+  stroke: #262626 !important;
+}
+
+/* ATIVO: #059669 (verde) */
+html:not(.dark) .profile-tab-item.profile-tab-active .profile-tab-icon,
+html:not(.dark) .profile-tab-item.profile-tab-active .profile-tab-icon svg,
+html:not(.dark) .profile-tab-item[aria-selected="true"] .profile-tab-icon,
+html:not(.dark) .profile-tab-item[aria-selected="true"] .profile-tab-icon svg,
+html:not(.dark) .profile-tab-item.profile-tab-active:hover .profile-tab-icon,
+html:not(.dark) .profile-tab-item.profile-tab-active:hover .profile-tab-icon svg,
+html:not(.dark) .profile-tab-item[aria-selected="true"]:hover .profile-tab-icon,
+html:not(.dark) .profile-tab-item[aria-selected="true"]:hover .profile-tab-icon svg,
+html:not(.dark) [data-profile-tab][aria-selected="true"] [data-tab-icon],
+html:not(.dark) [data-profile-tab][aria-selected="true"] [data-tab-icon] svg,
+html:not(.dark) [data-profile-tab][aria-selected="true"]:hover [data-tab-icon],
+html:not(.dark) [data-profile-tab][aria-selected="true"]:hover [data-tab-icon] svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* ======================================================== */
+/* 23. Componente Configurações da Barbearia (Versão Light) */
+/* OBS: NÃO ALTERAR A VERSÃO DARK (MANTER AS CORES)        */
+/* ======================================================== */
+
+/* LINE (Abaixo dos títulos: Estabelecimento, Regras de Agenda, Funcionamento, Notificação WhatsApp) */
+/* ESTADO DEFAULT: Color #52525B */
+html:not(.dark) .settings-tab-item,
+html:not(.dark) [data-settings-tab] {
+  border-bottom: 2px solid #52525B !important;
+  transition: all 150ms ease-in-out;
+}
+
+/* ESTADO HOVER (qdo mouse passa por cima): Color: #059669 (verde) */
+html:not(.dark) .settings-tab-item:hover,
+html:not(.dark) [data-settings-tab]:hover {
+  border-bottom-color: #059669 !important;
+}
+
+/* ESTADO ATIVO (clique do mouse): Color: #059669 (verde) */
+html:not(.dark) .settings-tab-item.settings-tab-active,
+html:not(.dark) .settings-tab-item[aria-selected="true"],
+html:not(.dark) [data-settings-tab][aria-selected="true"] {
+  border-bottom-color: #059669 !important;
+}
+
+/* TITULOS (Estabelecimento, Regras de Agenda, Funcionamento, Notificação WhatsApp) */
+/* ESTADO DEFAULT: Color #52525B */
+html:not(.dark) .settings-tab-item .settings-tab-title,
+html:not(.dark) [data-settings-tab] [data-tab-title] {
+  color: #52525B !important;
+  transition: color 150ms ease-in-out;
+}
+
+/* ESTADO HOVER (qdo mouse passa por cima): Color: #262626 */
+html:not(.dark) .settings-tab-item:hover .settings-tab-title,
+html:not(.dark) [data-settings-tab]:hover [data-tab-title] {
+  color: #262626 !important;
+}
+
+/* ESTADO ATIVO (clique do mouse): Color: #059669 (verde) */
+html:not(.dark) .settings-tab-item.settings-tab-active .settings-tab-title,
+html:not(.dark) .settings-tab-item[aria-selected="true"] .settings-tab-title,
+html:not(.dark) .settings-tab-item.settings-tab-active:hover .settings-tab-title,
+html:not(.dark) .settings-tab-item[aria-selected="true"]:hover .settings-tab-title,
+html:not(.dark) [data-settings-tab][aria-selected="true"] [data-tab-title],
+html:not(.dark) [data-settings-tab][aria-selected="true"]:hover [data-tab-title] {
+  color: #059669 !important;
+  font-weight: 700 !important;
+}
+
+/* ICONES (Estabelecimento, Regras de Agenda, Funcionamento, Notificação WhatsApp) */
+/* ESTADO DEFAULT: Color #52525B */
+html:not(.dark) .settings-tab-item .settings-tab-icon,
+html:not(.dark) .settings-tab-item .settings-tab-icon svg,
+html:not(.dark) [data-settings-tab] [data-tab-icon],
+html:not(.dark) [data-settings-tab] [data-tab-icon] svg {
+  color: #52525B !important;
+  stroke: #52525B !important;
+  transition: color 150ms ease-in-out, stroke 150ms ease-in-out;
+}
+
+/* ESTADO HOVER (qdo mouse passa por cima): Color: #262626 */
+html:not(.dark) .settings-tab-item:hover .settings-tab-icon,
+html:not(.dark) .settings-tab-item:hover .settings-tab-icon svg,
+html:not(.dark) [data-settings-tab]:hover [data-tab-icon],
+html:not(.dark) [data-settings-tab]:hover [data-tab-icon] svg {
+  color: #262626 !important;
+  stroke: #262626 !important;
+}
+
+/* ESTADO ATIVO (clique do mouse): Color: #059669 (verde) */
+html:not(.dark) .settings-tab-item.settings-tab-active .settings-tab-icon,
+html:not(.dark) .settings-tab-item.settings-tab-active .settings-tab-icon svg,
+html:not(.dark) .settings-tab-item[aria-selected="true"] .settings-tab-icon,
+html:not(.dark) .settings-tab-item[aria-selected="true"] .settings-tab-icon svg,
+html:not(.dark) .settings-tab-item.settings-tab-active:hover .settings-tab-icon,
+html:not(.dark) .settings-tab-item.settings-tab-active:hover .settings-tab-icon svg,
+html:not(.dark) .settings-tab-item[aria-selected="true"]:hover .settings-tab-icon,
+html:not(.dark) .settings-tab-item[aria-selected="true"]:hover .settings-tab-icon svg,
+html:not(.dark) [data-settings-tab][aria-selected="true"] [data-tab-icon],
+html:not(.dark) [data-settings-tab][aria-selected="true"] [data-tab-icon] svg,
+html:not(.dark) [data-settings-tab][aria-selected="true"]:hover [data-tab-icon],
+html:not(.dark) [data-settings-tab][aria-selected="true"]:hover [data-tab-icon] svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+
+
 

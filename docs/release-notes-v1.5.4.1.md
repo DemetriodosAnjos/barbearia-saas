@@ -48,6 +48,37 @@
   - `src/index.css`:
     - Regra com máxima especificidade adicionada para os seletores `[data-google-auth-text="true"]` e `[data-user-dropdown-google="true"]` garantindo a renderização consistente da cor `#55555E !important`.
 
+### 5. Refinamento de UI: Estados das Abas no Componente Meu Perfil (Default, Hover e Ativo)
+- **Ajuste Solicitado**: Padronização dos 3 estados (Default, Hover e Ativo) para Títulos, Ícones e Linha inferior das 4 abas (*Dados Pessoais*, *Contato & Endereço*, *Perfil & Chave PIX*, *Segurança & Acesso*):
+  - **Títulos**: Default `#52525B` | Hover `#262626` | Ativo `#059669` (verde esmeralda em negrito)
+  - **Ícones**: Default `#52525B` | Hover `#262626` | Ativo `#059669` (verde esmeralda)
+  - **Line (borda inferior)**: Default `#52525B` | Hover `#059669` (verde esmeralda) | Ativo `#059669` (verde esmeralda)
+- **Implementação**:
+  - `src/components/ui/Tabs.styles.js`: adicionada variante `profile` com `tabProfile` configurada para transições suaves e linha de borda inferior de 2px com preservação estrita do dark mode.
+  - `src/components/ui/Tabs.jsx`: renderização dos atributos e classes semânticas (`.profile-tab-title`, `.profile-tab-icon`, `.profile-tab-item`).
+  - `src/pages/BarbershopAdmin/UserProfileView.jsx`: integração de `variant="profile"` e `className="profile-tabs"`.
+  - `src/index.css`: regras com alta especificidade garantindo fidelidade cromática absoluta no modo claro e preservando o tema escuro.
+  - `docs/analise-ux-perfil-tabs-estados.md`: documentação técnica detalhada dos estados.
+
+### 6. Refinamento de UI: Estados das Abas no Componente Configurações da Barbearia
+- **Ajuste Solicitado**: Eliminação de ícones exibidos como strings nos títulos e inclusão de componentes oficiais da biblioteca `lucide-react`:
+  - `Estabelecimento`: `<Building2 />`
+  - `Regras de Agenda`: `<Clock />`
+  - `Funcionamento`: `<Calendar />`
+  - `Notificação WhatsApp`: `<MessageSquare />`
+- **Padronização Cromática na Versão Light (`html:not(.dark)`)**:
+  - **Títulos**: Default `#52525B` | Hover `#262626` | Ativo `#059669` (verde esmeralda em negrito)
+  - **Ícones**: Default `#52525B` | Hover `#262626` | Ativo `#059669` (verde esmeralda)
+  - **Line (borda inferior)**: Default `#52525B` | Hover `#059669` (verde esmeralda) | Ativo `#059669` (verde esmeralda)
+- **Preservação Estrita da Versão Dark (`html.dark`)**:
+  - Regras isoladas sob o seletor `html:not(.dark)`, mantendo cores nativas em âmbar (`text-amber-400`, `border-amber-500`) e neutros no modo escuro sem qualquer alteração.
+- **Implementação**:
+  - `src/pages/BarbershopAdmin/BarbershopSettingsView.jsx`: integração dos 4 títulos com ícones Lucide e variante `settings`.
+  - `src/components/ui/Tabs.styles.js`: adição de `tabSettings` e `listWrapper.settings`.
+  - `src/components/ui/Tabs.jsx`: atributos `data-settings-tab` e classes `.settings-tab-*`.
+  - `src/index.css`: seção 23 com regras exclusivas para a versão light.
+  - `docs/analise-ux-configuracoes-tabs-estados.md`: documentação técnica do componente.
+
 ---
 
 ## 📋 Arquivos Afetados
@@ -61,10 +92,15 @@
 - `src/components/ui/Modal.styles.js`
 - `src/components/ui/ActionSpinnerOverlayModal.jsx`
 - `src/components/ToastContainer.tsx`
+- `src/components/ui/Tabs.jsx`
+- `src/components/ui/Tabs.styles.js`
 - `src/pages/BarbershopAdmin/BarbershopDashboard.jsx`
+- `src/pages/BarbershopAdmin/BarbershopSettingsView.jsx`
 - `src/pages/BarbershopAdmin/UserProfileView.jsx`
 - `src/index.css`
 - `docs/module-agenda.md`
 - `docs/module-planos-e-trial-ux.md`
 - `docs/analise-ux-sidebar-theme-light.md`
+- `docs/analise-ux-perfil-tabs-estados.md`
+- `docs/analise-ux-configuracoes-tabs-estados.md`
 - `docs/release-notes-v1.5.4.1.md`
