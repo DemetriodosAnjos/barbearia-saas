@@ -1220,7 +1220,12 @@ html:not(.dark) [data-settings-tab][aria-selected="true"]:hover [data-tab-icon] 
    Preservando as cores da versão DARK intactas
    ========================================================================== */
 html:not(.dark) .profile-header-card,
-html:not(.dark) [data-profile-header-card],
+html:not(.dark) [data-profile-header-card] {
+  background-color: #FFFFFF !important;
+  border: 0 !important;
+  border-color: transparent !important;
+}
+
 html:not(.dark) .barbershop-settings-header-card,
 html:not(.dark) [data-settings-header-card] {
   background-color: #FFFFFF !important;
@@ -1231,6 +1236,89 @@ html.dark [data-profile-header-card],
 html.dark .barbershop-settings-header-card,
 html.dark [data-settings-header-card] {
   background-color: #171717 !important;
+}
+
+/* ==========================================================================
+   REFINAMENTO DE UI - HEADER (MEU PERFIL) LIGHT THEME
+   - Administrador: #059669 (verde)
+   - Demais elementos: #18181B
+   - Botão Voltar ao Painel: sem contorno, sem bg hover, hover #059669
+   ========================================================================== */
+
+/* 1. Texto Administrador em Verde #059669 */
+html:not(.dark) .profile-header-role,
+html:not(.dark) [data-profile-header-role] {
+  color: #059669 !important;
+}
+
+/* 2. Demais Textos em #18181B */
+html:not(.dark) .profile-header-text-dark,
+html:not(.dark) [data-profile-header-text-dark] {
+  color: #18181B !important;
+}
+
+/* 3. Ícones em #18181B */
+html:not(.dark) .profile-header-icon-dark,
+html:not(.dark) [data-profile-header-icon-dark] {
+  color: #18181B !important;
+  stroke: #18181B !important;
+}
+
+/* 4. Botão Voltar ao Painel (Link) */
+.profile-back-button,
+[data-profile-back-button] {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html:not(.dark) .profile-back-button,
+html:not(.dark) [data-profile-back-button] {
+  color: #18181B !important;
+  border: 0 !important;
+  border-width: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html:not(.dark) .profile-back-button *,
+html:not(.dark) [data-profile-back-button] * {
+  color: #18181B !important;
+  border: 0 !important;
+}
+
+html:not(.dark) .profile-back-button:hover,
+html:not(.dark) [data-profile-back-button]:hover {
+  color: #059669 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+}
+
+html:not(.dark) .profile-back-button:hover *,
+html:not(.dark) [data-profile-back-button]:hover * {
+  color: #059669 !important;
+  stroke: #059669 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.dark .profile-back-button,
+html.dark [data-profile-back-button] {
+  color: #a3a3a3 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html.dark .profile-back-button:hover,
+html.dark [data-profile-back-button]:hover,
+html.dark .profile-back-button:hover * {
+  color: #ffffff !important;
+  background: transparent !important;
 }
 
 

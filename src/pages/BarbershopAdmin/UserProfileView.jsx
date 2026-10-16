@@ -985,22 +985,37 @@ export default function UserProfileView({
 
           <div className="flex flex-col justify-center min-w-0">
             {/* TITULO: Nome do profissional (centralizado com o Avatar, sem o texto "(Deme Frost)") */}
-            <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight truncate">
+            <h2
+              className="profile-header-text-dark text-xl font-bold text-[#18181B] dark:text-white tracking-tight truncate"
+              data-profile-header-text-dark
+            >
               <SafeHtml html={personalData.fullName} />
             </h2>
 
             {/* DIV INLINE: Texto Administrador + Elipse + Apelido: Deme Frost */}
-            <div className="flex items-center gap-2 mt-1.5 text-xs text-zinc-600 dark:text-neutral-400 flex-wrap">
-              <span className="font-semibold text-zinc-800 dark:text-neutral-200">
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-[#18181B] dark:text-neutral-400 flex-wrap">
+              <span
+                className="profile-header-role font-semibold text-[#059669] dark:text-neutral-200"
+                data-profile-header-role
+              >
                 {normalizedRole === "employee" || normalizedRole === "barber"
                   ? "Barbeiro"
                   : normalizedRole === "superadmin"
                   ? "SuperAdmin"
                   : "Administrador"}
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-neutral-500 inline-block shrink-0" />
-              <span>
-                Apelido: <strong className="font-semibold text-zinc-800 dark:text-neutral-200"><SafeHtml html={personalData.displayName || personalData.fullName} /></strong>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#18181B]/40 dark:bg-neutral-500 inline-block shrink-0" />
+              <span
+                className="profile-header-text-dark text-[#18181B] dark:text-neutral-400"
+                data-profile-header-text-dark
+              >
+                Apelido:{" "}
+                <strong
+                  className="profile-header-text-dark font-semibold text-[#18181B] dark:text-neutral-200"
+                  data-profile-header-text-dark
+                >
+                  <SafeHtml html={personalData.displayName || personalData.fullName} />
+                </strong>
               </span>
             </div>
           </div>
@@ -1020,21 +1035,34 @@ export default function UserProfileView({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0 shadow-none outline-none group self-start md:self-end"
+              data-profile-back-button
+              className="profile-back-button inline-flex items-center gap-1.5 text-xs font-medium text-[#18181B] hover:text-[#059669] dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer border-0 border-none p-0 shadow-none outline-none focus:outline-none ring-0 group self-start md:self-end"
             >
-              <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
-              <span>Voltar ao Painel</span>
+              <ArrowLeft
+                size={14}
+                className="transition-colors transition-transform group-hover:-translate-x-0.5"
+              />
+              <span className="transition-colors">
+                Voltar ao Painel
+              </span>
             </button>
           ) : (
             <div />
           )}
 
           {/* DIV 3 - Posição: Alinhado no canto direito do Card Container na base (bottom) */}
-          <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-neutral-400 flex-wrap md:justify-end">
+          <div className="flex items-center gap-4 text-xs text-[#18181B] dark:text-neutral-400 flex-wrap md:justify-end">
             {/* Elemento 1: Ícone + email (biblioteca Lucide) */}
             <div className="inline-flex items-center gap-1.5">
-              <Mail size={13} className="text-zinc-400 dark:text-neutral-500 shrink-0" />
-              <span className="font-mono text-zinc-600 dark:text-neutral-300">
+              <Mail
+                size={13}
+                className="profile-header-icon-dark text-[#18181B] dark:text-neutral-500 shrink-0"
+                data-profile-header-icon-dark
+              />
+              <span
+                className="profile-header-text-dark font-mono text-[#18181B] dark:text-neutral-300"
+                data-profile-header-text-dark
+              >
                 {contactData.email || user?.email || "ddoanjos@gmail.com"}
               </span>
             </div>
@@ -1048,12 +1076,26 @@ export default function UserProfileView({
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                 </svg>
-                <span className="text-zinc-600 dark:text-neutral-300">Conta Google Vinculada</span>
+                <span
+                  className="profile-header-text-dark text-[#18181B] dark:text-neutral-300"
+                  data-profile-header-text-dark
+                >
+                  Conta Google Vinculada
+                </span>
               </div>
             ) : (
               <div className="inline-flex items-center gap-1.5">
-                <Lock size={13} className="text-zinc-400 dark:text-neutral-500 shrink-0" />
-                <span className="text-zinc-600 dark:text-neutral-300">Acesso por e-mail e senha</span>
+                <Lock
+                  size={13}
+                  className="profile-header-icon-dark text-[#18181B] dark:text-neutral-500 shrink-0"
+                  data-profile-header-icon-dark
+                />
+                <span
+                  className="profile-header-text-dark text-[#18181B] dark:text-neutral-300"
+                  data-profile-header-text-dark
+                >
+                  Acesso por e-mail e senha
+                </span>
               </div>
             )}
           </div>

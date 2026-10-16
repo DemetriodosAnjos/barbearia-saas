@@ -4,7 +4,7 @@ export const profileStyles = {
 
   // Cabeçalho com Cartão de Identificação Rápida
   headerCard:
-    "p-6 bg-[#FFFFFF] dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-3xl flex flex-col md:flex-row md:items-stretch justify-between gap-6 shadow-xl relative overflow-hidden",
+    "p-6 bg-[#FFFFFF] dark:bg-neutral-900 border-0 dark:border dark:border-neutral-800 rounded-3xl flex flex-col md:flex-row md:items-stretch justify-between gap-6 shadow-xl relative overflow-hidden",
   profileIdentity:
     "flex items-center gap-5 text-left flex-1 min-w-0",
   avatarWrapper: "relative group cursor-pointer shrink-0",
