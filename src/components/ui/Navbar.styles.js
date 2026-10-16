@@ -5,7 +5,7 @@ export const navbarStyles = {
 
   // Seções Direita e Esquerda
   leftSection: "flex items-center gap-3 md:gap-4 overflow-hidden",
-  rightSection: "flex items-center gap-2.5 md:gap-3 shrink-0",
+  rightSection: "flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0",
 
   // Botão hambúrguer no mobile para abrir a Sidebar
   menuButton:

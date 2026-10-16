@@ -5,6 +5,7 @@ import IconButton from "./IconButton";
 import ThemeToggle from "./ThemeToggle";
 import Modal from "./Modal";
 import ProjectIcon from "./ProjectIcon";
+import Avatar from "./Avatar";
 import { getBarbershopUnitName, formatUnitLocation } from "../../utils/unitLocation";
 
 export default function Navbar({
@@ -30,6 +31,8 @@ export default function Navbar({
 }) {
   const resolvedName =
     user?.name ||
+    user?.fullName ||
+    user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
     (user?.email ? user.email.split("@")[0] : "Administrador");
 
@@ -63,6 +66,18 @@ export default function Navbar({
     user?.app_metadata?.provider === "google"
   );
 
+  const resolvedAvatarSrc =
+    user?.avatarSrc ||
+    user?.avatar_url ||
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.avatarSrc ||
+    (typeof user?.avatar === "string" &&
+    (user.avatar.startsWith("http") ||
+      user.avatar.startsWith("blob:") ||
+      user.avatar.startsWith("data:"))
+      ? user.avatar
+      : null);
+
   const resolvedAvatar =
     user?.avatar ||
     (resolvedName && resolvedName.length >= 2
@@ -75,6 +90,7 @@ export default function Navbar({
     rawRole: normalizedRole,
     isGoogleAuth,
     avatar: resolvedAvatar,
+    avatarSrc: resolvedAvatarSrc,
     loyaltyPoints: user?.loyaltyPoints,
   };
 
@@ -158,22 +174,36 @@ export default function Navbar({
         </a>
         <header className={`${navbarStyles.container} ${hasTrialBanner ? "top-[41px]" : "top-0"} ${className}`}>
           <div className={navbarStyles.leftSection}>
-            <div className={`${navbarStyles.avatar} navbar-avatar`} data-navbar-avatar="true">
+            {/* Modo Claro: Preserva 100% o avatar original da navbar light */}
+            <div className={`${navbarStyles.avatar} navbar-avatar dark:hidden`} data-navbar-avatar="true">
               {resolvedUser.avatar}
             </div>
-          <div className="flex flex-col">
-            <span className={navbarStyles.clientGreeting}>Olá, bem-vindo!</span>
-            <span className={navbarStyles.clientName}>{resolvedUser.name}</span>
+
+            {/* Modo Escuro (Dark Theme): Miniatura do Avatar do Header de Meu Perfil */}
+            <div className="hidden dark:flex relative shrink-0 items-center justify-center" data-navbar-avatar-dark="true">
+              <Avatar
+                src={resolvedUser.avatarSrc}
+                name={resolvedUser.name}
+                size="sm"
+                status="available"
+                showStatusRing={false}
+                className="shrink-0"
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <span className={navbarStyles.clientGreeting}>Olá, bem-vindo!</span>
+              <span className={navbarStyles.clientName}>{resolvedUser.name}</span>
+            </div>
+
+            <div className={navbarStyles.clientBranchBadge}>
+              <ProjectIcon name="MapPin" size={13} colorVariant="amber" className="mr-1" />
+              <span>{currentUnitName} • 1.2 km</span>
+            </div>
           </div>
 
-          <div className={navbarStyles.clientBranchBadge}>
-            <ProjectIcon name="MapPin" size={13} colorVariant="amber" className="mr-1" />
-            <span>{currentUnitName} • 1.2 km</span>
-          </div>
-        </div>
-
-        <div className={navbarStyles.rightSection}>
-          <ThemeToggle className="hidden sm:inline-flex" />
+          <div className={navbarStyles.rightSection}>
+            <ThemeToggle className="inline-flex" />
 
           {resolvedUser.loyaltyPoints !== undefined && (
             <div
@@ -347,7 +377,7 @@ export default function Navbar({
             )}
           </div>
 
-          <ThemeToggle className="hidden sm:inline-flex" />
+          <ThemeToggle className="inline-flex" />
 
           {/* Notificações */}
           <div className={navbarStyles.notificationWrapper}>
@@ -380,11 +410,27 @@ export default function Navbar({
               data-avatar-button="true"
               data-active={isUserMenuOpen ? "true" : "false"}
             >
+              {/* Modo Claro: Preserva 100% o avatar original da navbar light */}
               <div
-                className={`${navbarStyles.avatar} navbar-avatar`}
+                className={`${navbarStyles.avatar} navbar-avatar dark:hidden`}
                 data-navbar-avatar="true"
               >
                 {resolvedUser.avatar}
+              </div>
+
+              {/* Modo Escuro (Dark Theme - Mobile First): Miniatura do Avatar do Header de Meu Perfil */}
+              <div
+                className="hidden dark:flex relative shrink-0 items-center justify-center"
+                data-navbar-avatar-dark="true"
+              >
+                <Avatar
+                  src={resolvedUser.avatarSrc}
+                  name={resolvedUser.name}
+                  size="sm"
+                  status={barberStatus === "busy" ? "in_service" : barberStatus === "break" ? "on_break" : "available"}
+                  showStatusRing={false}
+                  className="shrink-0"
+                />
               </div>
               <div className={navbarStyles.userMeta}>
                 <span className={navbarStyles.userName} data-user-name="true">{resolvedUser.name}</span>

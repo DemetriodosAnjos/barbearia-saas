@@ -48,13 +48,16 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
       <span
         className={`
           ${themeToggleStyles.iconBox}
-          ${isDark ? themeToggleStyles.iconActive : themeToggleStyles.iconInactive}
+          ${isDark ? "theme-toggle-active theme-toggle-moon-active bg-amber-600 dark:bg-amber-600 !bg-amber-600 text-white shadow-xs font-bold scale-105" : themeToggleStyles.iconInactive}
         `}
+        data-theme-active={isDark ? "true" : undefined}
+        data-theme-moon="true"
       >
         <ProjectIcon
           name="Moon"
           size={14}
-          colorVariant={isDark ? "amber" : "neutral"}
+          colorVariant={isDark ? "white" : "neutral"}
+          className={`icon-moon ${isDark ? "!text-white text-white" : ""}`}
         />
       </span>
 
@@ -62,8 +65,10 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
       <span
         className={`
           ${themeToggleStyles.iconBox}
-          ${!isDark ? `${themeToggleStyles.iconActive} theme-toggle-sun-active` : themeToggleStyles.iconInactive}
+          ${!isDark ? "theme-toggle-active theme-toggle-sun-active bg-[#059669] text-white shadow-xs font-bold scale-105" : themeToggleStyles.iconInactive}
         `}
+        data-theme-active={!isDark ? "true" : undefined}
+        data-theme-sun="true"
       >
         <ProjectIcon
           name="Sun"

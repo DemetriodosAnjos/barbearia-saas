@@ -1552,9 +1552,51 @@ html.dark [data-trial-upgrade-btn] * {
   color: #ffffff !important;
 }
 
+/* ==========================================================================
+   23. REFINAMENTO THEME TOGGLE: 
+   - VERSÃO DARK THEME (MOBILE FIRST): ELIPSE ÂMBAR (#D97706) & ÍCONE LUA BRANCO (#FFFFFF)
+   - VERSÃO LIGHT THEME: PRESERVA ELIPSE VERDE (#059669) & ÍCONE SOL BRANCO (#FFFFFF)
+   ========================================================================== */
 
+/* DARK THEME: Elipse Âmbar (#d97706) e Ícone Lua em Branco (#ffffff) */
+html.dark [data-theme-toggle] [data-theme-active="true"],
+html.dark [data-theme-toggle] .theme-toggle-active,
+html.dark [data-theme-toggle] .theme-toggle-moon-active,
+html.dark .theme-toggle-btn [data-theme-active="true"],
+html.dark .theme-toggle-btn .theme-toggle-moon-active,
+html.dark [data-theme-toggle] [data-theme-moon][data-theme-active="true"] {
+  background-color: #d97706 !important; /* Âmbar */
+  color: #ffffff !important;
+}
 
+html.dark [data-theme-toggle] .icon-moon,
+html.dark [data-theme-toggle] .icon-moon svg,
+html.dark [data-theme-toggle] [data-theme-moon] svg,
+html.dark .theme-toggle-btn .icon-moon svg,
+html.dark .theme-toggle-moon-active svg {
+  color: #ffffff !important; /* Branca */
+  stroke: #ffffff !important;
+}
 
+/* LIGHT THEME (PRESERVAÇÃO INTEGRAL): Elipse Verde (#059669) e Ícone Sol Branco (#ffffff) */
+html:not(.dark) [data-theme-toggle] [data-theme-active="true"],
+html:not(.dark) [data-theme-toggle] .theme-toggle-active,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active,
+html:not(.dark) .theme-toggle-btn [data-theme-active="true"],
+html:not(.dark) .theme-toggle-btn .theme-toggle-sun-active,
+html:not(.dark) [data-theme-toggle] [data-theme-sun][data-theme-active="true"] {
+  background-color: #059669 !important; /* Verde Esmeralda Oficial Light */
+  color: #ffffff !important;
+}
 
+html:not(.dark) [data-theme-toggle] [data-theme-sun][data-theme-active="true"] svg,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
 
-
+html:not(.dark) [data-theme-toggle] [data-theme-moon]:not([data-theme-active="true"]) svg,
+html:not(.dark) [data-theme-toggle] .icon-moon:not(.theme-toggle-active) svg {
+  color: #71717a !important;
+  stroke: #71717a !important;
+}
