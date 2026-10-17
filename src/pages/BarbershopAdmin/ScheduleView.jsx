@@ -51,6 +51,9 @@ export default function ScheduleView({
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
   const [isMercadoPagoModalOpen, setIsMercadoPagoModalOpen] = useState(false);
 
+  // Estado do cabeçalho da Agenda como Accordion expansível (fechado por padrão para economizar espaço)
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
+
   // Estados para Prontuário Técnico e Cadastro de Cliente a partir do Card
   const [selectedClientForRecord, setSelectedClientForRecord] = useState(null);
   const [clientRecordNotes, setClientRecordNotes] = useState("");
@@ -818,50 +821,93 @@ export default function ScheduleView({
 
   return (
     <div className={scheduleStyles.container}>
-      {/* 1. CABEÇALHO */}
-      <div className={scheduleStyles.headerCard}>
-        <div className={scheduleStyles.titleWrapper}>
-          <h1 className={scheduleStyles.title}>
-            <ProjectIcon name="Calendar" size={24} className="text-amber-500" />
-            <span>Agenda de Atendimentos</span>
-          </h1>
-          <p className={scheduleStyles.subtitle}>
-            Acompanhe atendimentos, altere a agenda dos profissionais, cadastre
-            novos clientes, produtos e serviços.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-          <div className={scheduleStyles.statsGroup}>
-            <div
-              className={`${scheduleStyles.statBadge} ${scheduleStyles.statAppointments}`}
-            >
-              <ProjectIcon name="Scissors" size={16} className="text-amber-500" />
-              <span>{totalTodayAppointments} cortes hoje</span>
+      {/* 1. CABEÇALHO EXPANSÍVEL (ACCORDION) */}
+      <div className={scheduleStyles.headerCard} data-schedule-accordion="true">
+        {/* Barra Superior Compacta (Clicável) */}
+        <button
+          type="button"
+          onClick={() => setIsHeaderExpanded((prev) => !prev)}
+          aria-expanded={isHeaderExpanded}
+          aria-label={
+            isHeaderExpanded
+              ? "Recolher detalhes da Agenda de Atendimentos"
+              : "Expandir detalhes da Agenda de Atendimentos"
+          }
+          className="w-full flex items-center justify-between text-left cursor-pointer focus:outline-none select-none group"
+          data-accordion-trigger="true"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
+              <ProjectIcon name="Calendar" size={20} className="text-amber-500" />
             </div>
-
-            <div
-              className={`${scheduleStyles.statBadge} ${scheduleStyles.statRevenue}`}
-            >
-              <ProjectIcon name="DollarSign" size={16} className="text-amber-500" />
-              <span>
-                R$ {totalEstimatedRevenue.toFixed(2).replace(".", ",")} previsto
-              </span>
-            </div>
+            <h1 className={scheduleStyles.title}>
+              <span>Agenda de Atendimentos</span>
+            </h1>
           </div>
 
-          {onBack && (
-            <Button
-              variant="secondary"
-              onClick={onBack}
-              className="text-xs py-2 px-3"
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            {onBack && (
+              <Button
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBack();
+                }}
+                className="text-xs py-1.5 px-2.5 sm:py-2 sm:px-3"
+              >
+                <span className="flex items-center gap-1.5">
+                  <ProjectIcon name="ArrowLeft" size={14} colorVariant="inherit" />
+                  <span className="hidden sm:inline">Voltar</span>
+                </span>
+              </Button>
+            )}
+
+            <div
+              className={`p-1.5 rounded-lg text-neutral-400 group-hover:text-white group-hover:bg-neutral-800/60 transition-all duration-300 ${
+                isHeaderExpanded ? "rotate-180 text-amber-400" : "rotate-0"
+              }`}
+              data-chevron-indicator="true"
             >
-              <span className="flex items-center gap-1.5">
-                <ProjectIcon name="ArrowLeft" size={14} colorVariant="inherit" />
-                Voltar
-              </span>
-            </Button>
-          )}
+              <ProjectIcon name="ChevronDown" size={18} />
+            </div>
+          </div>
+        </button>
+
+        {/* Conteúdo Expansível (Subtítulo + Pills de Resumo) */}
+        <div
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+            isHeaderExpanded
+              ? "grid-rows-[1fr] opacity-100 mt-3 pt-3 border-t border-neutral-800/80"
+              : "grid-rows-[0fr] opacity-0 mt-0 pt-0 border-t-0 pointer-events-none"
+          }`}
+          data-accordion-content="true"
+        >
+          <div className="overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-0.5">
+              <p className={scheduleStyles.subtitle}>
+                Acompanhe atendimentos, altere a agenda dos profissionais, cadastre
+                novos clientes, produtos e serviços.
+              </p>
+
+              <div className={scheduleStyles.statsGroup}>
+                <div
+                  className={`${scheduleStyles.statBadge} ${scheduleStyles.statAppointments}`}
+                >
+                  <ProjectIcon name="Scissors" size={15} className="text-amber-500" />
+                  <span>{totalTodayAppointments} cortes hoje</span>
+                </div>
+
+                <div
+                  className={`${scheduleStyles.statBadge} ${scheduleStyles.statRevenue}`}
+                >
+                  <ProjectIcon name="DollarSign" size={15} className="text-amber-500" />
+                  <span>
+                    R$ {totalEstimatedRevenue.toFixed(2).replace(".", ",")} previsto
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

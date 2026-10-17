@@ -2,13 +2,13 @@ export const scheduleStyles = {
   // Container principal
   container: "w-full space-y-6 text-left select-none",
 
-  // Cabeçalho da Agenda
+  // Cabeçalho da Agenda (Accordion Expansível)
   headerCard:
-    "p-5 md:p-6 bg-neutral-900 border border-neutral-800 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl",
+    "p-3.5 sm:p-4 md:p-5 bg-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl shadow-xl transition-all duration-300",
   titleWrapper: "space-y-1 text-left",
   title:
-    "text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2",
-  subtitle: "text-xs text-neutral-400 leading-relaxed",
+    "text-base sm:text-lg md:text-xl font-bold text-white tracking-tight flex items-center gap-2",
+  subtitle: "text-xs text-neutral-400 leading-relaxed max-w-2xl",
 
   // Badges de Resumo do Dia
   statsGroup: "flex flex-wrap items-center gap-3",

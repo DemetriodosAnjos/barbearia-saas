@@ -13,6 +13,7 @@ A **Agenda de Atendimentos** é o núcleo (Core Engine) da barbearia. É nela qu
 ## 2. Componentes Principais
 1. **`ScheduleView.jsx` (`src/pages/BarbershopAdmin/ScheduleView.jsx`):**
    - Painel principal da agenda no Dashboard da Barbearia.
+   - **Cabeçalho Expansível (Accordion):** O card principal inicia recolhido por padrão com título *"Agenda de Atendimentos"*, ícone de calendário e Chevron Down, expandindo suavemente via clique para revelar a nova copy descritiva (*"Acompanhe atendimentos, altere a agenda dos profissionais, cadastre novos clientes, produtos e serviços."*) e as tags de métricas do dia (`{N} cortes hoje` e `R$ previsto`).
    - Renderiza timeline por barbeiro (`BarberTimelineColumn`), cartões de atendimento (`AppointmentCard`), filtros de data e status.
    - Gerencia alterações de status em tempo real:
      - `confirmed` (Confirmado)

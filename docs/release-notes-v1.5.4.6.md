@@ -37,6 +37,16 @@
   * Invocação explícita de `initTheme()` no bootstrap da aplicação (`src/main.tsx`), montagem do componente principal (`src/App.jsx`) e auto-execução em `src/utils/theme.js`.
   * **Eliminação do Bug de Alternância no Avatar**: O menu suspenso do Avatar e o componente `ThemeToggle` não alteram mais o tema da página de forma inesperada ao serem clicados ou montados.
 
-### 5. Documentação Técnica
-* Documentação técnica detalhada formalizada em `docs/analise-ux-navbar-mobile-first-dark.md`.
+### 5. Otimização de Espaço Vertical: Card "Agenda de Atendimentos" Expansível (Accordion)
+* **Novo Formato Expansível (Accordion)**:
+  * O card principal passa a iniciar **recolhido (closed)** por padrão, reduzindo o consumo vertical do Dashboard.
+  * Cabeçalho compacto interativo com ícone do Calendário, título *"Agenda de Atendimentos"* e indicador **Chevron Down** rotativo.
+  * Transição suave via CSS Grid que revela a nova copy (*"Acompanhe atendimentos, altere a agenda dos profissionais, cadastre novos clientes, produtos e serviços."*) e as tags de métricas do dia (`{N} cortes hoje` e `R$ previsto`).
+
+### 6. Documentação Técnica
+* Documentação técnica detalhada formalizada em:
+  * `docs/analise-ux-navbar-mobile-first-dark.md` (Navbar e Tema Escuro)
+  * `docs/analise-ux-avatar-dropdown-dark-theme.md` (Menu Dropdown do Avatar)
+  * `docs/analise-ux-agenda-accordion.md` (Card da Agenda Expansível)
+  * `docs/module-agenda.md` (Módulo da Agenda Atualizado)
 
