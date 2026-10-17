@@ -59,12 +59,12 @@ export const navbarStyles = {
 
   // Dropdown Flutuante (Menu do Usuário / Status)
   dropdownMenu:
-    "absolute right-0 top-full mt-2 w-56 bg-[#F4F4F5] dark:bg-[#262626] border border-[#D4D4D8] dark:border-neutral-700 rounded-xl shadow-2xl py-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-100",
+    "absolute right-0 top-full mt-2 w-56 bg-[#F4F4F5] dark:bg-[#262626] border border-[#D4D4D8] dark:border-[#969696] rounded-xl shadow-2xl py-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-100",
   dropdownHeader:
-    "px-3.5 py-2.5 border-b border-[#E4E4E7] dark:border-neutral-800",
+    "px-3.5 py-2.5 border-b border-[#E4E4E7] dark:border-[#969696]",
   dropdownItem:
-    "w-full px-3.5 py-2 text-xs font-medium text-[#55555E] dark:text-neutral-300 hover:bg-[#262626] hover:text-white dark:hover:bg-neutral-800/80 dark:hover:text-white transition-colors flex items-center gap-2.5 cursor-pointer",
-  dropdownDivider: "my-1 border-t border-[#E4E4E7] dark:border-neutral-800",
+    "w-full px-3.5 py-2 text-xs font-medium text-[#55555E] dark:text-[#969696] hover:bg-[#262626] hover:text-white dark:hover:bg-neutral-800/80 dark:hover:text-white transition-colors flex items-center gap-2.5 cursor-pointer",
+  dropdownDivider: "my-1 border-t border-[#E4E4E7] dark:border-[#969696]",
 
   // Elementos Exclusivos da Navbar do Cliente
   clientBrandWrapper: "flex items-center gap-3",

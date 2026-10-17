@@ -826,20 +826,35 @@ html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active:h
 }
 
 /* ======================================================== */
-/* PRESERVAÇÃO INTEGRAL DA VERSÃO DARK (MANTER AS CORES)    */
+/* PRESERVAÇÃO INTEGRAL DA VERSÃO DARK (PALETA #969696)     */
 /* ======================================================== */
-/* Ativo / Menu Dropdown no Modo Escuro: BG #262626 */
+/* Ativo / Menu Dropdown no Modo Escuro: BG #262626 e Borda #969696 */
 html.dark [data-avatar-button][data-active="true"],
 html.dark [data-user-dropdown-menu],
 html.dark .avatar-dropdown-menu {
   background-color: #262626 !important;
-  border-color: #3f3f46 !important;
+  border-color: #969696 !important;
 }
 
-/* Titulo Dark: Neutral-200 (#e5e5e5) */
-html.dark [data-user-name],
-html.dark .avatar-user-name {
-  color: #e5e5e5 !important;
+/* 1. Identificador de Usuário (Header do Dropdown): #969696 */
+html.dark [data-user-dropdown-header] [data-user-name],
+html.dark [data-user-dropdown-header] [data-user-dropdown-name],
+html.dark [data-user-dropdown-name],
+html.dark [data-user-dropdown-header] p,
+html.dark [data-user-dropdown-google],
+html.dark [data-user-dropdown-auth],
+html.dark [data-user-dropdown-text="email-senha"] {
+  color: #969696 !important;
+}
+
+/* 3. Linhas Divisórias (Borders / Separators) no Dropdown: #969696 */
+html.dark [data-user-dropdown-header],
+html.dark [data-user-dropdown-divider],
+html.dark .avatar-dropdown-menu [data-user-dropdown-divider],
+html.dark .avatar-dropdown-menu hr,
+html.dark [data-user-dropdown-menu] .border-b,
+html.dark [data-user-dropdown-menu] .border-t {
+  border-color: #969696 !important;
 }
 
 /* Administrador Dark: Color #FFB900 */
@@ -871,16 +886,23 @@ html.dark .avatar-dropdown-item:focus {
   background-color: #3f3f46 !important;
 }
 
+/* 2. Itens de Navegação (Links do Menu) em repouso no Dark: #969696 */
+html.dark .avatar-dropdown-item,
+html.dark .avatar-dropdown-item span,
+html.dark .avatar-dropdown-item [data-user-dropdown-text],
+html.dark [data-user-dropdown-text="perfil"],
+html.dark [data-user-dropdown-text="configuracoes"],
+html.dark [data-user-dropdown-text="suporte"],
+html.dark [data-user-dropdown-text="sair"] {
+  color: #969696 !important;
+}
+
+/* Hover e Foco dos Links: Branco puro (#ffffff) para contraste ótimo */
 html.dark .avatar-dropdown-item:hover span,
 html.dark .avatar-dropdown-item:focus span,
 html.dark .avatar-dropdown-item:hover [data-user-dropdown-text],
 html.dark .avatar-dropdown-item:focus [data-user-dropdown-text] {
   color: #ffffff !important;
-}
-
-/* TEXTOS Dark: neutral-300 / neutral-400 / red-400 */
-html.dark [data-user-dropdown-text="sair"] {
-  color: #f87171 !important;
 }
 
 /* Ícone Hambúrguer Dark: Manter #a3a3a3 / hover #ffffff */
