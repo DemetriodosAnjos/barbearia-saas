@@ -823,11 +823,11 @@ export default function ScheduleView({
         <div className={scheduleStyles.titleWrapper}>
           <h1 className={scheduleStyles.title}>
             <ProjectIcon name="Calendar" size={24} className="text-amber-500" />
-            <span>Agenda Operacional de Atendimentos</span>
+            <span>Agenda de Atendimentos</span>
           </h1>
           <p className={scheduleStyles.subtitle}>
-            Acompanhe atendimentos, altere barbeiros, cadastre novos serviços
-            on-the-fly e gerencie horários.
+            Acompanhe atendimentos, altere a agenda dos profissionais, cadastre
+            novos clientes, produtos e serviços.
           </p>
         </div>
 
