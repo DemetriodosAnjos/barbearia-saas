@@ -1,9 +1,9 @@
-# Análise UX: Bottom Navigation Bar Mobile com Ação Rápida Central (Layout 2+1+2)
+# Análise UX: Bottom Navigation Bar Mobile com Ação Rápida Central e Menu Popover (Layout 2+1+2)
 
 **Data:** Outubro de 2026  
 **Versão:** v1.5.4.8  
 **Componentes:** `BottomNavigation.jsx`, `BottomNavigation.styles.js`, `BarbershopDashboard.jsx`, `BarbershopDashboard.styles.js`  
-**Objetivo:** Proporcionar navegação ergonômica de alto desempenho na zona do polegar (*thumb zone*) em dispositivos móveis, com acesso instantâneo às 4 áreas vitais da barbearia e destaque proeminente para a criação de novos atendimentos.
+**Objetivo:** Proporcionar navegação ergonômica de alto desempenho na zona do polegar (*thumb zone*) em dispositivos móveis, com acesso instantâneo às 4 áreas vitais da barbearia, destaque proeminente para a criação de novos atendimentos e acesso rápido a configurações e perfil via Menu Popover "Mais".
 
 ---
 
@@ -14,8 +14,16 @@ A barra inferior foi desenhada respeitando o princípio de Fitts e o padrão erg
 ```
 +-------------------------------------------------------------------------+
 | [Agenda]    [Clientes]    [ (✂️) Novo Atendimento ]    [Financeiro]   [Mais]  |
-|  (Home)                     (CTA Central Elevado)                             |
-+-------------------------------------------------------------------------+
+|  (Home)                     (CTA Central Elevado)              |        |
++----------------------------------------------------------------|--------+
+                                                                 v
+                                                     [ Popover Suspenso ]
+                                                     - Modo de Exibição (Switch)
+                                                     - Meu Perfil
+                                                     - Configurações da Barbearia
+                                                     - Suporte & Ajuda
+                                                     ---------------------------
+                                                     - Sair da Plataforma
 ```
 
 ### Distribuição Rigorosa dos Elementos
@@ -28,36 +36,64 @@ A barra inferior foi desenhada respeitando o princípio de Fitts e o padrão erg
 4. **Financeiro** — Ícone: `DollarSign` *(Direita do centro)*
    - Visão consolidada de receitas, comissões dos barbeiros e faturamento.
 5. **Mais / Perfil** — Ícone: `Menu` *(Extrema direita)*
-   - Menu lateral e central de configurações, equipe, serviços e perfil do gestor.
+   - Conectado diretamente ao Menu Popover suspenso de configurações rápidas, perfil e modo de exibição.
 
 ---
 
-## 2. Padrões Visuais e Microinterações
+## 2. Cantos Arredondados Superiores e Prevenção de Vazamento de Tema (Dark Mode)
 
-- **Elevação do CTA Central:**
-  - Deslocamento vertical negativo (`-mt-6`) projetando o botão para fora da barra.
-  - Formato circular com anel de proteção (`border-4 border-white dark:border-neutral-900 ring-2 ring-orange-500/20`).
-  - Gradiente vibrante laranja/âmbar (`bg-gradient-to-tr from-orange-600 to-amber-500`) com sombra quente projetada (`shadow-lg shadow-orange-600/40`).
-  - Feedback tátil em dispositivos touch (`active:scale-95 transition-all`).
-- **Estados Ativo vs. Inativo:**
-  - **Ativo:** Tipografia em negrito com tom âmbar/laranja (`text-orange-600 dark:text-amber-400 font-bold`), micro-indicador esférico na base e atributo de acessibilidade `aria-current="page"`.
-  - **Inativo:** Tom neutro balanceado (`text-zinc-500 dark:text-neutral-400 font-medium`), evitando fadiga visual e direcionando a atenção para o conteúdo.
-- **Glassmorphism e Contraste:**
-  - Fundo translúcido com desfoque de alta densidade (`bg-white/95 dark:bg-neutral-900/95 backdrop-blur-lg`) e linha de corte superior sutil (`border-t border-zinc-200 dark:border-neutral-800/80`).
+### Cantos Arredondados Superiores (`rounded-t-2xl`)
+- Arredondamento aplicado estritamente na parte superior da barra (`border-top-left-radius: 1rem; border-top-right-radius: 1rem; border-bottom-left-radius: 0; border-bottom-right-radius: 0;`).
+- Linha divisória superior com tom sutil neutro (`border-t border-x border-neutral-800/90`).
+
+### Blindagem Contra Vazamento de Tema (Anti-Leak)
+- **Causa Raiz Identificada:** Em regras globais de modo claro (`html:not(.dark)`), utilitários `.bg-neutral-900` poderiam ser forçados a fundo claro (`#ffffff`), gerando clarões ou vazamentos nas curvas arredondadas em navegadores mobile (Safari, Chrome).
+- **Solução Implementada:**
+  1. Aplicação explícita e direta de `style={{ backgroundColor: '#171717', borderTopLeftRadius: '1rem', borderTopRightRadius: '1rem' }}` no container da Bottom Bar.
+  2. Inclusão de regra prioritária no `index.css` assegurando que `nav[data-testid="bottom-navigation-bar"]` e `[data-testid="bottom-nav-more-popover"]` mantenham `#171717` sem exceções.
+  3. Adição das meta tags `<meta name="theme-color" content="#171717" />` e `<meta name="color-scheme" content="dark" />` no `index.html`.
 
 ---
 
-## 3. Prevenção de Sobreposição de Conteúdo (Content Padding)
+## 3. Menu Suspenso ("Mais")
 
-Para evitar que a barra inferior fixa oculte cards, tabelas, botões de ação e dados do rodapé das telas:
-- Margem inferior expandida no container principal: `pb-32 md:pb-8`.
+Ancorado imediatamente acima da aba "Mais" no canto inferior direito, o Popover exibe uma interface compacta, elegante e fluida:
+
+1. **Modo de Exibição (Theme Toggle):**
+   - Chave seletora (*toggle switch*) acessível (`role="switch"`) com ícones de Lua (`Dark`) e Sol (`Light`).
+   - Permite alternar o tema do sistema com sincronização instantânea em memória e `safeStorage`.
+2. **Meu Perfil:**
+   - Ícone de usuário (`User`) + texto `Meu Perfil`.
+   - Navega para a tela `perfil` e fecha o popover.
+3. **Configurações da Barbearia:**
+   - Ícone de engrenagem (`Settings`) + texto `Configurações da Barbearia`.
+   - Navega para a tela `configuracoes` e fecha o popover.
+4. **Suporte & Ajuda:**
+   - Ícone de balão (`HelpCircle`) + texto `Suporte & Ajuda`.
+   - Navega para a tela `suporte` e fecha o popover.
+5. **Divisor Interno:** Linha sutil separando itens administrativos da ação destrutiva.
+6. **Sair da Plataforma:**
+   - Ícone de logout (`LogOut`) + texto `Sair da Plataforma` em tom de alerta (`text-red-400`).
+   - Executa a função segura de logout `onLogout` e expurga os dados de sessão.
+
+### Lógica de Fechamento (*Click Outside* & Acessibilidade)
+- Escuta ativa para cliques ou toques fora da área do Popover (`mousedown` e `touchstart`).
+- Suporte à tecla `Escape` (`keydown`) para fechamento rápido via teclado.
+- Backdrop invisível protetor para dispositivos touchscreen.
+
+---
+
+## 4. Prevenção de Sobreposição de Conteúdo (Content Padding)
+
+- Margem inferior expandida no container principal das telas: `pb-32 md:pb-8`.
 - Margem segura integrada na base da barra para aparelhos com barra de navegação por gestos: `pb-[max(0.65rem,env(safe-area-inset-bottom))]`.
 
 ---
 
-## 4. Testes e Acessibilidade (WCAG 2.2 AA)
+## 5. Testes e Acessibilidade (WCAG 2.2 AA)
 
 - `role="navigation"` com rótulo descritivo `aria-label="Navegação inferior mobile"`.
-- `aria-current="page"` dinâmico para leitores de tela na aba ativa.
+- Popover com `role="menu"` e botões com `role="menuitem"`.
+- Switch com `role="switch"` e `aria-checked`.
 - Áreas de toque de no mínimo 48x48px em conformidade com as diretrizes do Google Material e Apple HIG.
-- Cobertura por testes automatizados em `src/tests/components/BottomNavigation.test.jsx`.
+- Suíte completa de testes automatizados em `src/tests/components/BottomNavigation.test.jsx`.

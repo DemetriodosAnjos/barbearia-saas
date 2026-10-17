@@ -1,15 +1,15 @@
 export const bottomNavStyles = {
-  // Barra inferior fixa com efeito de vidro e borda superior sutil (fixa na base no mobile)
+  // Barra inferior fixa com cantos arredondados apenas no topo e dark theme nativo (sem vazamento)
   containerFixed:
-    "fixed bottom-0 inset-x-0 z-50 md:hidden bg-white/95 dark:bg-neutral-900/95 backdrop-blur-lg border-t border-zinc-200 dark:border-neutral-800/80 px-2 pt-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-2xl select-none",
+    "fixed bottom-0 left-0 right-0 z-50 md:hidden bg-neutral-900 text-neutral-100 border-t border-x border-neutral-800/90 rounded-t-2xl px-2 pt-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(0,0,0,0.6)] select-none",
 
   // Versão embutida (ideal para preview/testes sem esconder em desktop)
   containerStatic:
-    "w-full bg-white/95 dark:bg-neutral-900/95 backdrop-blur-lg border-t border-zinc-200 dark:border-neutral-800/80 px-2 pt-1.5 pb-2 select-none",
+    "w-full bg-neutral-900 text-neutral-100 border-t border-x border-neutral-800/90 rounded-t-2xl px-2 pt-1.5 pb-2 select-none shadow-lg",
 
   // Layout simétrico de 5 itens (2 + 1 + 2) em grid de 5 colunas rigorosamente iguais
   navGrid:
-    "w-full max-w-md mx-auto grid grid-cols-5 items-center justify-items-center",
+    "w-full max-w-md mx-auto grid grid-cols-5 items-center justify-items-center relative",
 
   // Cada botão de aba regular (colunas 1, 2, 4, 5)
   tabButton:
@@ -19,7 +19,7 @@ export const bottomNavStyles = {
   tabActive:
     "text-orange-600 dark:text-amber-400 font-bold",
   tabInactive:
-    "text-zinc-500 hover:text-zinc-800 dark:text-neutral-400 dark:hover:text-neutral-200 font-medium",
+    "text-zinc-400 hover:text-zinc-200 dark:text-neutral-400 dark:hover:text-neutral-200 font-medium",
 
   // Ícone e Rótulo da aba
   iconWrapper:
@@ -41,8 +41,20 @@ export const bottomNavStyles = {
   centerButtonWrapper:
     "flex flex-col items-center justify-center -mt-6 w-full cursor-pointer focus:outline-none select-none group min-h-[60px] relative z-10",
   centerButton:
-    "w-13 h-13 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 active:from-orange-700 active:to-amber-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/40 transition-all duration-200 active:scale-95 border-4 border-white dark:border-neutral-900 group-hover:scale-105 ring-2 ring-orange-500/20",
+    "w-13 h-13 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 active:from-orange-700 active:to-amber-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/40 transition-all duration-200 active:scale-95 border-4 border-neutral-900 group-hover:scale-105 ring-2 ring-orange-500/20",
   centerLabel:
     "text-[9.5px] font-bold text-orange-600 dark:text-amber-400 mt-0.5 truncate max-w-[85px] text-center tracking-tight leading-tight",
+
+  // Menu Suspenso Popover ("Mais")
+  morePopover:
+    "absolute bottom-[calc(100%+12px)] right-1 sm:right-2 z-50 w-70 max-w-[calc(100vw-1.5rem)] bg-neutral-900/98 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl shadow-black/80 p-2 text-neutral-100 select-none animate-in fade-in zoom-in-95 duration-150",
+  morePopoverArrow:
+    "absolute -bottom-1.5 right-6 w-3 h-3 bg-neutral-900 border-b border-r border-neutral-800 rotate-45",
+  moreItem:
+    "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors text-left cursor-pointer",
+  moreItemDanger:
+    "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors text-left cursor-pointer",
+  moreDivider:
+    "my-1 border-t border-neutral-800/80",
 };
 

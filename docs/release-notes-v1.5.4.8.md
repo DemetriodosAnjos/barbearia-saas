@@ -2,44 +2,49 @@
 
 **Data de Lançamento:** Outubro de 2026  
 **Status:** Homologado & Ativo  
-**Módulos:** Bottom Navigation Bar (`BottomNavigation.jsx`, `BottomNavigation.styles.js`), Dashboard Geral (`BarbershopDashboard.jsx`, `BarbershopDashboard.styles.js`), Agenda (`ScheduleView.jsx`), Metadados (`index.html`)
+**Módulos:** Bottom Navigation Bar (`BottomNavigation.jsx`, `BottomNavigation.styles.js`), Dashboard Geral (`BarbershopDashboard.jsx`, `BarbershopDashboard.styles.js`), Agenda (`ScheduleView.jsx`), Estilos Globais (`index.css`), Metadados (`index.html`)
 
 ---
 
 ## 🎯 Principais Atualizações da Versão 1.5.4.8
 
-### 1. Bottom Navigation Bar com Ação Rápida Central (Layout Simétrico 2+1+2)
-* **Estrutura e Ordem Ergonômica:**
-  1. **Agenda (Home)** — Ícone: `Calendar` *(Extrema esquerda)*
-  2. **Clientes** — Ícone: `Users` *(Esquerda do centro)*
-  3. **Novo Atendimento** — Ícone: `Scissors` *(Centro / Destaque principal)*
-  4. **Financeiro** — Ícone: `DollarSign` *(Direita do centro)*
-  5. **Mais / Perfil** — Ícone: `Menu` *(Extrema direita)*
-* **Destaque Visual do CTA Central:**
-  * Botão em elevação (`-mt-6`) com gradiente em destaque laranja/âmbar (`bg-gradient-to-tr from-orange-600 to-amber-500`).
-  * Sombra pronunciada (`shadow-orange-600/40`), anel duplo protetor e feedback tátil ao toque.
-  * Gatilho direto que abre instantaneamente o modal de cadastro de novo atendimento na Agenda.
-* **Estados Ativo e Inativo:**
-  * Identificação imediata da aba corrente com cor de realce (`text-orange-600 dark:text-amber-400 font-bold`) e micro-indicador inferior.
-  * Suporte a leitores de tela com `aria-current="page"` e conformidade de contraste WCAG 2.2 AA.
+### 1. Bottom Navigation Bar com Cantos Arredondados Superiores e Proteção Dark Mode
+* **Cantos Arredondados Superiores (`rounded-t-2xl`):**
+  * Aplicado arredondamento suave exclusivo nos cantos superior esquerdo e superior direito (`border-top-left-radius: 1rem` e `border-top-right-radius: 1rem`).
+  * Borda superior e laterais sutis em cinza escuro (`border-t border-x border-neutral-800/90`).
+* **Proteção Defensiva Contra Vazamento de Fundo Claro (Anti-Leak):**
+  * Background `#171717` (Dark Theme) aplicado diretamente via inline styles e regras estritas no `index.css`.
+  * Previne vazamento do fundo claro do navegador ou de seletores globais de modo claro nas curvas do topo.
+  * Meta tags `<meta name="theme-color" content="#171717" />` e `<meta name="color-scheme" content="dark" />` adicionadas no `index.html`.
 
 ---
 
-### 2. Espaçamento Defensivo de Conteúdo (`Padding Bottom`)
-* Ajustado o espaçamento inferior no container principal de telas (`mainContent`) para `pb-32 md:pb-8`.
-* Elimina qualquer risco de sobreposição da barra flutuante sobre listas de agendamentos, cartões de faturamento ou botões de rodapé.
-* Suporte nativo ao `env(safe-area-inset-bottom)` para iPhones com barra de gestos e dispositivos Android modernos.
+### 2. Menu Popover Suspenso Conectado ao Botão "Mais"
+* **Conexão Direta e Ergonômica:** O botão "Mais" (extrema direita) aciona um menu popover flutuante ancorado logo acima da barra inferior.
+* **As 5 Opções Oficiais:**
+  1. **Modo de Exibição (Theme Toggle):** Chave seletora (*toggle switch*) com ícones dinâmicos de Lua (`Dark`) e Sol (`Light`), sincronizando instantaneamente o tema global.
+  2. **Meu Perfil:** Acesso direto à gestão cadastral, avatar, biografia e dados do profissional gestor.
+  3. **Configurações da Barbearia:** Acesso ao painel de políticas, horários de atendimento e integrações.
+  4. **Suporte & Ajuda:** Central de ajuda e chamados técnicos.
+  5. **Sair da Plataforma:** Botão em destaque de alerta (`text-red-400`) para logout seguro e expurgo de sessão.
+* **Interatividade & Fechamento:**
+  * Fechamento automático ao clicar/tocar fora (*click outside*).
+  * Suporte ao fechamento via tecla `Escape`.
+  * Backdrop invisível touch-friendly em dispositivos móveis.
 
 ---
 
-### 3. Correção de Resiliência no `ScheduleView.jsx`
-* Corrigido `ReferenceError: useEffect is not defined` adicionando o import explícito de `useEffect` no módulo da Agenda.
-* Garantida a escuta reativa da prop `openNewAppointmentTrigger` para acionamento do modal através do clique no botão central da Bottom Navigation.
+### 3. Layout Simétrico 2 + 1 + 2 e Destaque CTA Central
+* **Estrutura Oficial de 5 Itens:**
+  1. **Agenda (Home)** — `Calendar` *(Extrema esquerda)*
+  2. **Clientes** — `Users` *(Esquerda do centro)*
+  3. **Novo Atendimento** — `Scissors` *(Centro / Destaque principal elevado em gradiente laranja/âmbar)*
+  4. **Financeiro** — `DollarSign` *(Direita do centro)*
+  5. **Mais / Perfil** — `Menu` *(Extrema direita com menu popover)*
+* **Espaçamento Defensivo:** Margem inferior expandida para `pb-32 md:pb-8` no container de telas, evitando qualquer sobreposição com o rodapé.
 
 ---
 
-### 4. Suíte de Testes Automatizados
-* Adicionado teste unitário em `src/tests/components/BottomNavigation.test.jsx`:
-  * Validação do container fixo e atributos de acessibilidade.
-  * Validação do botão central (`data-nav-center="true"`).
-  * Validação de transição de abas e disparos de evento `onChange`.
+### 4. Correções e Suíte de Testes Automatizados
+* Correção do import de `useEffect` em `ScheduleView.jsx`.
+* Testes unitários atualizados em `src/tests/components/BottomNavigation.test.jsx`, cobrindo cantos arredondados, proteção de cor de fundo, abertura do popover, chave de tema e acionamento de logout.

@@ -709,6 +709,8 @@ export default function BarbershopDashboard({
         items={mobileNavItems}
         activeItem={activeMenuTab}
         onChange={handleBottomNavChange}
+        onNavigate={setActiveMenuTab}
+        onLogout={onLogout}
       />
     </div>
   );

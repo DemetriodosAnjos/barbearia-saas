@@ -1729,5 +1729,24 @@ html:not(.dark) [data-unit-container] [data-unit-chevron] svg {
   color: #55555E !important;
   stroke: #55555E !important;
 }
+/* ======================================================== */
+/* 24. PROTEÇÃO CONTRA VAZAMENTO DE TEMA NA BOTTOM BAR     */
+/* Garante que o container escuro e cantos arredondados da  */
+/* barra inferior e do popover permaneçam em Dark Theme   */
+/* ======================================================== */
+nav[data-testid="bottom-navigation-bar"],
+[data-testid="bottom-navigation-bar"],
+.bottom-nav-dark-surface,
+[data-testid="bottom-nav-more-popover"] {
+  background-color: #171717 !important;
+  color: #f5f5f5 !important;
+}
 
-
+nav[data-testid="bottom-navigation-bar"],
+[data-testid="bottom-navigation-bar"],
+.bottom-nav-dark-surface {
+  border-top-left-radius: 1rem !important;
+  border-top-right-radius: 1rem !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
