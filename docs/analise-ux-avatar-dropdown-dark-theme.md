@@ -8,11 +8,13 @@ Este documento formaliza as decisões de design e arquitetura CSS aplicadas ao m
 ## 2. Microtarefas Implementadas
 
 ### 2.1. Identificador de Usuário (Header do Dropdown)
-- **Alvo**: Texto referente às credenciais/perfil ativo (nome de exibição do usuário, dados de autenticação e detalhes de sessão).
-- **Cor Aplicada**: `#969696` (cinza claro de alto contraste contra o fundo `#262626`).
+- **Nome do Administrador**:
+  - **Cor Aplicada**: `#ffffff` (Branca puro) para máxima visibilidade e destaque hierárquico do nome (ex: "Demetrio A L dos Anjos").
+- **Credenciais / Informações de Sessão**:
+  - **Cor Aplicada**: `#969696` (cinza claro para dados de apoio como tipo de autenticação Google / E-mail).
 - **Implementação**:
-  - `src/components/ui/Navbar.jsx`: Adicionado `dark:text-[#969696]` e atributo `data-user-dropdown-name="true"`.
-  - `src/index.css`: Regra com escopo estrito `html.dark [data-user-dropdown-header] [data-user-name]`, `html.dark [data-user-dropdown-name]`, `html.dark [data-user-dropdown-header] p`.
+  - `src/components/ui/Navbar.jsx`: `dark:text-white` no `<p>` do nome do usuário.
+  - `src/index.css`: Regra de alta especificidade `html.dark [data-user-dropdown-header] [data-user-name]` com `color: #ffffff !important`.
 
 ### 2.2. Itens de Navegação (Links do Menu)
 - **Alvo**: Textos dos links de navegação:

@@ -836,11 +836,16 @@ html.dark .avatar-dropdown-menu {
   border-color: #969696 !important;
 }
 
-/* 1. Identificador de Usuário (Header do Dropdown): #969696 */
+/* 1. Identificador de Usuário (Header do Dropdown): Nome do Administrador em #ffffff (Branca) */
 html.dark [data-user-dropdown-header] [data-user-name],
 html.dark [data-user-dropdown-header] [data-user-dropdown-name],
 html.dark [data-user-dropdown-name],
 html.dark [data-user-dropdown-header] p,
+html.dark [data-user-dropdown-header] p[data-user-dropdown-name] {
+  color: #ffffff !important;
+}
+
+/* Credenciais / detalhes de autenticação no header permanecem em #969696 */
 html.dark [data-user-dropdown-google],
 html.dark [data-user-dropdown-auth],
 html.dark [data-user-dropdown-text="email-senha"] {

@@ -432,7 +432,7 @@ export default function Navbar({
                 data-user-dropdown-menu="true"
               >
                 <div className={navbarStyles.dropdownHeader} data-user-dropdown-header="true">
-                  <p className="text-xs font-semibold text-[#059669] dark:text-[#969696]" data-user-name="true" data-user-dropdown-name="true">
+                  <p className="text-xs font-semibold text-[#059669] dark:text-white" data-user-name="true" data-user-dropdown-name="true">
                     {resolvedUser.name}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
