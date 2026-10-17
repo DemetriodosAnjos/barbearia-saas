@@ -8,7 +8,7 @@ export const barbershopStyles = {
     "flex-1 flex flex-col md:flex-row items-stretch min-h-[calc(100vh-42px)]",
 
   mainContent:
-    "flex-1 p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full overflow-y-auto",
+    "flex-1 p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full overflow-y-auto pb-32 md:pb-8",
   // Cabeçalho da Seção de Serviços & Produtos
   viewHeader:
     "flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800/80",

@@ -19,6 +19,16 @@ import CashierPosView from "./CashierPosView";
 import FinancialDashboardView from "./FinancialDashboardView";
 import SkeletonDashboard from "../../components/resilience/SkeletonDashboard";
 import ProjectIcon from "../../components/ui/ProjectIcon";
+import BottomNavigation from "../../components/ui/BottomNavigation";
+import {
+  Calendar,
+  Users,
+  Plus,
+  Scissors,
+  DollarSign,
+  Settings,
+  Menu,
+} from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { safeStorage } from "../../utils/safeStorage";
 
@@ -54,6 +64,80 @@ export default function BarbershopDashboard({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [barberPresenceStatus, setBarberPresenceStatus] = useState("available");
+  const [openNewAppointmentTrigger, setOpenNewAppointmentTrigger] = useState(0);
+
+  // Configuração dos 5 itens simétricos da barra inferior mobile (Layout 2 + 1 + 2)
+  const mobileNavItems = useMemo(
+    () => [
+      {
+        id: "agenda",
+        label: "Agenda",
+        title: "Agenda (Home)",
+        ariaLabel: "Agenda (Home)",
+        icon: <Calendar className="w-5 h-5" />,
+        isActive: activeMenuTab === "agenda",
+      },
+      {
+        id: "clientes",
+        label: "Clientes",
+        title: "Clientes",
+        ariaLabel: "Clientes",
+        icon: <Users className="w-5 h-5" />,
+        isActive: activeMenuTab === "clientes",
+      },
+      {
+        id: "novo_atendimento",
+        label: "Novo Atendimento",
+        title: "Novo Atendimento",
+        ariaLabel: "Novo Atendimento",
+        icon: <Scissors className="w-6 h-6 stroke-[2.2]" />,
+        isCenterAction: true,
+      },
+      {
+        id: "financeiro",
+        label: "Financeiro",
+        title: "Financeiro",
+        ariaLabel: "Financeiro",
+        icon: <DollarSign className="w-5 h-5" />,
+        isActive:
+          activeMenuTab === "dashboard_financeiro" ||
+          activeMenuTab === "caixa" ||
+          activeMenuTab === "pagamentos",
+      },
+      {
+        id: "perfil",
+        label: "Mais",
+        title: "Mais / Perfil",
+        ariaLabel: "Mais / Perfil",
+        icon: <Menu className="w-5 h-5" />,
+        isActive:
+          activeMenuTab === "perfil" ||
+          activeMenuTab === "configuracoes" ||
+          activeMenuTab === "suporte" ||
+          activeMenuTab === "servicos" ||
+          activeMenuTab === "profissionais" ||
+          activeMenuTab === "indicacoes",
+      },
+    ],
+    [activeMenuTab],
+  );
+
+  const handleBottomNavChange = (tabId) => {
+    if (tabId === "novo_atendimento") {
+      setActiveMenuTab("agenda");
+      setOpenNewAppointmentTrigger((prev) => prev + 1);
+      return;
+    }
+    if (tabId === "financeiro") {
+      setActiveMenuTab("dashboard_financeiro");
+      return;
+    }
+    if (tabId === "perfil" || tabId === "mais") {
+      setActiveMenuTab("perfil");
+      return;
+    }
+    setActiveMenuTab(tabId);
+  };
 
   // [Lazy Initializer: captura o timestamp de referência de forma idempotente na montagem]
   const [referenceDate] = useState(() => new Date());
@@ -488,6 +572,7 @@ export default function BarbershopDashboard({
                       comandas={comandas}
                       onNavigateToClients={() => setActiveMenuTab("clientes")}
                       onNavigateToCashier={() => setActiveMenuTab("caixa")}
+                      openNewAppointmentTrigger={openNewAppointmentTrigger}
                     />
                   </ErrorBoundary>
                 )}
@@ -618,6 +703,13 @@ export default function BarbershopDashboard({
           </main>
         </div>
       </div>
+
+      {/* 5. NAVEGAÇÃO INFERIOR MOBILE FIXA (LAYOUT ERGONÔMICO 2 + 1 + 2) */}
+      <BottomNavigation
+        items={mobileNavItems}
+        activeItem={activeMenuTab}
+        onChange={handleBottomNavChange}
+      />
     </div>
   );
 }

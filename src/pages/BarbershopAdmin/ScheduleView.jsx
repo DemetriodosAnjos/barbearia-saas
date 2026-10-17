@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import DOMPurify from "dompurify";
 import {
   TrendingUp,
@@ -76,6 +76,7 @@ export default function ScheduleView({
   onNavigateToClients,
   onNavigateToCashier,
   onBack,
+  openNewAppointmentTrigger = 0,
 }) {
   // Filtra apenas barbeiros que não foram excluídos/inativados para a grade
   const activeBarbers = barbers.filter((b) => b.status !== "inactive");
@@ -88,6 +89,13 @@ export default function ScheduleView({
   const [prefilledBarberId, setPrefilledBarberId] = useState("");
   const [prefilledTime, setPrefilledTime] = useState("");
   const [prefilledDate, setPrefilledDate] = useState("");
+
+  // Abre o modal de novo agendamento via botão de ação rápida externo (ex: Bottom Navigation)
+  useEffect(() => {
+    if (openNewAppointmentTrigger > 0) {
+      setIsNewModalOpen(true);
+    }
+  }, [openNewAppointmentTrigger]);
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
