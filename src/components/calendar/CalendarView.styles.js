@@ -3,6 +3,14 @@ export const calendarViewStyles = {
   container:
     "w-full bg-neutral-950 border border-neutral-800 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none text-left relative isolate z-10",
 
+  // Header do Container da Agenda de Atendimentos
+  agendaHeader:
+    "p-3.5 sm:p-4 bg-neutral-900 flex items-center justify-between",
+  agendaTitle:
+    "text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2",
+  agendaDivider:
+    "border-t border-neutral-800 w-full",
+
   // 1. Barra Superior de Controles (Header da Agenda: Linha Superior e Linha Inferior)
   toolbar:
     "p-3 sm:p-4 bg-neutral-900 border-b border-neutral-800 flex flex-col gap-2.5 sm:gap-3",

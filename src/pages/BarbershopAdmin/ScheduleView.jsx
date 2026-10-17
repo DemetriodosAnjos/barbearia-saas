@@ -1,5 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import DOMPurify from "dompurify";
+import {
+  TrendingUp,
+  DollarSign,
+  Users,
+  Scissors,
+  Calendar,
+  ChevronDown,
+} from "lucide-react";
 // [Import: cliente Supabase para persistência de agendamentos e alterações de status]
 import { supabase } from "../../lib/supabase";
 import { scheduleStyles } from "./ScheduleView.styles";
@@ -19,6 +27,39 @@ import { SafeHtml } from "../../components/ui/SafeHtml";
 import MercadoPagoCheckoutModal from "../../components/payments/MercadoPagoCheckoutModal";
 import { safeStorage } from "../../utils/safeStorage";
 
+// Helper para verificar se uma data (YYYY-MM-DD) pertence ao período ativo (Dia, Semana ou Mês)
+export const isDateInPeriod = (targetDateYMD, referenceDate, viewMode) => {
+  if (!targetDateYMD || !referenceDate) return false;
+  const cleanDateYMD = String(targetDateYMD).slice(0, 10);
+
+  if (viewMode === "day") {
+    const refYMD = formatDateToYMD(referenceDate);
+    return cleanDateYMD === refYMD;
+  }
+
+  if (viewMode === "week") {
+    const startOfWeek = new Date(referenceDate);
+    const dayIndex = startOfWeek.getDay(); // 0 = Domingo
+    startOfWeek.setDate(startOfWeek.getDate() - dayIndex);
+    const weekYMDs = new Set();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
+      weekYMDs.add(formatDateToYMD(d));
+    }
+    return weekYMDs.has(cleanDateYMD);
+  }
+
+  if (viewMode === "month") {
+    const year = referenceDate.getFullYear();
+    const month = String(referenceDate.getMonth() + 1).padStart(2, "0");
+    const monthPrefix = `${year}-${month}`;
+    return cleanDateYMD.startsWith(monthPrefix);
+  }
+
+  return true;
+};
+
 // [Função componente: consome serviços reais sem catálogo fictício de fallback]
 export default function ScheduleView({
   tenant,
@@ -31,6 +72,7 @@ export default function ScheduleView({
   clients = [],
   onUpdateClients,
   onUpdateClient,
+  comandas = [],
   onNavigateToClients,
   onNavigateToCashier,
   onBack,
@@ -51,8 +93,12 @@ export default function ScheduleView({
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
   const [isMercadoPagoModalOpen, setIsMercadoPagoModalOpen] = useState(false);
 
-  // Estado do cabeçalho da Agenda como Accordion expansível (fechado por padrão para economizar espaço)
-  const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
+  // Estado do card "Previsão atual" como Accordion/Dropdown expansível (aberto por padrão)
+  const [isPrevisaoExpanded, setIsPrevisaoExpanded] = useState(true);
+
+  // Estados de navegação temporal sincronizados com a Agenda de Atendimentos (Dia, Semana, Mês)
+  const [viewMode, setViewMode] = useState("day"); // 'day' | 'week' | 'month'
+  const [currentDate, setCurrentDate] = useState(() => new Date());
 
   // Estados para Prontuário Técnico e Cadastro de Cliente a partir do Card
   const [selectedClientForRecord, setSelectedClientForRecord] = useState(null);
@@ -808,40 +854,141 @@ export default function ScheduleView({
     }
   };
 
-  // Métricas do Topo em tempo real
-  const totalTodayAppointments = currentAppointments.filter(
-    (a) => a.status !== "cancelled",
-  ).length;
-  const totalEstimatedRevenue = currentAppointments
-    .filter((a) => a.status !== "cancelled")
-    .reduce((acc, a) => acc + Number(a.price || 0), 0);
+  // =========================================================================
+  // CÁLCULO REATIVO DOS 3 BIG NUMBERS DA PREVISÃO ATUAL (REGRAS DE NEGÓCIO)
+  // =========================================================================
+
+  // 1. Clientes: Puxa a quantidade total de clientes cadastrados no sistema (menu Clientes e Prontuários)
+  const totalClientsCount = useMemo(() => {
+    if (Array.isArray(clients) && clients.length > 0) {
+      return clients.length;
+    }
+    // Fallback defensivo para clientes únicos registrados em atendimentos
+    const uniqueClients = new Set();
+    currentAppointments.forEach((a) => {
+      const phone = (a.clientPhone || a.client_phone || "").replace(/\D/g, "");
+      const name = (a.clientName || a.client_name || "").trim().toLowerCase();
+      if (phone) uniqueClients.add(phone);
+      else if (name) uniqueClients.add(name);
+    });
+    return uniqueClients.size;
+  }, [clients, currentAppointments]);
+
+  // Atendimentos ativos dentro do período selecionado na agenda (Dia, Semana ou Mês)
+  const periodAppointments = useMemo(() => {
+    return currentAppointments.filter((a) => {
+      if (a.status === "cancelled" || a.status === "cancelado") return false;
+      const apptDate = getAppointmentDateYMD(a);
+      return isDateInPeriod(apptDate, currentDate, viewMode);
+    });
+  }, [currentAppointments, currentDate, viewMode]);
+
+  // 2. Serviços: Exibe a quantidade de serviços realizados com base no filtro temporal ativo (Dia, Semana ou Mês)
+  const periodServicesCount = useMemo(() => {
+    return periodAppointments.reduce((count, a) => {
+      if (Array.isArray(a.services) && a.services.length > 0) {
+        return count + a.services.length;
+      }
+      return count + 1;
+    }, 0);
+  }, [periodAppointments]);
+
+  // 3. Preço / Faturamento: Exibe a soma total dos preços das comandas e serviços com base no filtro temporal ativo
+  const totalPeriodRevenue = useMemo(() => {
+    // 3.1. Soma dos preços dos agendamentos no período
+    const apptsTotal = periodAppointments.reduce(
+      (sum, a) => sum + Number(a.price || 0),
+      0
+    );
+
+    // 3.2. Soma das comandas ativas no período (evitando duplicar agendamentos já computados)
+    const apptIdsSet = new Set(periodAppointments.map((a) => a.id));
+    const extraComandasTotal = (comandas || []).reduce((sum, cmd) => {
+      if (cmd.status === "cancelled" || cmd.status === "cancelado") return sum;
+      if (apptIdsSet.has(cmd.id) || (cmd.appointmentId && apptIdsSet.has(cmd.appointmentId))) {
+        return sum;
+      }
+      const cmdDate = cmd.date || (cmd.createdAt ? String(cmd.createdAt).slice(0, 10) : "");
+      if (!cmdDate || !isDateInPeriod(cmdDate, currentDate, viewMode)) {
+        return sum;
+      }
+      const sSum = (cmd.services || []).reduce((acc, s) => acc + Number(s.price || 0), 0);
+      const pSum = (cmd.products || []).reduce(
+        (acc, p) =>
+          acc +
+          Number(
+            p.total ||
+              Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+          ),
+        0,
+      );
+      const cmdTotal = Number(cmd.totalPrice || cmd.total || (sSum + pSum) || 0);
+      return sum + cmdTotal;
+    }, 0);
+
+    return apptsTotal + extraComandasTotal;
+  }, [periodAppointments, comandas, currentDate, viewMode]);
+
+  // Rótulos descritivos do intervalo selecionado
+  const periodLabel = useMemo(() => {
+    if (viewMode === "day") {
+      const isToday = formatDateToYMD(currentDate) === formatDateToYMD(new Date());
+      return isToday ? "Hoje" : currentDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    }
+    if (viewMode === "week") {
+      return "Nesta semana";
+    }
+    return "Neste mês";
+  }, [viewMode, currentDate]);
+
+  const periodServicesLabel = useMemo(() => {
+    if (viewMode === "day") {
+      const isToday = formatDateToYMD(currentDate) === formatDateToYMD(new Date());
+      return isToday
+        ? "Realizados hoje"
+        : `Em ${currentDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
+    }
+    if (viewMode === "week") {
+      return "Realizados na semana";
+    }
+    return "Realizados no mês";
+  }, [viewMode, currentDate]);
+
+  const formattedRevenue = useMemo(() => {
+    return `R$ ${totalPeriodRevenue.toFixed(2).replace(".", ",")}`;
+  }, [totalPeriodRevenue]);
 
   const previewBarber = activeBarbers.find((b) => b.id === editForm.barberId);
   const previewService = services.find((s) => s.id === editForm.serviceId);
 
   return (
     <div className={scheduleStyles.container}>
-      {/* 1. CABEÇALHO EXPANSÍVEL (ACCORDION) */}
-      <div className={scheduleStyles.headerCard} data-schedule-accordion="true">
-        {/* Barra Superior Compacta (Clicável) */}
+      {/* 1. CARD "PREVISÃO ATUAL" (EXPANSÍVEL / DROPDOWN COM 3 BIG NUMBERS) */}
+      <div
+        className={scheduleStyles.headerCard}
+        data-previsao-card="true"
+        data-schedule-accordion="true"
+      >
+        {/* Cabeçalho do Dropdown */}
         <button
           type="button"
-          onClick={() => setIsHeaderExpanded((prev) => !prev)}
-          aria-expanded={isHeaderExpanded}
+          onClick={() => setIsPrevisaoExpanded((prev) => !prev)}
+          aria-expanded={isPrevisaoExpanded}
           aria-label={
-            isHeaderExpanded
-              ? "Recolher detalhes da Agenda de Atendimentos"
-              : "Expandir detalhes da Agenda de Atendimentos"
+            isPrevisaoExpanded
+              ? "Recolher detalhes da Previsão atual"
+              : "Expandir detalhes da Previsão atual"
           }
           className="w-full flex items-center justify-between text-left cursor-pointer focus:outline-none select-none group"
+          data-previsao-trigger="true"
           data-accordion-trigger="true"
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
-              <ProjectIcon name="Calendar" size={20} className="text-amber-500" />
+              <DollarSign className="w-5 h-5 text-amber-500" />
             </div>
             <h1 className={scheduleStyles.title}>
-              <span>Agenda de Atendimentos</span>
+              <span>Previsão atual</span>
             </h1>
           </div>
 
@@ -864,46 +1011,96 @@ export default function ScheduleView({
 
             <div
               className={`p-1.5 rounded-lg text-neutral-400 group-hover:text-white group-hover:bg-neutral-800/60 transition-all duration-300 ${
-                isHeaderExpanded ? "rotate-180 text-amber-400" : "rotate-0"
+                isPrevisaoExpanded ? "rotate-180 text-amber-400" : "rotate-0"
               }`}
               data-chevron-indicator="true"
             >
-              <ProjectIcon name="ChevronDown" size={18} />
+              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
         </button>
 
-        {/* Conteúdo Expansível (Subtítulo + Pills de Resumo) */}
+        {/* Linha Divisória interna e os 3 Big Numbers */}
         <div
           className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
-            isHeaderExpanded
-              ? "grid-rows-[1fr] opacity-100 mt-3 pt-3 border-t border-neutral-800/80"
-              : "grid-rows-[0fr] opacity-0 mt-0 pt-0 border-t-0 pointer-events-none"
+            isPrevisaoExpanded
+              ? "grid-rows-[1fr] opacity-100"
+              : "grid-rows-[0fr] opacity-0 pointer-events-none"
           }`}
+          data-previsao-content="true"
           data-accordion-content="true"
         >
           <div className="overflow-hidden">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-0.5">
-              <p className={scheduleStyles.subtitle}>
-                Acompanhe atendimentos, altere a agenda dos profissionais, cadastre
-                novos clientes, produtos e serviços.
-              </p>
-
-              <div className={scheduleStyles.statsGroup}>
+            {/* Linha Divisória interna: Separando o cabeçalho dos blocos de métricas */}
+            <div className="border-t border-neutral-800/80 mt-3.5 pt-3.5 sm:pt-4">
+              <div className={scheduleStyles.bigNumbersGrid}>
+                {/* 1. Big Number: Clientes */}
                 <div
-                  className={`${scheduleStyles.statBadge} ${scheduleStyles.statAppointments}`}
+                  className={scheduleStyles.bigNumberCard}
+                  data-bignumber-clients="true"
                 >
-                  <ProjectIcon name="Scissors" size={15} className="text-amber-500" />
-                  <span>{totalTodayAppointments} cortes hoje</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-neutral-400">
+                      Clientes
+                    </span>
+                    <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                      <Users className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
+                      {totalClientsCount}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 mt-1">
+                    Cadastrados no sistema
+                  </p>
                 </div>
 
+                {/* 2. Big Number: Serviços */}
                 <div
-                  className={`${scheduleStyles.statBadge} ${scheduleStyles.statRevenue}`}
+                  className={scheduleStyles.bigNumberCard}
+                  data-bignumber-services="true"
                 >
-                  <ProjectIcon name="DollarSign" size={15} className="text-amber-500" />
-                  <span>
-                    R$ {totalEstimatedRevenue.toFixed(2).replace(".", ",")} previsto
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-neutral-400">
+                      Serviços
+                    </span>
+                    <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <Scissors className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
+                      {periodServicesCount}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-400/90 font-medium mt-1">
+                    {periodServicesLabel} ({periodServicesCount === 1 ? "1 serviço" : `${periodServicesCount} serviços`})
+                  </p>
+                </div>
+
+                {/* 3. Big Number: Preço / Faturamento */}
+                <div
+                  className={scheduleStyles.bigNumberCard}
+                  data-bignumber-revenue="true"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-neutral-400">
+                      Preço
+                    </span>
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono tracking-tight">
+                      {formattedRevenue}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-400/90 font-medium mt-1">
+                    Faturamento previsto ({periodLabel.toLowerCase()})
+                  </p>
                 </div>
               </div>
             </div>
@@ -911,8 +1108,12 @@ export default function ScheduleView({
         </div>
       </div>
 
-      {/* 2. GRADE DA LINHA DO TEMPO */}
+      {/* 2. GRADE DA LINHA DO TEMPO: Agenda de Atendimentos */}
       <CalendarView
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        currentDate={currentDate}
+        onDateChange={setCurrentDate}
         barbers={activeBarbers}
         appointments={currentAppointments}
         startHour={8}

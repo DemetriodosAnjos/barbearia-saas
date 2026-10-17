@@ -72,10 +72,31 @@ export default function CalendarView({
   onSaveClient,
   onOpenClientRecord,
   onDropAppointment,
+  viewMode: controlledViewMode,
+  onViewModeChange,
+  currentDate: controlledDate,
   onDateChange,
 }) {
-  const [viewMode, setViewMode] = useState("day"); // 'day' | 'week' | 'month'
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [internalViewMode, setInternalViewMode] = useState("day"); // 'day' | 'week' | 'month'
+  const [internalCurrentDate, setInternalCurrentDate] = useState(() => new Date());
+
+  const viewMode = controlledViewMode !== undefined ? controlledViewMode : internalViewMode;
+  const currentDate = controlledDate !== undefined ? controlledDate : internalCurrentDate;
+
+  const setViewMode = (newMode) => {
+    setInternalViewMode(newMode);
+    if (onViewModeChange) {
+      onViewModeChange(newMode);
+    }
+  };
+
+  const setCurrentDate = (newDate) => {
+    setInternalCurrentDate(newDate);
+    if (onDateChange) {
+      onDateChange(newDate);
+    }
+  };
+
   const [selectedBarberFilter, setSelectedBarberFilter] = useState("all");
   const [showCancelled, setShowCancelled] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -381,7 +402,22 @@ export default function CalendarView({
 
   return (
     <div className={calendarViewStyles.container}>
-      {/* 1. BARRA SUPERIOR DE CONTROLES: LINHA 1 (NAVEGAÇÃO TEMPORAL) + LINHA 2 (FILTROS E AÇÕES) */}
+      {/* HEADER DO CONTAINER: Agenda de Atendimentos */}
+      <div className={calendarViewStyles.agendaHeader} data-calendar-header="true">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
+            <Calendar className="w-5 h-5 text-amber-500" />
+          </div>
+          <h2 className={calendarViewStyles.agendaTitle}>
+            Agenda de Atendimentos
+          </h2>
+        </div>
+      </div>
+
+      {/* LINHA DIVISÓRIA (DIVIDER): Separa visualmente o título dos controles de navegação e filtros */}
+      <div className={calendarViewStyles.agendaDivider} data-calendar-divider="true" />
+
+      {/* CONTROLES INFERIORES: Linha 1 (Navegação de data) + Linha 2 (Filtro de período, barbeiros e + Novo) */}
       <div className={calendarViewStyles.toolbar} data-calendar-toolbar="true">
         {/* Linha Superior: Navegação Temporal */}
         <div className={calendarViewStyles.navGroup} data-calendar-nav-group="true">

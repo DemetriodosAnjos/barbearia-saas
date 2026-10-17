@@ -485,6 +485,7 @@ export default function BarbershopDashboard({
                       clients={clients}
                       onUpdateClients={onUpdateClients}
                       onUpdateClient={onUpdateClient}
+                      comandas={comandas}
                       onNavigateToClients={() => setActiveMenuTab("clientes")}
                       onNavigateToCashier={() => setActiveMenuTab("caixa")}
                     />

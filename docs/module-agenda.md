@@ -13,8 +13,12 @@ A **Agenda de Atendimentos** é o núcleo (Core Engine) da barbearia. É nela qu
 ## 2. Componentes Principais
 1. **`ScheduleView.jsx` (`src/pages/BarbershopAdmin/ScheduleView.jsx`):**
    - Painel principal da agenda no Dashboard da Barbearia.
-   - **Cabeçalho Expansível (Accordion):** O card principal inicia recolhido por padrão com título *"Agenda de Atendimentos"*, ícone de calendário e Chevron Down, expandindo suavemente via clique para revelar a nova copy descritiva (*"Acompanhe atendimentos, altere a agenda dos profissionais, cadastre novos clientes, produtos e serviços."*) e as tags de métricas do dia (`{N} cortes hoje` e `R$ previsto`).
-   - Renderiza timeline por barbeiro (`BarberTimelineColumn`), cartões de atendimento (`AppointmentCard`), filtros de data e status.
+   - **Card "Previsão atual" (Dropdown Expansível):** O card superior atua como sumário executivo com cabeçalho interativo contendo ícone de cifrão (`DollarSign`), título *"Previsão atual"*, Chevron rotativo e linha divisória interna.
+   - **3 Big Numbers Dinâmicos e Reativos:**
+     1. **Clientes:** Quantidade total de clientes cadastrados no sistema (menu Clientes e Prontuários).
+     2. **Serviços:** Quantidade de serviços realizados e agendados no intervalo temporal ativo (Dia, Semana ou Mês).
+     3. **Preço / Faturamento:** Soma total dos preços de serviços e comandas no período ativo, sincronizado instantaneamente com os filtros da agenda.
+   - Renderiza a grade da linha do tempo (`CalendarView`), gerencia status de agendamentos e modais de edição/cancelamento.
    - Gerencia alterações de status em tempo real:
      - `confirmed` (Confirmado)
      - `in_service` (Em atendimento na cadeira)
@@ -37,10 +41,13 @@ A **Agenda de Atendimentos** é o núcleo (Core Engine) da barbearia. É nela qu
    - **Integração Mercado Pago:** Opção direta no menu e no modal de detalhes para liquidar o atendimento via API do Mercado Pago (Pix ou Cartão).
 
 4. **`CalendarView.jsx` & `BarberTimelineColumn.jsx` (`src/components/calendar/`):**
-   - **Cabeçalho Responsivo Mobile First (2 Linhas):**
+   - **Header do Container e Linha Divisória (Divider):**
+     - Header dedicado com ícone de calendário (`Calendar`) em container âmbar e título principal *"Agenda de Atendimentos"*.
+     - Linha divisória horizontal dedicada separando o cabeçalho dos controles de navegação e filtros.
+   - **Controles Inferiores Mobile First:**
      - **Linha 1 (Navegação Temporal):** Controles `Chevron Left` / `Chevron Right` com data centralizada em destaque (`Hoje, Sábado 17 de Outubro de 2026`) e atalho dinâmico para retornar a "Hoje".
-     - **Linha 2 (Filtros Compactos e CTA em Linha Única):** Dropdown compacto de modo (`Dia`, `Semana`, `Mês`) com fundo em laranja âmbar de destaque (`bg-amber-600`), dropdown de profissionais com truncamento responsivo e botão primário compacto com ícone de soma e rótulo **`Novo`**. Botão "Ocultos" removido para garantir encaixe perfeito em 1 linha em dispositivos móveis.
-   - **Isolamento Estrito de Slots por Data (`activeDateYMD`):** Na visão diária (`viewMode === "day"`), cada coluna de barbeiro filtra os cards da timeline estritamente pela data selecionada (`getAppointmentDateYMD(appt) === activeDateYMD`). Agendamentos de dias futuros (ex: `09/10` ou `10/10`) nunca são misturados nos slots do dia `08/10`.
+     - **Linha 2 (Filtros Compactos e CTA em Linha Única):** Dropdown compacto de modo (`Dia`, `Semana`, `Mês`) com fundo em laranja âmbar de destaque (`bg-amber-600`), dropdown de profissionais com truncamento responsivo e botão primário compacto com ícone de soma e rótulo **`Novo`**.
+   - **Isolamento Estrito de Slots por Data (`activeDateYMD`):** Na visão diária (`viewMode === "day"`), cada coluna de barbeiro filtra os cards da timeline estritamente pela data selecionada (`getAppointmentDateYMD(appt) === activeDateYMD`). Agendamentos de dias futuros nunca são misturados nos slots do dia atual.
    - **Tag Indicadora `{N} cortes` Clicável (`BarberTimelineColumn`):** O indicador de total de cortes no cabeçalho do barbeiro (ex: `Henrique Silva • 3 cortes`) funciona como botão interativo que abre o **Modal de Agendamentos do Profissional**.
    - **Modal / Subtela de Agendamentos do Barbeiro:** Exibe os cards de todos os atendimentos do profissional com filtros rápidos (`Todos`, `Dia Atual`, `Outros Dias`), **Nome do Cliente**, telefone, serviço, valor, status e **botão clicável de Dia e Hora** (`dd/mm/aaaa • HH:mm às HH:mm`). Ao clicar no card ou no Dia/Hora, o modal fecha, a agenda navega automaticamente para a data daquele agendamento na visão diária, faz scroll suave até o horário e aplica destaque luminoso (`ring-amber-400 animate-pulse`) no slot.
 
