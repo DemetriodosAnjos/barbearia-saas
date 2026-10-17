@@ -4,7 +4,7 @@ Sistema SaaS multi-tenant completo e de alta performance para barbearias, com co
 
 ---
 
-## 🔐 Autenticação & Tela de Login (`Login`)
+## Autenticação & Tela de Login (`Login`)
 
 A tela de autenticação oficial foi configurada com os seguintes padrões de UX e segurança:
 
@@ -27,7 +27,7 @@ A tela de autenticação oficial foi configurada com os seguintes padrões de UX
 
 ---
 
-## 🚀 Principais Módulos
+## Principais Módulos
 
 - **Portal de Agendamento do Cliente (`client-app`)**:
   - Funil responsivo para clientes agendarem serviços, escolherem barbeiro preferido, visualizarem horários livres em tempo real e receberem confirmação via WhatsApp.
@@ -52,7 +52,7 @@ A tela de autenticação oficial foi configurada com os seguintes padrões de UX
 
 ---
 
-## 🛠️ Tecnologias
+## Tecnologias
 
 - **Front-end**: React 19 + TypeScript + Vite + Tailwind CSS.
 - **Back-end & Banco de Dados**: Supabase (PostgreSQL) com Row Level Security (RLS).
@@ -62,7 +62,7 @@ A tela de autenticação oficial foi configurada com os seguintes padrões de UX
 
 ---
 
-## 📦 Execução Local
+## Execução Local
 
 ```bash
 # Iniciar servidor de desenvolvimento (porta 3000)
