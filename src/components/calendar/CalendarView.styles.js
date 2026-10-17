@@ -3,23 +3,16 @@ export const calendarViewStyles = {
   container:
     "w-full bg-neutral-950 border border-neutral-800 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none text-left relative isolate z-10",
 
-  // 1. Barra Superior de Controles (Header da Agenda)
+  // 1. Barra Superior de Controles (Header da Agenda: Linha Superior e Linha Inferior)
   toolbar:
-    "p-4 bg-neutral-900 border-b border-neutral-800 flex flex-wrap items-center justify-between gap-4",
-  navGroup: "flex items-center gap-2",
+    "p-3 sm:p-4 bg-neutral-900 border-b border-neutral-800 flex flex-col gap-2.5 sm:gap-3",
+  navGroup: "flex items-center justify-between w-full py-0.5",
   dateTitle:
-    "text-sm md:text-base font-bold text-neutral-100 capitalize min-w-[200px]",
+    "text-xs xs:text-sm sm:text-base md:text-lg font-bold text-white tracking-tight text-center truncate",
 
-  // Alternador de Visão (Dia | Semana | Mês)
-  viewToggleWrapper:
-    "flex items-center bg-neutral-950 p-1 rounded-xl border border-neutral-800 text-xs font-semibold",
-  viewButton:
-    "px-3 py-1.5 rounded-lg transition-all duration-150 cursor-pointer",
-  viewActive: "bg-amber-600 text-white shadow-xs",
-  viewInactive: "text-neutral-400 hover:text-white",
-
-  // Ações do Topo (Filtro e Botão Novo)
-  actionsGroup: "flex items-center gap-3",
+  // Linha Inferior: Controles Compactos e CTA em Linha Única
+  controlsRow:
+    "flex items-center justify-between gap-1.5 xs:gap-2 pt-2.5 border-t border-neutral-800/80 w-full",
 
   // 2. Área da Grade Diária
   gridWrapper:

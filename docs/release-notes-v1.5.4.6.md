@@ -43,10 +43,20 @@
   * Cabeçalho compacto interativo com ícone do Calendário, título *"Agenda de Atendimentos"* e indicador **Chevron Down** rotativo.
   * Transição suave via CSS Grid que revela a nova copy (*"Acompanhe atendimentos, altere a agenda dos profissionais, cadastre novos clientes, produtos e serviços."*) e as tags de métricas do dia (`{N} cortes hoje` e `R$ previsto`).
 
-### 6. Documentação Técnica
+### 6. Cabeçalho Responsivo da Agenda Mobile First (Navegação + Filtros em Dropdown + CTA Compacto)
+* **Estrutura em Duas Linhas Otimizada para Mobile**:
+  * **Linha 1 (Navegação Temporal)**: Controles `Chevron Left` / `Chevron Right` com data centralizada em destaque (`Hoje, Sábado 17 de Outubro de 2026`).
+  * **Linha 2 (Controles em Linha Única)**:
+    * Seletor de visualização compacto em `<select>` com fundo/pílula em laranja de destaque (`bg-amber-600`) para os modos `Dia`, `Semana` e `Mês`.
+    * Filtro de profissionais em `<select>` com indicador `Chevron Down` e truncamento inteligente.
+    * Botão primário de ação (CTA) compacto com ícone de soma e rótulo **`Novo`**.
+    * Remoção do botão secundário de cancelados ("Ocultos") para garantir o alinhamento horizontal dos 3 controles em smartphones.
+
+### 7. Documentação Técnica
 * Documentação técnica detalhada formalizada em:
   * `docs/analise-ux-navbar-mobile-first-dark.md` (Navbar e Tema Escuro)
   * `docs/analise-ux-avatar-dropdown-dark-theme.md` (Menu Dropdown do Avatar)
   * `docs/analise-ux-agenda-accordion.md` (Card da Agenda Expansível)
+  * `docs/analise-ux-agenda-cabecalho-mobile-first.md` (Cabeçalho Responsivo Mobile First)
   * `docs/module-agenda.md` (Módulo da Agenda Atualizado)
 

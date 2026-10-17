@@ -9,6 +9,9 @@ import {
   Phone,
   ArrowRight,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { calendarViewStyles } from "./CalendarView.styles";
 import BarberTimelineColumn from "./BarberTimelineColumn";
@@ -297,12 +300,43 @@ export default function CalendarView({
 
   const weekDaysList = getWeekDays();
 
-  const formattedDateTitle = currentDate.toLocaleDateString("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const formattedDateTitle = useMemo(() => {
+    if (viewMode === "day") {
+      const weekday = currentDate.toLocaleDateString("pt-BR", {
+        weekday: "long",
+      });
+      const capitalizedWeekday =
+        weekday.charAt(0).toUpperCase() + weekday.slice(1);
+      const day = currentDate.getDate();
+      const month = currentDate.toLocaleDateString("pt-BR", {
+        month: "long",
+      });
+      const capitalizedMonth =
+        month.charAt(0).toUpperCase() + month.slice(1);
+      const year = currentDate.getFullYear();
+
+      if (isToday) {
+        return `Hoje, ${capitalizedWeekday} ${day} de ${capitalizedMonth} de ${year}`;
+      }
+      return `${capitalizedWeekday}, ${day} de ${capitalizedMonth} de ${year}`;
+    }
+    if (viewMode === "week") {
+      const start = weekDaysList[0];
+      const end = weekDaysList[6];
+      const startDay = start.getDate();
+      const endDay = end.getDate();
+      const month = end.toLocaleDateString("pt-BR", { month: "long" });
+      const capitalizedMonth =
+        month.charAt(0).toUpperCase() + month.slice(1);
+      const year = end.getFullYear();
+      return `Semana: ${startDay} a ${endDay} de ${capitalizedMonth} de ${year}`;
+    }
+    const month = currentDate.toLocaleDateString("pt-BR", { month: "long" });
+    const capitalizedMonth =
+      month.charAt(0).toUpperCase() + month.slice(1);
+    const year = currentDate.getFullYear();
+    return `${capitalizedMonth} de ${year}`;
+  }, [viewMode, currentDate, isToday, weekDaysList]);
 
   const filteredBarbers =
     selectedBarberFilter === "all"
@@ -347,106 +381,130 @@ export default function CalendarView({
 
   return (
     <div className={calendarViewStyles.container}>
-      {/* 1. BARRA SUPERIOR DE CONTROLES */}
-      <div className={calendarViewStyles.toolbar}>
-        <div className={calendarViewStyles.navGroup}>
-          <Button
-            variant="secondary"
-            onClick={handleToday}
-            className="text-xs py-1.5 px-3"
-          >
-            Hoje
-          </Button>
-
-          <IconButton
-            direction="prev"
-            size="sm"
-            variant="ghost"
+      {/* 1. BARRA SUPERIOR DE CONTROLES: LINHA 1 (NAVEGAÇÃO TEMPORAL) + LINHA 2 (FILTROS E AÇÕES) */}
+      <div className={calendarViewStyles.toolbar} data-calendar-toolbar="true">
+        {/* Linha Superior: Navegação Temporal */}
+        <div className={calendarViewStyles.navGroup} data-calendar-nav-group="true">
+          {/* Seta para a esquerda (Chevron Left) */}
+          <button
+            type="button"
             onClick={handlePrev}
-            ariaLabel="Anterior"
-          />
-          <IconButton
-            direction="next"
-            size="sm"
-            variant="ghost"
+            aria-label="Voltar período ou data anterior"
+            className="p-2 sm:px-3 sm:py-2 rounded-xl text-neutral-400 hover:text-white bg-neutral-800/70 hover:bg-neutral-800 border border-neutral-700/60 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            data-nav-prev="true"
+          >
+            <ChevronLeft className="w-4 h-4 text-neutral-300 hover:text-white transition-colors" />
+            <span className="hidden sm:inline text-xs font-medium">Anterior</span>
+          </button>
+
+          {/* Rótulo da Data Atual em Destaque */}
+          <div className="flex items-center justify-center gap-2 px-2 flex-1 text-center">
+            <h2 className={calendarViewStyles.dateTitle} data-calendar-date-title="true">
+              <Calendar className="w-4 h-4 text-amber-500 shrink-0 hidden xs:inline" />
+              <span>{formattedDateTitle}</span>
+            </h2>
+            {!isToday && (
+              <button
+                type="button"
+                onClick={handleToday}
+                className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                title="Ir para a data de hoje"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
+
+          {/* Seta para a direita (Chevron Right) */}
+          <button
+            type="button"
             onClick={handleNext}
-            ariaLabel="Próximo"
-          />
-
-          <span className={calendarViewStyles.dateTitle}>
-            {formattedDateTitle}
-          </span>
-        </div>
-
-        {/* Alternador [ Dia | Semana | Mês ] */}
-        <div className={calendarViewStyles.viewToggleWrapper}>
-          <button
-            type="button"
-            onClick={() => setViewMode("day")}
-            className={`${calendarViewStyles.viewButton} ${viewMode === "day" ? calendarViewStyles.viewActive : calendarViewStyles.viewInactive}`}
+            aria-label="Avançar período ou próxima data"
+            className="p-2 sm:px-3 sm:py-2 rounded-xl text-neutral-400 hover:text-white bg-neutral-800/70 hover:bg-neutral-800 border border-neutral-700/60 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            data-nav-next="true"
           >
-            Dia
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("week")}
-            className={`${calendarViewStyles.viewButton} ${viewMode === "week" ? calendarViewStyles.viewActive : calendarViewStyles.viewInactive}`}
-          >
-            Semana
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("month")}
-            className={`${calendarViewStyles.viewButton} ${viewMode === "month" ? calendarViewStyles.viewActive : calendarViewStyles.viewInactive}`}
-          >
-            Mês
+            <span className="hidden sm:inline text-xs font-medium">Próximo</span>
+            <ChevronRight className="w-4 h-4 text-neutral-300 hover:text-white transition-colors" />
           </button>
         </div>
 
-        {/* Filtros e Botão Novo */}
-        <div className={calendarViewStyles.actionsGroup}>
-          <select
-            value={selectedBarberFilter}
-            onChange={(e) => setSelectedBarberFilter(e.target.value)}
-            className="bg-neutral-800 text-neutral-200 text-xs py-2 px-3 rounded-lg border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
-            aria-label="Filtrar por Barbeiro"
+        {/* Linha Inferior: Filtros Compactos e CTA (Mobile First em Linha Única) */}
+        <div
+          className={calendarViewStyles.controlsRow}
+          data-calendar-controls-row="true"
+        >
+          {/* 1. Seletor de Visualização (Dropdown Select com fundo/pílula em laranja de destaque) */}
+          <div
+            className="relative inline-flex items-center shrink-0"
+            data-view-mode-container="true"
           >
-            <option value="all">Todos os Barbeiros</option>
-            {barbers.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
+            <select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              className="appearance-none bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white text-xs font-bold py-2 pl-2.5 xs:pl-3 pr-6 xs:pr-7 rounded-xl border border-amber-500/40 shadow-sm focus:outline-none focus:ring-1 focus:ring-white cursor-pointer transition-colors"
+              aria-label="Selecionar modo de visualização da agenda"
+              data-view-mode-select="true"
+            >
+              <option value="day" className="bg-neutral-900 text-white font-medium">
+                Dia
               </option>
-            ))}
-          </select>
+              <option value="week" className="bg-neutral-900 text-white font-medium">
+                Semana
+              </option>
+              <option value="month" className="bg-neutral-900 text-white font-medium">
+                Mês
+              </option>
+            </select>
+            <div className="pointer-events-none absolute right-2 flex items-center text-white">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </div>
+          </div>
 
+          {/* 2. Filtro de Profissionais (Dropdown Select estilizado com Chevron) */}
+          <div
+            className="relative inline-flex items-center flex-1 min-w-0 max-w-[145px] xs:max-w-[175px] sm:max-w-[240px]"
+            data-barber-filter-container="true"
+          >
+            <select
+              value={selectedBarberFilter}
+              onChange={(e) => setSelectedBarberFilter(e.target.value)}
+              className="w-full appearance-none bg-neutral-800/90 hover:bg-neutral-800 text-neutral-200 text-xs font-medium py-2 pl-2.5 pr-6 xs:pr-7 rounded-xl border border-neutral-700/80 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer transition-colors truncate"
+              aria-label="Filtrar por Barbeiro ou Profissional"
+              title="Filtrar por profissional"
+              data-barber-filter-select="true"
+            >
+              <option value="all" className="bg-neutral-900 text-neutral-200">
+                Todos os Barbeiros
+              </option>
+              {barbers.map((b) => (
+                <option
+                  key={b.id}
+                  value={b.id}
+                  className="bg-neutral-900 text-neutral-200"
+                >
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute right-2 flex items-center text-neutral-400">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          {/* 3. Botão Principal de Ação (CTA Compacto 'Novo') */}
           <button
             type="button"
-            onClick={() => setShowCancelled((prev) => !prev)}
-            className={`text-xs py-2 px-3 rounded-lg border font-medium transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
-              showCancelled
-                ? "bg-red-950/60 border-red-500/60 text-red-300 hover:bg-red-900/70"
-                : "bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700 hover:text-white"
-            }`}
-            title="Alternar visibilidade de agendamentos cancelados na agenda"
-            aria-label="Alternar visibilidade de agendamentos cancelados"
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${showCancelled ? "bg-red-400" : "bg-neutral-500"}`}
-            />
-            <span>Cancelados: {showCancelled ? "Visíveis" : "Ocultos"}</span>
-          </button>
-
-          <Button
-            variant="primary"
             onClick={() =>
               onNewAppointmentClick && onNewAppointmentClick(currentDate)
             }
             disabled={isCurrentViewPast}
-            className="text-xs py-2 px-3.5 flex items-center gap-1.5"
+            className="px-2.5 xs:px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 active:bg-amber-700 shadow-md shadow-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
+            aria-label="Cadastrar novo agendamento"
+            data-new-appointment-btn="true"
           >
-            <Plus className="w-3.5 h-3.5 text-neutral-950" />
-            <span>Novo Agendamento</span>
-          </Button>
+            <Plus className="w-3.5 h-3.5 text-white" />
+            <span>Novo</span>
+          </button>
         </div>
       </div>
 
