@@ -1600,3 +1600,107 @@ html:not(.dark) [data-theme-toggle] .icon-moon:not(.theme-toggle-active) svg {
   color: #71717a !important;
   stroke: #71717a !important;
 }
+
+/* ==========================================================================
+   24. REFINAMENTO NAVBAR MOBILE FIRST (DARK THEME)
+   - Menu hambúrguer: Âmbar no Dark (#f59e0b / #d97706) e Verde Esmeralda no Light (#059669)
+   - Componente Alerta (Sino): Âmbar no Dark (#f59e0b) e Neutro no Light (#71717a / zinc-500)
+   - Preservação estrita da paleta de cores da versão Light
+   ========================================================================== */
+
+/* DARK THEME: Menu Hambúrguer em Âmbar */
+html.dark [data-menu-button],
+html.dark .navbar-menu-button,
+html.dark [data-menu-icon],
+html.dark [data-menu-button] svg,
+html.dark .navbar-menu-button svg {
+  color: #f59e0b !important;
+  stroke: #f59e0b !important;
+}
+
+html.dark [data-menu-button]:hover,
+html.dark .navbar-menu-button:hover,
+html.dark [data-menu-button]:hover svg,
+html.dark .navbar-menu-button:hover svg {
+  color: #fbbf24 !important;
+  stroke: #fbbf24 !important;
+}
+
+/* DARK THEME: Alerta (Sino) em Âmbar */
+html.dark [data-notification-button] svg,
+html.dark [data-notification-bell],
+html.dark [data-notification-bell] svg,
+html.dark .navbar-bell-btn svg {
+  color: #f59e0b !important;
+  stroke: #f59e0b !important;
+}
+
+html.dark [data-notification-button]:hover svg,
+html.dark [data-notification-bell]:hover svg,
+html.dark .navbar-bell-btn:hover svg {
+  color: #fbbf24 !important;
+  stroke: #fbbf24 !important;
+}
+
+/* LIGHT THEME (PRESERVAÇÃO INTEGRAL): Menu Hambúrguer Verde Esmeralda Oficial */
+html:not(.dark) [data-menu-button],
+html:not(.dark) .navbar-menu-button,
+html:not(.dark) [data-menu-icon],
+html:not(.dark) [data-menu-button] svg,
+html:not(.dark) .navbar-menu-button svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* LIGHT THEME (PRESERVAÇÃO INTEGRAL): Sino Neutro Oficial */
+html:not(.dark) [data-notification-button] svg,
+html:not(.dark) [data-notification-bell],
+html:not(.dark) [data-notification-bell] svg,
+html:not(.dark) .navbar-bell-btn svg {
+  color: #71717a !important;
+  stroke: #71717a !important;
+}
+
+/* ==========================================================================
+   25. ELEMENTO UNIDADE DA BARBEARIA (AO LADO DO ALERTA / SINO)
+   - Dark Theme:
+     * Cor do texto: #969696 (cinza claro)
+     * Cor do ícone (chevron down/up): #969696 (cinza claro)
+     * Cor do contorno do container (stroke): #969696 (cinza claro)
+   - Light Theme:
+     * Preservação integral da paleta oficial (#55555E / borda #D4D4D8)
+   ========================================================================== */
+
+/* DARK THEME: Unidade da Barbearia */
+html.dark [data-unit-select],
+html.dark select[data-unit-select],
+html.dark [data-unit-container] select {
+  color: #969696 !important;
+  border-color: #969696 !important;
+  background-color: rgba(23, 23, 23, 0.8) !important;
+}
+
+html.dark [data-unit-chevron],
+html.dark [data-unit-chevron] svg,
+html.dark [data-unit-container] [data-unit-chevron] svg {
+  color: #969696 !important;
+  stroke: #969696 !important;
+}
+
+/* LIGHT THEME (PRESERVAÇÃO INTEGRAL) */
+html:not(.dark) [data-unit-select],
+html:not(.dark) select[data-unit-select],
+html:not(.dark) [data-unit-container] select {
+  color: #55555E !important;
+  border-color: #D4D4D8 !important;
+  background-color: #F4F4F5 !important;
+}
+
+html:not(.dark) [data-unit-chevron],
+html:not(.dark) [data-unit-chevron] svg,
+html:not(.dark) [data-unit-container] [data-unit-chevron] svg {
+  color: #55555E !important;
+  stroke: #55555E !important;
+}
+
+

@@ -135,13 +135,12 @@ export default function Navbar({
         ];
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const [isBranchSelectOpen, setIsBranchSelectOpen] = useState(false);
 
   // Estado para o Modal de Confirmação de Saída
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const userMenuRef = useRef(null);
-  const statusMenuRef = useRef(null);
 
   // Fecha dropdowns ao clicar fora
   useEffect(() => {
@@ -149,19 +148,10 @@ export default function Navbar({
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setIsUserMenuOpen(false);
       }
-      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target)) {
-        setIsStatusMenuOpen(false);
-      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const statusLabels = {
-    available: "Disponível",
-    busy: "Em Atendimento",
-    break: "Em Pausa",
-  };
 
   // ==========================================
   // 1. NAVBAR DO CLIENTE FINAL
@@ -203,29 +193,34 @@ export default function Navbar({
           </div>
 
           <div className={navbarStyles.rightSection}>
-            <ThemeToggle className="inline-flex" />
+            {resolvedUser.loyaltyPoints !== undefined && (
+              <div
+                className={navbarStyles.loyaltyPointsBadge}
+                title="Pontos acumulados"
+              >
+                <ProjectIcon name="Star" size={13} colorVariant="amber" className="mr-1" />
+                <span>{resolvedUser.loyaltyPoints} pts</span>
+              </div>
+            )}
 
-          {resolvedUser.loyaltyPoints !== undefined && (
-            <div
-              className={navbarStyles.loyaltyPointsBadge}
-              title="Pontos acumulados"
-            >
-              <ProjectIcon name="Star" size={13} colorVariant="amber" className="mr-1" />
-              <span>{resolvedUser.loyaltyPoints} pts</span>
+            <div className={navbarStyles.notificationWrapper}>
+              <IconButton
+                variant="ghost"
+                size="sm"
+                ariaLabel="Avisos e Lembretes"
+                onClick={onNotificationsClick}
+                className="navbar-bell-btn text-zinc-500 hover:text-zinc-700 dark:text-amber-500 dark:hover:text-amber-400"
+                data-notification-button="true"
+              >
+                <ProjectIcon
+                  name="Bell"
+                  size={18}
+                  className="text-zinc-500 dark:text-amber-500"
+                  data-notification-bell="true"
+                />
+              </IconButton>
+              <span className={navbarStyles.notificationDot} />
             </div>
-          )}
-
-          <div className={navbarStyles.notificationWrapper}>
-            <IconButton
-              variant="ghost"
-              size="sm"
-              ariaLabel="Avisos e Lembretes"
-              onClick={onNotificationsClick}
-            >
-              <ProjectIcon name="Bell" size={18} colorVariant="neutral" />
-            </IconButton>
-            <span className={navbarStyles.notificationDot} />
-          </div>
 
           <Button
             variant="primary"
@@ -263,7 +258,7 @@ export default function Navbar({
             <ProjectIcon
               name="Menu"
               size={22}
-              className="text-[#059669] dark:text-neutral-400"
+              className="text-[#059669] dark:text-amber-400"
               data-menu-icon="true"
             />
           </button>
@@ -291,103 +286,64 @@ export default function Navbar({
             })}
           </div>
 
-          <div className="relative inline-flex items-center">
+        </div>
+
+        {/* Lado Direito: Unidade da Barbearia + Notificações (Sino) + Seletor Avatar */}
+        <div className={navbarStyles.rightSection}>
+          {/* Elemento Unidade da Barbearia (ao lado do alerta / sino) */}
+          <div className="relative inline-flex items-center" data-unit-container="true">
             <select
               value={selectedBranch}
-              onChange={(e) => onSelectBranch && onSelectBranch(e.target.value)}
-              className={`${navbarStyles.branchSelect} appearance-none pr-7`}
+              onChange={(e) => {
+                if (onSelectBranch) onSelectBranch(e.target.value);
+                setIsBranchSelectOpen(false);
+              }}
+              onClick={() => setIsBranchSelectOpen((prev) => !prev)}
+              onFocus={() => setIsBranchSelectOpen(true)}
+              onBlur={() => setIsBranchSelectOpen(false)}
+              className={`${navbarStyles.branchSelect} appearance-none pr-6 sm:pr-7 cursor-pointer`}
               aria-label="Selecionar Filial ou Unidade"
               title={`Unidade da Barbearia: ${currentUnitName}`}
+              data-unit-select="true"
             >
               {resolvedBranches.map((b) => (
                 <option
                   key={b.id}
                   value={b.id}
-                  className="bg-neutral-900 text-white"
+                  className="bg-[#F4F4F5] dark:bg-neutral-900 text-[#55555E] dark:text-[#969696]"
                 >
                   {b.name}
                 </option>
               ))}
             </select>
-            <div className="pointer-events-none absolute right-2 flex items-center text-neutral-400">
-              <ProjectIcon name="ChevronDown" size={13} colorVariant="neutral" />
+            <div
+              className="pointer-events-none absolute right-2 flex items-center text-[#55555E] dark:text-[#969696]"
+              data-unit-chevron="true"
+            >
+              <ProjectIcon
+                name={isBranchSelectOpen ? "ChevronUp" : "ChevronDown"}
+                size={13}
+                className="text-[#55555E] dark:text-[#969696]"
+              />
             </div>
           </div>
-        </div>
 
-        {/* Lado Direito: Status + Atalho + Tema + Notificações + Perfil */}
-        <div className={navbarStyles.rightSection}>
-          {/* Status de Atendimento */}
-          <div className="relative" ref={statusMenuRef}>
-            <button
-              type="button"
-              onClick={() => setIsStatusMenuOpen((prev) => !prev)}
-              aria-haspopup="true"
-              aria-expanded={isStatusMenuOpen}
-              aria-label={`Status de atendimento: ${statusLabels[barberStatus]}. Clique para alterar.`}
-              className={`${navbarStyles.statusBadge} ${navbarStyles.statusStates[barberStatus]} focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none`}
-            >
-              <span
-                className={`${navbarStyles.statusDot} ${navbarStyles.statusDots[barberStatus]}`}
-              />
-              <span className="hidden sm:inline">
-                {statusLabels[barberStatus]}
-              </span>
-            </button>
-
-            {isStatusMenuOpen && (
-              <div className={navbarStyles.dropdownMenu} role="menu" aria-label="Opções de status de atendimento">
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onStatusChange("available");
-                    setIsStatusMenuOpen(false);
-                  }}
-                  className={navbarStyles.dropdownItem}
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>Disponível para Atender</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onStatusChange("busy");
-                    setIsStatusMenuOpen(false);
-                  }}
-                  className={navbarStyles.dropdownItem}
-                >
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  <span>Em Atendimento</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onStatusChange("break");
-                    setIsStatusMenuOpen(false);
-                  }}
-                  className={navbarStyles.dropdownItem}
-                >
-                  <span className="w-2 h-2 rounded-full bg-neutral-500" />
-                  <span>Em Pausa / Almoço</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          <ThemeToggle className="inline-flex" />
-
-          {/* Notificações */}
+          {/* Notificações (Sino - Âmbar no Dark, Neutro no Light) */}
           <div className={navbarStyles.notificationWrapper}>
             <IconButton
               variant="ghost"
               size="sm"
               ariaLabel="Notificações do salão"
               onClick={onNotificationsClick}
+              className="navbar-bell-btn text-zinc-500 hover:text-zinc-700 dark:text-amber-400 dark:hover:text-amber-300"
+              data-notification-button="true"
             >
-              <ProjectIcon name="Bell" size={18} colorVariant="neutral" />
+              <ProjectIcon
+                name="Bell"
+                size={18}
+                className="text-zinc-500 dark:text-amber-400"
+                data-notification-bell="true"
+              />
             </IconButton>
             {notificationsCount > 0 && (
               <span
@@ -503,7 +459,7 @@ export default function Navbar({
                   </div>
                 </div>
 
-                <div className="px-3.5 py-2 flex sm:hidden items-center justify-between text-xs text-[#55555E] dark:text-neutral-300 border-b border-[#E4E4E7] dark:border-neutral-800">
+                <div className="px-3.5 py-2 flex items-center justify-between text-xs text-[#55555E] dark:text-neutral-300 border-b border-[#E4E4E7] dark:border-neutral-800">
                   <span>Modo de Exibição</span>
                   <ThemeToggle />
                 </div>

@@ -9,18 +9,18 @@ export const navbarStyles = {
 
   // Botão hambúrguer no mobile para abrir a Sidebar
   menuButton:
-    "md:hidden text-[#059669] hover:text-emerald-700 dark:text-neutral-400 dark:hover:text-white p-2 rounded-lg hover:bg-[#F4F4F5] dark:hover:bg-neutral-800 transition-colors",
+    "md:hidden text-[#059669] hover:text-emerald-700 dark:text-amber-400 dark:hover:text-amber-300 p-2 rounded-lg hover:bg-[#F4F4F5] dark:hover:bg-neutral-800 transition-colors cursor-pointer",
 
-  // Breadcrumbs (Caminho da página)
+  // Breadcrumbs (Caminho da página) - Oculto no mobile para preservar espaço limpo
   breadcrumbWrapper:
-    "hidden sm:flex items-center gap-2 text-xs font-medium",
+    "hidden md:flex items-center gap-2 text-xs font-medium",
   breadcrumbCurrent:
     "font-semibold text-[#059669] dark:text-amber-400 navbar-breadcrumb-current",
   breadcrumbSeparator: "text-zinc-400 dark:text-neutral-600 navbar-breadcrumb-separator",
 
-  // Seletor de Filial / Unidade
+  // Seletor de Filial / Unidade (Posicionado ao lado do Alerta / Sino)
   branchSelect:
-    "bg-neutral-800/80 hover:bg-neutral-800 text-neutral-200 text-xs font-medium py-1.5 px-3 rounded-lg border border-neutral-700/60 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer transition-colors max-w-[170px] truncate",
+    "bg-[#F4F4F5] dark:bg-neutral-900/80 hover:bg-[#E4E4E7] dark:hover:bg-neutral-800 text-[#55555E] dark:text-[#969696] text-[11px] sm:text-xs font-medium py-1 px-2.5 sm:py-1.5 sm:px-3 rounded-lg border border-[#D4D4D8] dark:border-[#969696] focus:outline-none focus:ring-1 focus:ring-[#969696] cursor-pointer transition-colors max-w-[125px] xs:max-w-[155px] sm:max-w-[210px] md:max-w-[240px] truncate select-none",
 
   // Badge de Status de Atendimento do Barbeiro
   statusBadge:
