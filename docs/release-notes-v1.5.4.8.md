@@ -19,14 +19,17 @@
 
 ---
 
-### 2. Menu Popover Suspenso Conectado ao Botão "Mais"
-* **Conexão Direta e Ergonômica:** O botão "Mais" (extrema direita) aciona um menu popover flutuante ancorado logo acima da barra inferior.
-* **As 5 Opções Oficiais:**
-  1. **Modo de Exibição (Theme Toggle):** Chave seletora (*toggle switch*) com ícones dinâmicos de Lua (`Dark`) e Sol (`Light`), sincronizando instantaneamente o tema global.
-  2. **Meu Perfil:** Acesso direto à gestão cadastral, avatar, biografia e dados do profissional gestor.
-  3. **Configurações da Barbearia:** Acesso ao painel de políticas, horários de atendimento e integrações.
-  4. **Suporte & Ajuda:** Central de ajuda e chamados técnicos.
-  5. **Sair da Plataforma:** Botão em destaque de alerta (`text-red-400`) para logout seguro e expurgo de sessão.
+### 2. Menu Popover Suspenso Padronizado com o Dropdown da Navbar
+* **Conexão Direta e Ergonômica:** O botão "Mais" (extrema direita) aciona o menu popover flutuante com a mesma identidade visual e componentes do dropdown do Avatar da Navbar.
+* **As 5 Opções Oficiais (Tipografia #969696 e Componente ThemeToggle):**
+  1. **Modo de Exibição (Reutilização de ThemeToggle):** Integração direta do componente `<ThemeToggle />` da Navbar, preservando o switch pílula com ícones de Sol e Lua e sincronização reativa com o tema do sistema.
+  2. **Meu Perfil:** Texto na cor `#969696` (Dark) / `#55555E` (Light) e ícone em tom dourado/âmbar com hover branco.
+  3. **Configurações da Barbearia:** Texto na cor `#969696` (Dark) / `#55555E` (Light) com hover branco.
+  4. **Suporte & Ajuda:** Texto na cor `#969696` (Dark) / `#55555E` (Light) com hover branco.
+  5. **Sair da Plataforma:** Texto na cor `#969696` (Dark) / `#55555E` (Light) e ícone de logout com hover branco, acionando o encerramento seguro de sessão.
+* **Padronização dos Ícones da Barra Inferior:**
+  * Todos os ícones da Bottom Navigation Bar (`Agenda`, `Clientes`, `Novo Atendimento`, `Financeiro`, `Mais`) adotam a cor **Âmbar** (`text-amber-500 dark:text-amber-400`).
+  * Paleta de cores da versão Light preservada integralmente sem qualquer alteração.
 * **Interatividade & Fechamento:**
   * Fechamento automático ao clicar/tocar fora (*click outside*).
   * Suporte ao fechamento via tecla `Escape`.
@@ -36,11 +39,11 @@
 
 ### 3. Layout Simétrico 2 + 1 + 2 e Destaque CTA Central
 * **Estrutura Oficial de 5 Itens:**
-  1. **Agenda (Home)** — `Calendar` *(Extrema esquerda)*
-  2. **Clientes** — `Users` *(Esquerda do centro)*
+  1. **Agenda (Home)** — `Calendar` em tom Âmbar *(Extrema esquerda)*
+  2. **Clientes** — `Users` em tom Âmbar *(Esquerda do centro)*
   3. **Novo Atendimento** — `Scissors` *(Centro / Destaque principal elevado em gradiente laranja/âmbar)*
-  4. **Financeiro** — `DollarSign` *(Direita do centro)*
-  5. **Mais / Perfil** — `Menu` *(Extrema direita com menu popover)*
+  4. **Financeiro** — `DollarSign` em tom Âmbar *(Direita do centro)*
+  5. **Mais / Perfil** — `Menu` em tom Âmbar *(Extrema direita com menu popover)*
 * **Espaçamento Defensivo:** Margem inferior expandida para `pb-32 md:pb-8` no container de telas, evitando qualquer sobreposição com o rodapé.
 
 ---

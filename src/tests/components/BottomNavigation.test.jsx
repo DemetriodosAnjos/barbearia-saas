@@ -68,6 +68,21 @@ describe("Component: BottomNavigation (Layout Simétrico 2+1+2 e Menu Mais)", ()
     expect(screen.getByText("Mais")).toBeInTheDocument();
   });
 
+  it("renderiza os ícones da barra inferior estilizados no tom Âmbar do Dark Theme", () => {
+    render(
+      <BottomNavigation
+        items={mockItems}
+        activeItem="agenda"
+        onChange={vi.fn()}
+      />
+    );
+
+    // Verifica que os botões contêm wrappers com a classe de cor âmbar
+    const agendaBtn = screen.getByTestId("bottom-nav-agenda");
+    const iconContainer = agendaBtn.querySelector("div");
+    expect(iconContainer?.className).toContain("text-amber-500");
+  });
+
   it("destaca visualmente o botão central de 'Novo Atendimento' (isCenterAction)", () => {
     render(
       <BottomNavigation
@@ -83,7 +98,7 @@ describe("Component: BottomNavigation (Layout Simétrico 2+1+2 e Menu Mais)", ()
     expect(screen.getByTestId("icon-novo")).toBeInTheDocument();
   });
 
-  it("abre o menu suspenso popover com as 5 opções ao clicar no botão 'Mais'", () => {
+  it("abre o menu suspenso popover com as 5 opções com tipografia #969696 idêntica à Navbar", () => {
     const handleNavigate = vi.fn();
     const handleLogout = vi.fn();
 
@@ -108,21 +123,31 @@ describe("Component: BottomNavigation (Layout Simétrico 2+1+2 e Menu Mais)", ()
     const popover = screen.getByTestId("bottom-nav-more-popover");
     expect(popover).toBeInTheDocument();
 
-    // 1. Modo de Exibição com toggle
-    expect(screen.getByText("Modo de Exibição")).toBeInTheDocument();
-    expect(screen.getByTestId("bottom-nav-theme-toggle")).toBeInTheDocument();
+    // 1. Modo de Exibição com ThemeToggle da Navbar
+    const modoExibicaoLabel = screen.getByText("Modo de Exibição");
+    expect(modoExibicaoLabel).toBeInTheDocument();
+    expect(modoExibicaoLabel).toHaveClass("dark:text-[#969696]");
+    expect(screen.getByRole("button", { name: /alternar para modo/i })).toBeInTheDocument();
 
-    // 2. Meu Perfil
-    expect(screen.getByText("Meu Perfil")).toBeInTheDocument();
+    // 2. Meu Perfil com cor #969696
+    const perfilLabel = screen.getByText("Meu Perfil");
+    expect(perfilLabel).toBeInTheDocument();
+    expect(perfilLabel).toHaveClass("dark:text-[#969696]");
 
-    // 3. Configurações da Barbearia
-    expect(screen.getByText("Configurações da Barbearia")).toBeInTheDocument();
+    // 3. Configurações da Barbearia com cor #969696
+    const configLabel = screen.getByText("Configurações da Barbearia");
+    expect(configLabel).toBeInTheDocument();
+    expect(configLabel).toHaveClass("dark:text-[#969696]");
 
-    // 4. Suporte & Ajuda
-    expect(screen.getByText("Suporte & Ajuda")).toBeInTheDocument();
+    // 4. Suporte & Ajuda com cor #969696
+    const suporteLabel = screen.getByText("Suporte & Ajuda");
+    expect(suporteLabel).toBeInTheDocument();
+    expect(suporteLabel).toHaveClass("dark:text-[#969696]");
 
-    // 5. Sair da Plataforma
-    expect(screen.getByText("Sair da Plataforma")).toBeInTheDocument();
+    // 5. Sair da Plataforma com cor #969696
+    const sairLabel = screen.getByText("Sair da Plataforma");
+    expect(sairLabel).toBeInTheDocument();
+    expect(sairLabel).toHaveClass("dark:text-[#969696]");
 
     // Clica em "Meu Perfil"
     fireEvent.click(screen.getByTestId("bottom-nav-item-perfil"));
@@ -151,7 +176,7 @@ describe("Component: BottomNavigation (Layout Simétrico 2+1+2 e Menu Mais)", ()
     expect(handleLogout).toHaveBeenCalled();
   });
 
-  it("alterna o switch de tema ao clicar no Modo de Exibição", () => {
+  it("alterna o ThemeToggle ao clicar no seletor de tema dentro do menu Mais", () => {
     render(
       <BottomNavigation
         items={mockItems}
@@ -163,11 +188,11 @@ describe("Component: BottomNavigation (Layout Simétrico 2+1+2 e Menu Mais)", ()
     // Abre menu Mais
     fireEvent.click(screen.getByTestId("bottom-nav-mais"));
 
-    const themeToggle = screen.getByTestId("bottom-nav-theme-toggle");
-    expect(themeToggle).toBeInTheDocument();
+    const themeToggleBtn = screen.getByRole("button", { name: /alternar para modo/i });
+    expect(themeToggleBtn).toBeInTheDocument();
 
     // Alterna o tema
-    fireEvent.click(themeToggle);
+    fireEvent.click(themeToggleBtn);
     expect(document.documentElement.classList.contains("dark") || !document.documentElement.classList.contains("dark")).toBeTruthy();
   });
 

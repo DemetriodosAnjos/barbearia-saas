@@ -1,16 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { bottomNavStyles } from "./BottomNavigation.styles";
 import ProjectIcon from "./ProjectIcon";
-import {
-  Moon,
-  Sun,
-  User,
-  Settings,
-  HelpCircle,
-  LogOut,
-} from "lucide-react";
-import { applyThemeMode } from "../../utils/theme";
-import { safeStorage } from "../../utils/safeStorage";
+import ThemeToggle from "./ThemeToggle";
 
 export default function BottomNavigation({
   items = [],
@@ -23,19 +14,6 @@ export default function BottomNavigation({
   style = {},
 }) {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => {
-    try {
-      const saved = safeStorage.getItem("barbersaas_theme_mode");
-      if (saved) return saved === "dark";
-      if (typeof document !== "undefined") {
-        return document.documentElement.classList.contains("dark");
-      }
-      return true;
-    } catch {
-      return true;
-    }
-  });
-
   const popoverRef = useRef(null);
   const moreButtonRef = useRef(null);
 
@@ -71,26 +49,6 @@ export default function BottomNavigation({
     };
   }, [isMoreMenuOpen]);
 
-  // Sincroniza o estado do tema com mudanças externas no DOM/storage
-  useEffect(() => {
-    const handleThemeChange = () => {
-      const mode = safeStorage.getItem("barbersaas_theme_mode") || "dark";
-      setIsDark(mode === "dark");
-    };
-
-    window.addEventListener("storage", handleThemeChange);
-    return () => window.removeEventListener("storage", handleThemeChange);
-  }, []);
-
-  const toggleTheme = (e) => {
-    if (e) e.stopPropagation();
-    const nextDark = !isDark;
-    setIsDark(nextDark);
-    applyThemeMode(nextDark ? "dark" : "light");
-    // Notifica outros ouvintes locais de troca de tema
-    window.dispatchEvent(new Event("storage"));
-  };
-
   const handleItemSelect = (screenId) => {
     setIsMoreMenuOpen(false);
     if (onNavigate) {
@@ -116,7 +74,14 @@ export default function BottomNavigation({
   const renderIcon = (icon) => {
     if (!icon) return null;
     if (typeof icon === "string") {
-      return <ProjectIcon name={icon} size={20} />;
+      return (
+        <ProjectIcon
+          name={icon}
+          size={20}
+          className="text-amber-500 dark:text-amber-400"
+          colorVariant="amber"
+        />
+      );
     }
     return icon;
   };
@@ -209,8 +174,8 @@ export default function BottomNavigation({
                     data-nav-item={item.id}
                     data-testid={`bottom-nav-${item.id}`}
                   >
-                    <div className={bottomNavStyles.iconWrapper}>
-                      <div className="flex items-center justify-center">
+                    <div className={`${bottomNavStyles.iconWrapper} text-amber-500 dark:text-amber-400`}>
+                      <div className="flex items-center justify-center text-amber-500 dark:text-amber-400">
                         {renderIcon(item.icon)}
                       </div>
                       {item.badge && (
@@ -232,64 +197,28 @@ export default function BottomNavigation({
                     )}
                   </button>
 
-                  {/* Popover suspenso ancorado acima do botão Mais */}
+                  {/* Popover suspenso ancorado acima do botão Mais com padrão da Navbar */}
                   {isMoreMenuOpen && (
                     <div
                       ref={popoverRef}
                       role="menu"
                       aria-label="Menu Mais opções"
                       data-testid="bottom-nav-more-popover"
-                      className={bottomNavStyles.morePopover}
-                      style={{ backgroundColor: "#171717" }}
+                      className={`${bottomNavStyles.morePopover} avatar-dropdown-menu`}
                     >
                       {/* Ponta sutil (triângulo) indicando o botão Mais */}
                       <div
                         className={bottomNavStyles.morePopoverArrow}
-                        style={{ backgroundColor: "#171717" }}
                         aria-hidden="true"
                       />
 
-                      {/* 1. MODO DE EXIBIÇÃO (THEME TOGGLE SWITCH) */}
+                      {/* 1. MODO DE EXIBIÇÃO (REUTILIZAÇÃO DO THEMETOGGLE DA NAVBAR) */}
                       <div
-                        className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors select-none"
+                        className={bottomNavStyles.moreHeader}
                         data-testid="bottom-nav-theme-row"
                       >
-                        <div className="flex items-center gap-2.5 text-xs font-semibold text-neutral-200">
-                          {isDark ? (
-                            <Moon className="w-4 h-4 text-amber-400" />
-                          ) : (
-                            <Sun className="w-4 h-4 text-amber-500" />
-                          )}
-                          <span>Modo de Exibição</span>
-                        </div>
-
-                        {/* Chave seletora (toggle switch) com ícones de Lua e Sol */}
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isDark}
-                          onClick={toggleTheme}
-                          aria-label={`Alternar para modo ${isDark ? "claro" : "escuro"}`}
-                          title={`Modo Atual: ${isDark ? "Escuro (Dark)" : "Claro (Light)"}`}
-                          data-testid="bottom-nav-theme-toggle"
-                          className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500/40 ${
-                            isDark ? "bg-amber-600" : "bg-neutral-700"
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none flex h-6 w-6 transform items-center justify-center rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
-                              isDark
-                                ? "translate-x-6 text-amber-600"
-                                : "translate-x-0 text-neutral-800"
-                            }`}
-                          >
-                            {isDark ? (
-                              <Moon className="w-3.5 h-3.5 fill-current" />
-                            ) : (
-                              <Sun className="w-3.5 h-3.5 fill-current" />
-                            )}
-                          </span>
-                        </button>
+                        <span className="text-[#55555E] dark:text-[#969696] font-medium">Modo de Exibição</span>
+                        <ThemeToggle />
                       </div>
 
                       {/* 2. MEU PERFIL */}
@@ -300,8 +229,18 @@ export default function BottomNavigation({
                         className={bottomNavStyles.moreItem}
                         data-testid="bottom-nav-item-perfil"
                       >
-                        <User className="w-4 h-4 text-amber-500 shrink-0" />
-                        <span>Meu Perfil</span>
+                        <ProjectIcon
+                          name="User"
+                          size={15}
+                          className="mr-0 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white transition-colors shrink-0"
+                          data-user-dropdown-icon="perfil"
+                        />
+                        <span
+                          className="text-[#55555E] dark:text-[#969696] group-hover:text-white group-focus:text-white transition-colors"
+                          data-user-dropdown-text="perfil"
+                        >
+                          Meu Perfil
+                        </span>
                       </button>
 
                       {/* 3. CONFIGURAÇÕES DA BARBEARIA */}
@@ -312,8 +251,18 @@ export default function BottomNavigation({
                         className={bottomNavStyles.moreItem}
                         data-testid="bottom-nav-item-configuracoes"
                       >
-                        <Settings className="w-4 h-4 text-amber-500 shrink-0" />
-                        <span>Configurações da Barbearia</span>
+                        <ProjectIcon
+                          name="Settings"
+                          size={15}
+                          className="mr-0 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white transition-colors shrink-0"
+                          data-user-dropdown-icon="configuracoes"
+                        />
+                        <span
+                          className="text-[#55555E] dark:text-[#969696] group-hover:text-white group-focus:text-white transition-colors"
+                          data-user-dropdown-text="configuracoes"
+                        >
+                          Configurações da Barbearia
+                        </span>
                       </button>
 
                       {/* 4. SUPORTE & AJUDA */}
@@ -324,23 +273,44 @@ export default function BottomNavigation({
                         className={bottomNavStyles.moreItem}
                         data-testid="bottom-nav-item-suporte"
                       >
-                        <HelpCircle className="w-4 h-4 text-amber-500 shrink-0" />
-                        <span>Suporte & Ajuda</span>
+                        <ProjectIcon
+                          name="MessageSquare"
+                          size={15}
+                          className="mr-0 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white transition-colors shrink-0"
+                          data-user-dropdown-icon="suporte"
+                        />
+                        <span
+                          className="text-[#55555E] dark:text-[#969696] group-hover:text-white group-focus:text-white transition-colors"
+                          data-user-dropdown-text="suporte"
+                        >
+                          Suporte & Ajuda
+                        </span>
                       </button>
 
                       {/* LINHA SEPARADORA */}
-                      <div className={bottomNavStyles.moreDivider} />
+                      <div className={bottomNavStyles.moreDivider} data-user-dropdown-divider="true" />
 
                       {/* 5. SAIR DA PLATAFORMA */}
                       <button
                         type="button"
                         role="menuitem"
                         onClick={handleLogoutClick}
-                        className={bottomNavStyles.moreItemDanger}
+                        className={bottomNavStyles.moreItem}
                         data-testid="bottom-nav-item-logout"
                       >
-                        <LogOut className="w-4 h-4 text-red-400 shrink-0" />
-                        <span>Sair da Plataforma</span>
+                        <ProjectIcon
+                          name="LogOut"
+                          size={15}
+                          colorVariant="danger"
+                          className="mr-0 text-red-500 dark:text-red-400 group-hover:text-white group-focus:text-white transition-colors shrink-0"
+                          data-user-dropdown-icon="sair"
+                        />
+                        <span
+                          className="text-[#55555E] dark:text-[#969696] group-hover:text-white group-focus:text-white transition-colors"
+                          data-user-dropdown-text="sair"
+                        >
+                          Sair da Plataforma
+                        </span>
                       </button>
                     </div>
                   )}
@@ -371,9 +341,9 @@ export default function BottomNavigation({
                   data-nav-item={item.id}
                   data-testid={`bottom-nav-${item.id}`}
                 >
-                  {/* Ícone com suporte a Badge de contador */}
-                  <div className={bottomNavStyles.iconWrapper}>
-                    <div className="flex items-center justify-center">
+                  {/* Ícone com suporte a Badge de contador na cor Âmbar */}
+                  <div className={`${bottomNavStyles.iconWrapper} text-amber-500 dark:text-amber-400`}>
+                    <div className="flex items-center justify-center text-amber-500 dark:text-amber-400">
                       {renderIcon(item.icon)}
                     </div>
                     {item.badge && (

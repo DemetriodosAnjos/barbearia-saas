@@ -57,24 +57,29 @@ A barra inferior foi desenhada respeitando o princípio de Fitts e o padrão erg
 
 ## 3. Menu Suspenso ("Mais")
 
-Ancorado imediatamente acima da aba "Mais" no canto inferior direito, o Popover exibe uma interface compacta, elegante e fluida:
+Ancorado imediatamente acima da aba "Mais" no canto inferior direito, o Popover exibe uma interface compacta, elegante e fluida, padronizada com o dropdown do Avatar da Navbar:
 
-1. **Modo de Exibição (Theme Toggle):**
-   - Chave seletora (*toggle switch*) acessível (`role="switch"`) com ícones de Lua (`Dark`) e Sol (`Light`).
-   - Permite alternar o tema do sistema com sincronização instantânea em memória e `safeStorage`.
+1. **Modo de Exibição (Reutilização de ThemeToggle):**
+   - Reutilização do componente oficial `<ThemeToggle />` da Navbar, exibindo o botão pílula com ícones de Sol e Lua.
+   - Texto "Modo de Exibição" na tipografia `#969696` (Dark) / `#55555E` (Light).
+   - Alternância em tempo real com persistência segura em `safeStorage`.
 2. **Meu Perfil:**
-   - Ícone de usuário (`User`) + texto `Meu Perfil`.
+   - Ícone de usuário (`User`) em tom dourado/âmbar + texto `Meu Perfil` na cor `#969696` (Dark) / `#55555E` (Light) com hover branco (`group-hover:text-white`).
    - Navega para a tela `perfil` e fecha o popover.
 3. **Configurações da Barbearia:**
-   - Ícone de engrenagem (`Settings`) + texto `Configurações da Barbearia`.
+   - Ícone de engrenagem (`Settings`) + texto `Configurações da Barbearia` na cor `#969696` (Dark) / `#55555E` (Light) com hover branco.
    - Navega para a tela `configuracoes` e fecha o popover.
 4. **Suporte & Ajuda:**
-   - Ícone de balão (`HelpCircle`) + texto `Suporte & Ajuda`.
+   - Ícone de balão (`MessageSquare`) + texto `Suporte & Ajuda` na cor `#969696` (Dark) / `#55555E` (Light) com hover branco.
    - Navega para a tela `suporte` e fecha o popover.
-5. **Divisor Interno:** Linha sutil separando itens administrativos da ação destrutiva.
+5. **Divisor Interno:** Linha sutil separadora na cor `#E4E4E7` (Light) / `#969696` (Dark).
 6. **Sair da Plataforma:**
-   - Ícone de logout (`LogOut`) + texto `Sair da Plataforma` em tom de alerta (`text-red-400`).
+   - Ícone de logout (`LogOut`) + texto `Sair da Plataforma` na cor `#969696` (Dark) / `#55555E` (Light) com hover branco.
    - Executa a função segura de logout `onLogout` e expurga os dados de sessão.
+
+### Ícones da Bottom Navigation Bar
+- Todos os ícones da barra inferior (`Agenda`, `Clientes`, `Novo Atendimento`, `Financeiro`, `Mais`) adotam o tom **Âmbar** oficial (`text-amber-500 dark:text-amber-400`).
+- A paleta de cores da versão **Light** foi integralmente preservada sem qualquer alteração.
 
 ### Lógica de Fechamento (*Click Outside* & Acessibilidade)
 - Escuta ativa para cliques ou toques fora da área do Popover (`mousedown` e `touchstart`).

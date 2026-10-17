@@ -74,7 +74,7 @@ export default function BarbershopDashboard({
         label: "Agenda",
         title: "Agenda (Home)",
         ariaLabel: "Agenda (Home)",
-        icon: <Calendar className="w-5 h-5" />,
+        icon: <Calendar className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
         isActive: activeMenuTab === "agenda",
       },
       {
@@ -82,7 +82,7 @@ export default function BarbershopDashboard({
         label: "Clientes",
         title: "Clientes",
         ariaLabel: "Clientes",
-        icon: <Users className="w-5 h-5" />,
+        icon: <Users className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
         isActive: activeMenuTab === "clientes",
       },
       {
@@ -90,7 +90,7 @@ export default function BarbershopDashboard({
         label: "Novo Atendimento",
         title: "Novo Atendimento",
         ariaLabel: "Novo Atendimento",
-        icon: <Scissors className="w-6 h-6 stroke-[2.2]" />,
+        icon: <Scissors className="w-6 h-6 stroke-[2.2] text-white" />,
         isCenterAction: true,
       },
       {
@@ -98,7 +98,7 @@ export default function BarbershopDashboard({
         label: "Financeiro",
         title: "Financeiro",
         ariaLabel: "Financeiro",
-        icon: <DollarSign className="w-5 h-5" />,
+        icon: <DollarSign className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
         isActive:
           activeMenuTab === "dashboard_financeiro" ||
           activeMenuTab === "caixa" ||
@@ -109,7 +109,7 @@ export default function BarbershopDashboard({
         label: "Mais",
         title: "Mais / Perfil",
         ariaLabel: "Mais / Perfil",
-        icon: <Menu className="w-5 h-5" />,
+        icon: <Menu className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
         isActive:
           activeMenuTab === "perfil" ||
           activeMenuTab === "configuracoes" ||
