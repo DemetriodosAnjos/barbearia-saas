@@ -30,6 +30,7 @@ import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { PartialDataNotice } from "./components/ui/ContractFallback";
 import OfflineBanner from "./components/resilience/OfflineBanner";
 import { registerOrUpdateGlobalSession } from "./services/sessionTracker";
+import { initTheme } from "./utils/theme";
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -375,6 +376,11 @@ export default function App() {
       setTenant(fallback);
       return fallback;
     }
+  }, []);
+
+  // Inicialização e garantia estrita do tema escuro padrão (antes e após login)
+  useEffect(() => {
+    initTheme();
   }, []);
 
   // Sincronização e validação de sessão real ao recarregar a página (F5)

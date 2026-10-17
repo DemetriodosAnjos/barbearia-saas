@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html class="dark" lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -10,6 +10,23 @@
     <meta property="og:description" content="Sistema SaaS para barbearias com agendamentos em tempo real, comissões automáticas, frente de caixa (PDV) e pagamentos Mercado Pago." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function() {
+        try {
+          var mode = localStorage.getItem("barbersaas_theme_mode");
+          if (mode === "light") {
+            document.documentElement.classList.remove("dark");
+          } else {
+            document.documentElement.classList.add("dark");
+            if (!mode) {
+              localStorage.setItem("barbersaas_theme_mode", "dark");
+            }
+          }
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body class="bg-neutral-900 text-neutral-100 min-h-screen">

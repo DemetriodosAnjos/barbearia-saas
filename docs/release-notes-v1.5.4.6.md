@@ -30,5 +30,13 @@
   * Componente `ThemeToggle` mantido no menu suspenso do perfil do usuário e removido da barra direta para maximizar a área útil em telas móveis.
   * Badge de status de atendimento na barra unificado com o indicador de presença nativo do Avatar.
 
-### 4. Documentação Técnica
+### 4. Correção de Bug: Padrão Dark Theme no Carregamento Inicial (Anti-Flicker)
+* **Correção do Carregamento Inicial**:
+  * Adicionada a classe `dark` diretamente na tag raiz `<html class="dark" lang="pt-BR">` em `index.html`.
+  * Implementado script inline no `<head>` para verificação antecipada de preferência salva, garantindo que o tema escuro seja sempre o padrão antes e após o login.
+  * Invocação explícita de `initTheme()` no bootstrap da aplicação (`src/main.tsx`), montagem do componente principal (`src/App.jsx`) e auto-execução em `src/utils/theme.js`.
+  * **Eliminação do Bug de Alternância no Avatar**: O menu suspenso do Avatar e o componente `ThemeToggle` não alteram mais o tema da página de forma inesperada ao serem clicados ou montados.
+
+### 5. Documentação Técnica
 * Documentação técnica detalhada formalizada em `docs/analise-ux-navbar-mobile-first-dark.md`.
+

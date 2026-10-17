@@ -474,13 +474,14 @@ export const LIGHT_PALETTE_MINIMALIST_EMERALD = {
 
 export function applyThemeMode(mode = "dark") {
   const root = document.documentElement;
-  if (mode === "dark") {
-    root.classList.add("dark");
-  } else {
+  const isLight = mode === "light";
+  if (isLight) {
     root.classList.remove("dark");
+  } else {
+    root.classList.add("dark");
   }
   try {
-    safeStorage.setItem("barbersaas_theme_mode", mode);
+    safeStorage.setItem("barbersaas_theme_mode", isLight ? "light" : "dark");
   } catch {
     // safe fallback
   }
@@ -491,6 +492,15 @@ export function initTheme() {
   const savedBrand = safeStorage.getItem("barbersaas_brand_theme") || "amber";
   applyThemeMode(savedMode);
   setBrandTheme(savedBrand);
+}
+
+// Auto-inicialização imediata caso o módulo seja importado em ambiente de navegador
+if (typeof document !== "undefined") {
+  try {
+    initTheme();
+  } catch {
+    // safe fallback
+  }
 }
 
 // Cálculo de Contraste WCAG (Garante texto legível sobre qualquer cor)
