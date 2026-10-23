@@ -159,8 +159,8 @@ export default function App() {
           }, parsed);
         } else if (email === "ddoanjos@gmail.com" || email === "atendmentor@gmail.com") {
           return normalizeTenantRecord({
-            id: "788299e3-a26c-4a0b-bc71-c7ae81ed40d3",
-            name: "Barbearia Dos Anjos",
+            id: "db3f8187-8771-4f7c-b2bf-b7486d4eb1b6",
+            name: "Barbearia Demetrio dos Anjos",
             slug: "barbearia-dos-anjos",
             plan: "enterprise",
             subscription_plan: "Entreprise",
@@ -518,11 +518,23 @@ export default function App() {
         rawUser.user_metadata?.full_name ||
         (userEmail ? userEmail.split("@")[0] : "Usuário");
 
+      const resolvedAvatar =
+        profileRow?.avatar_url ||
+        rawUser.avatar_url ||
+        rawUser.avatar ||
+        rawUser.avatarUrl ||
+        rawUser.user_metadata?.avatar_url ||
+        rawUser.user_metadata?.picture ||
+        "";
+
       return {
         ...rawUser,
         id: officialUserId,
         name: resolvedName,
         role: normalizedRole,
+        avatar: resolvedAvatar,
+        avatarUrl: resolvedAvatar,
+        avatar_url: resolvedAvatar,
         barbeariaId: officialShopId,
         tenant_id: officialShopId,
         barbershop_id: officialShopId,
@@ -531,6 +543,8 @@ export default function App() {
           id: officialUserId,
           name: resolvedName,
           role: normalizedRole,
+          avatar_url: resolvedAvatar,
+          picture: resolvedAvatar,
           tenant_id: officialShopId,
           barbershop_id: officialShopId,
         },

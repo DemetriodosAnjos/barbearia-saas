@@ -185,11 +185,21 @@ export async function secureLogin({
         data.user.user_metadata?.full_name ||
         normalizedEmail.split("@")[0];
 
+      const resolvedAvatar =
+        profileRow?.avatar_url ||
+        data.user.user_metadata?.avatar_url ||
+        data.user.user_metadata?.picture ||
+        data.user.avatarUrl ||
+        "";
+
       const normalizedUser = {
         ...data.user,
         id: officialUserId, // UUID oficial sincronizado com o Google!
         name: normalizedName,
         role: normalizedRole,
+        avatar: resolvedAvatar,
+        avatarUrl: resolvedAvatar,
+        avatar_url: resolvedAvatar,
         barbeariaId: resolvedBarbershopId,
         tenant_id: resolvedBarbershopId,
         barbershop_id: resolvedBarbershopId,
@@ -199,6 +209,8 @@ export async function secureLogin({
           id: officialUserId,
           name: normalizedName,
           role: normalizedRole,
+          avatar_url: resolvedAvatar,
+          picture: resolvedAvatar,
           tenant_id: resolvedBarbershopId,
           barbershop_id: resolvedBarbershopId,
           barbershop_name: barbershopName,
