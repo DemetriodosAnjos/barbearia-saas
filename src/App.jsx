@@ -422,6 +422,15 @@ export default function App() {
             phone: profileRow.phone || prev.user_metadata?.phone,
             avatar_url: profileRow.avatar_url || prev.user_metadata?.avatar_url,
           };
+          const resolvedSyncAvatar =
+            profileRow.avatar_url ||
+            prev.avatarUrl ||
+            prev.avatar ||
+            prev.avatar_url ||
+            prev.user_metadata?.avatar_url ||
+            prev.user_metadata?.picture ||
+            "";
+
           const updated = {
             ...prev,
             name: profileRow.full_name || prev.name,
@@ -431,7 +440,14 @@ export default function App() {
             cnpj: profileRow.cnpj || prev.cnpj,
             birth_date: profileRow.birth_date || prev.birth_date,
             birthDate: profileRow.birth_date || prev.birthDate,
-            user_metadata: mergedMeta,
+            avatar: resolvedSyncAvatar,
+            avatarUrl: resolvedSyncAvatar,
+            avatar_url: resolvedSyncAvatar,
+            user_metadata: {
+              ...mergedMeta,
+              avatar_url: resolvedSyncAvatar,
+              picture: resolvedSyncAvatar,
+            },
           };
           safeStorage.setItem("saas_auth_user", JSON.stringify(updated));
           return updated;
@@ -1923,15 +1939,29 @@ export default function App() {
                   loggedUser.user_metadata?.tenant_id ||
                   loggedUser.user_metadata?.barbershop_id ||
                   resolveUnifiedTenantId(null, loggedUser);
+                const immediateAvatar =
+                  loggedUser?.avatarUrl ||
+                  loggedUser?.avatar ||
+                  loggedUser?.avatar_url ||
+                  loggedUser?.picture ||
+                  loggedUser?.user_metadata?.avatar_url ||
+                  loggedUser?.user_metadata?.picture ||
+                  "";
+
                 const userWithRole = {
                   ...loggedUser,
                   role: role,
+                  avatar: immediateAvatar,
+                  avatarUrl: immediateAvatar,
+                  avatar_url: immediateAvatar,
                   barbeariaId: unifiedTenant,
                   tenant_id: unifiedTenant,
                   barbershop_id: unifiedTenant,
                   user_metadata: {
                     ...(loggedUser?.user_metadata || {}),
                     role: role,
+                    avatar_url: immediateAvatar,
+                    picture: immediateAvatar,
                     tenant_id: unifiedTenant,
                     barbershop_id: unifiedTenant,
                   },
@@ -1955,12 +1985,17 @@ export default function App() {
                 const synchronizedUser = {
                   ...userWithRole,
                   id: userWithRole.id,
+                  avatar: userWithRole.avatarUrl || userWithRole.avatar || immediateAvatar,
+                  avatarUrl: userWithRole.avatarUrl || userWithRole.avatar || immediateAvatar,
+                  avatar_url: userWithRole.avatar_url || userWithRole.avatar || immediateAvatar,
                   barbeariaId: tenantIdToLoad,
                   tenant_id: tenantIdToLoad,
                   barbershop_id: tenantIdToLoad,
                   user_metadata: {
                     ...(userWithRole.user_metadata || {}),
                     id: userWithRole.id,
+                    avatar_url: userWithRole.avatarUrl || userWithRole.avatar || immediateAvatar,
+                    picture: userWithRole.avatarUrl || userWithRole.avatar || immediateAvatar,
                     tenant_id: tenantIdToLoad,
                     barbershop_id: tenantIdToLoad,
                   },
