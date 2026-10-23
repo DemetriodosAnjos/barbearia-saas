@@ -1,10 +1,27 @@
-import { useState, useEffect, useMemo } from "react";
-import { Calendar, Clock, Plus, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import {
+  Calendar,
+  Clock,
+  Plus,
+  CheckCircle2,
+  AlertCircle,
+  Users,
+  User,
+  Scissors,
+  AlertTriangle,
+  FileText,
+  X,
+  Sparkles,
+  Phone,
+  Check,
+} from "lucide-react";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
 import Select from "../ui/Select";
 import { supabase } from "../../lib/supabase";
+import { safeStorage } from "../../utils/safeStorage";
+import { normalizeClientRecord } from "../../pages/BarbershopAdmin/ClientsDirectoryView";
 
 export default function NewAppointmentModal({
   isOpen = false,
@@ -14,6 +31,7 @@ export default function NewAppointmentModal({
   tenant,
   barbers = [],
   services = [],
+  clients = [],
   prefilledBarberId = "",
   prefilledTime = "",
   prefilledDate = "",
@@ -36,6 +54,13 @@ export default function NewAppointmentModal({
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState({});
 
+  // Estados de Autocomplete e Prontuário em Tempo Real
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [localClients, setLocalClients] = useState([]);
+  const dropdownRef = useRef(null);
+  const searchDebounceRef = useRef(null);
+
   // Estados do Modal de Spinner de Ação (Tempo total 2.4s)
   const [isSaving, setIsSaving] = useState(false);
   const [saveStage, setSaveStage] = useState("saving"); // 'saving' | 'success'
@@ -46,6 +71,208 @@ export default function NewAppointmentModal({
   const [quickServiceName, setQuickServiceName] = useState("");
   const [quickServicePrice, setQuickServicePrice] = useState("");
   const [quickServiceDuration, setQuickServiceDuration] = useState("30");
+
+  // Sincroniza e consolida a base de clientes (props, safeStorage e Supabase em tempo real)
+  const syncClientsPool = useCallback(async () => {
+    const pool = new Map();
+
+    const addClientToPool = (c) => {
+      if (!c) return;
+      const norm = normalizeClientRecord(c);
+      const k = norm.id || (norm.phone ? norm.phone.replace(/\D/g, "") : null) || norm.name;
+      if (k && !pool.has(k)) {
+        pool.set(k, norm);
+      }
+    };
+
+    // 1. Clientes passados via prop (ex: do painel/agenda)
+    if (Array.isArray(clients)) {
+      clients.forEach(addClientToPool);
+    }
+
+    // 2. Cache local do tenant no safeStorage
+    try {
+      const activeTenantId = tenant?.id || "default";
+      const cached = safeStorage.getItem(`saas_clients_cache_${activeTenantId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(addClientToPool);
+        }
+      }
+    } catch {}
+
+    // 3. Busca em tempo real na tabela clients do Supabase
+    const targetTenantId = tenant?.id;
+    if (targetTenantId && !String(targetTenantId).startsWith("temp-")) {
+      try {
+        const { data: dbClients } = await supabase
+          .from("clients")
+          .select("*")
+          .or(`barbershop_id.eq.${targetTenantId},tenant_id.eq.${targetTenantId}`)
+          .order("name", { ascending: true })
+          .limit(100);
+
+        if (Array.isArray(dbClients) && dbClients.length > 0) {
+          dbClients.forEach(addClientToPool);
+        }
+      } catch (err) {
+        console.warn("[NewAppointmentModal] Aviso ao sincronizar clientes do Supabase:", err);
+      }
+    }
+
+    setLocalClients(Array.from(pool.values()));
+  }, [clients, tenant?.id]);
+
+  useEffect(() => {
+    if (isOpen) {
+      syncClientsPool();
+    } else {
+      setIsDropdownOpen(false);
+      setSelectedClient(null);
+      setClientName("");
+      setClientPhone("");
+      setNotes("");
+      setErrors({});
+    }
+  }, [isOpen, syncClientsPool]);
+
+  // Fecha o dropdown de sugestões ao clicar fora do container
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Busca remota e filtragem em tempo real ao digitar o nome do cliente
+  const handleClientNameChange = (e) => {
+    const val = e.target.value;
+    setClientName(val);
+
+    if (errors.clientName) {
+      setErrors((prev) => ({ ...prev, clientName: null }));
+    }
+
+    // Se o usuário alterar o nome após vincular um cliente, desvincula a seleção
+    if (selectedClient && selectedClient.name !== val) {
+      setSelectedClient(null);
+    }
+
+    if (val.trim().length > 0) {
+      setIsDropdownOpen(true);
+    } else {
+      setIsDropdownOpen(false);
+    }
+
+    // Busca remota adicional no Supabase quando digitar 2 ou mais caracteres
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    const trimmed = val.trim();
+    if (trimmed.length >= 2) {
+      searchDebounceRef.current = setTimeout(async () => {
+        try {
+          const targetTenantId = tenant?.id;
+          let queryBuilder = supabase
+            .from("clients")
+            .select("*")
+            .or(`name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%`);
+
+          if (targetTenantId && !String(targetTenantId).startsWith("temp-")) {
+            queryBuilder = queryBuilder.or(
+              `barbershop_id.eq.${targetTenantId},tenant_id.eq.${targetTenantId}`
+            );
+          }
+
+          const { data: searchResults } = await queryBuilder.limit(10);
+          if (Array.isArray(searchResults) && searchResults.length > 0) {
+            setLocalClients((prev) => {
+              const map = new Map();
+              prev.forEach((c) => {
+                const k = c.id || (c.phone ? c.phone.replace(/\D/g, "") : null) || c.name;
+                if (k) map.set(k, c);
+              });
+              searchResults.forEach((c) => {
+                const norm = normalizeClientRecord(c);
+                const k = norm.id || (norm.phone ? norm.phone.replace(/\D/g, "") : null) || norm.name;
+                if (k) map.set(k, norm);
+              });
+              return Array.from(map.values());
+            });
+          }
+        } catch {
+          // tolerante
+        }
+      }, 250);
+    }
+  };
+
+  // Sugestões filtradas: só aparecem enquanto o usuário estiver digitando e houver clientes correspondentes
+  // "Caso não exista nenhum cliente, não aparece nenhuma informação, mas se existir algum cliente lá,
+  // enquanto o usuário estiver digitando o nome do cliente aparece como sugestão..."
+  const clientSuggestions = useMemo(() => {
+    const query = clientName.trim().toLowerCase();
+    if (!query) return [];
+
+    // Se o cliente já está vinculado e o texto é exatamente o nome dele, não exibe popup
+    if (selectedClient && selectedClient.name.toLowerCase() === query) {
+      return [];
+    }
+
+    const cleanNumeric = query.replace(/\D/g, "");
+    const seen = new Set();
+    const result = [];
+
+    for (const c of localClients) {
+      if (!c) continue;
+      const name = (c.name || "").toLowerCase();
+      const phoneDigits = (c.phone || "").replace(/\D/g, "");
+      const email = (c.email || "").toLowerCase();
+
+      const nameMatch = name.includes(query);
+      const phoneMatch = cleanNumeric.length > 0 && phoneDigits.includes(cleanNumeric);
+      const emailMatch = email.includes(query);
+
+      if (nameMatch || phoneMatch || emailMatch) {
+        const uniqueKey = c.id || phoneDigits || name;
+        if (!seen.has(uniqueKey)) {
+          seen.add(uniqueKey);
+          result.push(c);
+          if (result.length >= 6) break;
+        }
+      }
+    }
+
+    return result;
+  }, [clientName, localClients, selectedClient]);
+
+  // AÇÃO: Selecionar Cliente e Carregar seus Dados e Prontuário no Modal
+  const handleSelectClient = (client) => {
+    setClientName(client.name || "");
+    setClientPhone(client.phone || "");
+    setSelectedClient(client);
+    setIsDropdownOpen(false);
+    setErrors((prev) => ({ ...prev, clientName: null, clientPhone: null }));
+
+    // Se o cliente possui barbeiro de preferência e ele está cadastrado na barbearia, auto-seleciona
+    const prefName = (client.preferredBarber || client.preferred_barber || "").trim().toLowerCase();
+    if (prefName) {
+      const foundBarber = barbers.find(
+        (b) =>
+          (b.name || "").trim().toLowerCase() === prefName ||
+          (b.displayName || "").trim().toLowerCase() === prefName ||
+          b.id === client.preferredBarberId
+      );
+      if (foundBarber) {
+        setSelectedBarberId(foundBarber.id);
+      }
+    }
+  };
 
   // GERAÇÃO DINÂMICA DE HORÁRIOS BASEADA NO HORÁRIO REAL
   // Se a data for hoje, a grade NÃO exibe horários iguais/menores que o horário atual em tempo real
@@ -129,25 +356,54 @@ export default function NewAppointmentModal({
     barbers.find((b) => b.id === selectedBarberId) || barbers[0];
 
   // AÇÃO: Salvar Novo Serviço Criado na Hora
-  const handleSaveQuickService = () => {
+  const handleSaveQuickService = async () => {
     if (!quickServiceName.trim() || !quickServicePrice) {
       alert("Informe o nome e o preço do novo serviço.");
       return;
     }
 
+    const serviceId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `s-${Date.now()}`;
+
+    const targetBarbershopId = tenant?.id || null;
+
     const newService = {
-      id: `s-${Date.now()}`,
+      id: serviceId,
       name: quickServiceName.trim(),
       category: "Cabelo",
       durationMinutes: Number(quickServiceDuration),
       duration_minutes: Number(quickServiceDuration),
       price: Number(quickServicePrice),
+      commission_percent: 50,
       active: true,
       description: "Serviço cadastrado durante o agendamento.",
+      barbershop_id: targetBarbershopId,
+      tenant_id: targetBarbershopId,
     };
 
     if (onAddService) {
       onAddService(newService);
+    }
+
+    // Persiste no Supabase garantindo o ID obrigatório
+    try {
+      await supabase.from("services").insert([
+        {
+          id: serviceId,
+          name: newService.name,
+          category: newService.category,
+          duration_minutes: newService.durationMinutes,
+          price: newService.price,
+          commission_percent: 50,
+          active: true,
+          barbershop_id: targetBarbershopId,
+          tenant_id: targetBarbershopId,
+        },
+      ]);
+    } catch (err) {
+      console.warn("[NewAppointmentModal] Aviso ao persistir serviço no Supabase:", err);
     }
 
     setSelectedServiceId(newService.id);
@@ -211,6 +467,7 @@ export default function NewAppointmentModal({
       id: appointmentId,
       tenant_id: targetBarbershopId,
       barbershop_id: targetBarbershopId,
+      client_id: selectedClient?.id && isUuid(selectedClient.id) ? selectedClient.id : null,
       barber_id: isUuid(resolvedBarberId) ? resolvedBarberId : null,
       barber_name: resolvedBarberName,
       client_name: clientName.trim(),
@@ -223,7 +480,7 @@ export default function NewAppointmentModal({
       price: resolvedPrice,
       status: "confirmed",
       is_paid: false,
-      is_vip: false,
+      is_vip: Boolean(selectedClient?.isVip || selectedClient?.is_vip),
       notes: notes.trim() || null,
       created_at: new Date().toISOString(),
     };
@@ -231,6 +488,7 @@ export default function NewAppointmentModal({
     // Objeto consolidado para o estado React da aplicação
     const newAppointment = {
       ...supabasePayload,
+      clientId: selectedClient?.id || null,
       barberId: resolvedBarberId,
       barberName: resolvedBarberName,
       clientName: clientName.trim(),
@@ -241,7 +499,8 @@ export default function NewAppointmentModal({
       endTime: calculatedEndTime,
       durationMinutes: duration,
       isPaid: false,
-      isVip: false,
+      isVip: Boolean(selectedClient?.isVip || selectedClient?.is_vip),
+      clientRecord: selectedClient || null,
       notes: notes.trim(),
     };
 
@@ -289,6 +548,8 @@ export default function NewAppointmentModal({
         setIsSaving(false);
         setClientName("");
         setClientPhone("");
+        setSelectedClient(null);
+        setIsDropdownOpen(false);
         setNotes("");
         setErrors({});
         onClose();
@@ -328,19 +589,128 @@ export default function NewAppointmentModal({
         }
       >
         <div className="space-y-4 text-left">
-          {/* 1. DADOS DO CLIENTE */}
+          {/* 1. DADOS DO CLIENTE COM AUTOCOMPLETE E PRONTUÁRIOS EM TEMPO REAL */}
           <div className="space-y-3">
-            <Input
-              label="Nome do Cliente"
-              placeholder="Ex: Rodrigo Faro"
-              value={clientName}
-              onChange={(e) => {
-                setClientName(e.target.value);
-                if (errors.clientName)
-                  setErrors({ ...errors, clientName: null });
-              }}
-              error={errors.clientName}
-            />
+            <div className="relative" ref={dropdownRef}>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-neutral-300">
+                  Nome do Cliente
+                </label>
+                {selectedClient && (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    <Check className="w-3 h-3" /> Prontuário Vinculado
+                  </span>
+                )}
+              </div>
+
+              <Input
+                placeholder="Ex: Carlos Oliveira (digite para buscar cliente cadastrado)"
+                value={clientName}
+                onChange={handleClientNameChange}
+                onFocus={() => {
+                  if (clientName.trim().length > 0 && clientSuggestions.length > 0) {
+                    setIsDropdownOpen(true);
+                  }
+                }}
+                error={errors.clientName}
+              />
+
+              {/* DROPDOWN DE SUGESTÕES DO MENU CLIENTES E PRONTUÁRIOS */}
+              {/* "Caso não exista nenhum cliente, não aparece nenhuma informação, mas se existir algum cliente lá,
+                  enquanto o usuário estiver digitando o nome do cliente aparece como sugestão..." */}
+              {isDropdownOpen && clientSuggestions.length > 0 && (
+                <div
+                  className="absolute top-full left-0 right-0 mt-1.5 bg-neutral-900 border border-neutral-700/80 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-neutral-800/80 animate-in fade-in zoom-in-95 duration-150"
+                  role="listbox"
+                  aria-label="Sugestões de clientes cadastrados no menu e prontuários"
+                >
+                  <div className="px-3.5 py-1.5 bg-neutral-950 text-[10px] uppercase tracking-wider font-bold text-amber-400 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-3 h-3 text-amber-400" />
+                      Clientes Encontrados ({clientSuggestions.length})
+                    </span>
+                    <span className="text-neutral-500 font-normal text-[10px]">
+                      Clique para carregar dados e prontuário
+                    </span>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto">
+                    {clientSuggestions.map((client, idx) => {
+                      const cutSpecs =
+                        client.technicalNotes?.cutSpecs ||
+                        client.notes ||
+                        "";
+                      const allergyAlert =
+                        client.technicalNotes?.allergyAlert || "";
+                      const preferred =
+                        client.preferredBarber || client.preferred_barber || "";
+
+                      return (
+                        <div
+                          key={`${client.id || client.phone || 'client'}-${idx}`}
+                          role="option"
+                          aria-selected={selectedClient?.id === client.id}
+                          onClick={() => handleSelectClient(client)}
+                          className="p-3 hover:bg-neutral-800/90 cursor-pointer transition-colors flex items-start gap-3 group text-left"
+                        >
+                          {/* Avatar com iniciais */}
+                          <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm shrink-0 group-hover:bg-amber-500 group-hover:text-neutral-950 transition-colors">
+                            {(client.name || "C").charAt(0).toUpperCase()}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate">
+                                {client.name}
+                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {client.isVip && (
+                                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                    VIP
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-neutral-400">
+                                  {client.totalVisits > 0
+                                    ? `${client.totalVisits} visitas`
+                                    : "Novo"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[11px] text-neutral-400 mt-0.5">
+                              <span className="flex items-center gap-1 font-mono">
+                                <Phone className="w-2.5 h-2.5 text-neutral-500" />
+                                {client.phone || "Sem telefone"}
+                              </span>
+                              {preferred && (
+                                <span className="truncate text-neutral-400">
+                                  • Prefere: {preferred}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Prévia do Prontuário Técnico */}
+                            {cutSpecs && (
+                              <div className="mt-1 text-[11px] text-neutral-300 flex items-center gap-1 truncate bg-neutral-950/60 px-2 py-0.5 rounded-md border border-neutral-800">
+                                <Scissors className="w-3 h-3 text-amber-400 shrink-0" />
+                                <span className="truncate">{cutSpecs}</span>
+                              </div>
+                            )}
+
+                            {allergyAlert && (
+                              <div className="mt-1 text-[10px] text-red-300 font-medium flex items-center gap-1 truncate bg-red-950/40 px-2 py-0.5 rounded-md border border-red-500/30">
+                                <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+                                <span className="truncate">Alergia: {allergyAlert}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <Input
               label="WhatsApp do Cliente"
@@ -353,8 +723,124 @@ export default function NewAppointmentModal({
                   setErrors({ ...errors, clientPhone: null });
               }}
               error={errors.clientPhone}
-              helperText="Enviaremos confirmação e lembretes automáticos por este número."
+              helperText={
+                selectedClient
+                  ? "Telefone sincronizado automaticamente do cadastro do cliente."
+                  : "Enviaremos confirmação e lembretes automáticos por este número."
+              }
             />
+
+            {/* CARD DE PRONTUÁRIO TÉCNICO VINCULADO */}
+            {selectedClient && (
+              <div className="p-3.5 bg-neutral-950 border border-amber-500/30 rounded-2xl space-y-2.5 animate-in fade-in duration-200 text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-lg bg-amber-500/10 text-amber-400">
+                      <FileText className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                        Prontuário de {selectedClient.name}
+                        {selectedClient.isVip && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">
+                            VIP
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[11px] text-neutral-400 block">
+                        {selectedClient.totalVisits || 0} corte(s) realizados • Retorno habitual a cada {selectedClient.frequencyDays || 18} dias
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedClient(null);
+                    }}
+                    className="text-xs text-neutral-400 hover:text-red-400 flex items-center gap-1 p-1 hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
+                    title="Desvincular prontuário e preencher livremente"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Desvincular</span>
+                  </button>
+                </div>
+
+                {/* Alerta de Alergia / Sensibilidade */}
+                {selectedClient.technicalNotes?.allergyAlert && (
+                  <div className="p-2.5 bg-red-950/40 border border-red-500/30 rounded-xl flex items-start gap-2 text-xs text-red-200">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-red-300">Alerta de Sensibilidade / Alergia:</span>
+                      <p className="text-red-200/90 text-[11px] mt-0.5 leading-relaxed">
+                        {selectedClient.technicalNotes.allergyAlert}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Especificações de Corte e Barba */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="bg-neutral-900/80 p-2.5 rounded-xl border border-neutral-800">
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 flex items-center gap-1 mb-1">
+                      <Scissors className="w-3 h-3 text-amber-400" />
+                      Corte Habitual / Estilo
+                    </span>
+                    <p className="text-neutral-200 text-xs line-clamp-2">
+                      {selectedClient.technicalNotes?.cutSpecs ||
+                        selectedClient.notes ||
+                        "Sem anotação de estilo registrada"}
+                    </p>
+                  </div>
+
+                  <div className="bg-neutral-900/80 p-2.5 rounded-xl border border-neutral-800">
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 flex items-center gap-1 mb-1">
+                      <User className="w-3 h-3 text-amber-400" />
+                      Barba & Preferências
+                    </span>
+                    <p className="text-neutral-200 text-xs">
+                      {selectedClient.technicalNotes?.beardSpecs
+                        ? selectedClient.technicalNotes.beardSpecs
+                        : selectedClient.preferredBarber
+                        ? `Barbeiro de preferência: ${selectedClient.preferredBarber}`
+                        : "Sem especificação de barba"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ação rápida para copiar notas do prontuário para as observações do agendamento */}
+                {(selectedClient.technicalNotes?.cutSpecs ||
+                  selectedClient.technicalNotes?.allergyAlert ||
+                  selectedClient.notes) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const parts = [];
+                      if (selectedClient.technicalNotes?.allergyAlert) {
+                        parts.push(`ALERTA: ${selectedClient.technicalNotes.allergyAlert}`);
+                      }
+                      if (selectedClient.technicalNotes?.cutSpecs) {
+                        parts.push(`Corte: ${selectedClient.technicalNotes.cutSpecs}`);
+                      }
+                      if (selectedClient.technicalNotes?.beardSpecs) {
+                        parts.push(`Barba: ${selectedClient.technicalNotes.beardSpecs}`);
+                      }
+                      if (
+                        selectedClient.notes &&
+                        !parts.some((p) => p.includes(selectedClient.notes))
+                      ) {
+                        parts.push(selectedClient.notes);
+                      }
+                      const compiled = parts.join(" | ");
+                      setNotes((prev) => (prev ? `${prev} | ${compiled}` : compiled));
+                    }}
+                    className="text-[11px] font-medium text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer pt-1"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Copiar detalhes do prontuário para observações deste agendamento
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 2. BARBEIRO E SERVIÇO COM CADASTRO ON-THE-FLY */}

@@ -959,10 +959,17 @@ export default function App() {
   // Sincronização reativa e persistência de Clientes no cache local segmentado por tenant
   const handleUpdateClients = useCallback((updatedClients) => {
     const list = Array.isArray(updatedClients) ? updatedClients : [];
-    setClients(list);
+    const dedupMap = new Map();
+    list.forEach((c) => {
+      if (!c) return;
+      const k = c.id || (c.phone ? c.phone.replace(/\D/g, "") : null) || c.name;
+      if (k) dedupMap.set(k, c);
+    });
+    const uniqueList = Array.from(dedupMap.values());
+    setClients(uniqueList);
     try {
       const activeTenantId = tenant?.id || currentUser?.user_metadata?.barbershop_id || currentUser?.id || "default";
-      safeStorage.setItem(`saas_clients_cache_${activeTenantId}`, JSON.stringify(list));
+      safeStorage.setItem(`saas_clients_cache_${activeTenantId}`, JSON.stringify(uniqueList));
       // Remove chaves legadas não segmentadas para prevenir vazamento cruzado
       safeStorage.removeItem("saas_clients_cache");
       safeStorage.removeItem("barbearia_saas_clients_v2");
@@ -979,7 +986,7 @@ export default function App() {
     const targetName = (clientData.name || "").trim();
     const oldTargetName = (oldName || "").trim().toLowerCase();
 
-    // 1. Atualiza lista de clientes em memória
+    // 1. Atualiza lista de clientes em memória com desduplicação estrita
     setClients((prev) => {
       let found = false;
       const updated = prev.map((c) => {
@@ -994,7 +1001,14 @@ export default function App() {
         }
         return c;
       });
-      const finalList = found ? updated : [clientData, ...updated];
+      const rawList = found ? updated : [clientData, ...updated];
+      const dedupMap = new Map();
+      rawList.forEach((c) => {
+        if (!c) return;
+        const k = c.id || (c.phone ? c.phone.replace(/\D/g, "") : null) || c.name;
+        if (k) dedupMap.set(k, c);
+      });
+      const finalList = Array.from(dedupMap.values());
       try {
         const activeTenantId = tenant?.id || currentUser?.user_metadata?.barbershop_id || currentUser?.id || "default";
         safeStorage.setItem(`saas_clients_cache_${activeTenantId}`, JSON.stringify(finalList));

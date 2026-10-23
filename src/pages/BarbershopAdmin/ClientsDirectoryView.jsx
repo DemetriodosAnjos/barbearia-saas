@@ -779,12 +779,19 @@ export default function ClientsDirectoryView({
     setIsSavingClient(false);
   };
 
-  // Isolamento estrito de dados da barbearia (BOLA Defense)
-  const tenantScopedClients = clients.filter((c) => {
-    if (!activeTenantId) return false;
+  // Isolamento estrito e desduplicação de dados da barbearia (BOLA Defense)
+  const tenantScopedClients = clients.reduce((acc, c) => {
+    if (!c || !activeTenantId) return acc;
     const clientTenant = c.tenant_id || c.tenantId || c.barbershop_id || c.barbershopId;
-    return clientTenant === activeTenantId;
-  });
+    if (clientTenant !== activeTenantId) return acc;
+
+    const dedupeKey = c.id || (c.phone ? c.phone.replace(/\D/g, "") : null) || c.name;
+    if (dedupeKey && acc.some((existing) => (existing.id && existing.id === c.id) || (existing.phone && c.phone && existing.phone.replace(/\D/g, "") === c.phone.replace(/\D/g, "")))) {
+      return acc;
+    }
+    acc.push(c);
+    return acc;
+  }, []);
 
   // Filtros e Métricas Robustas da Carteira
   const totalClients = tenantScopedClients.length;

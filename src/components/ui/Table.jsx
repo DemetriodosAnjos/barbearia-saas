@@ -172,7 +172,7 @@ export default function Table({
                 const isSelected = selectedIds.includes(row[keyField]);
                 return (
                   <tr
-                    key={row[keyField] || index}
+                    key={row[keyField] ? `${row[keyField]}-${index}` : index}
                     className={`
                       ${tableStyles.tr}
                       ${isSelected ? tableStyles.trSelected : ""}
