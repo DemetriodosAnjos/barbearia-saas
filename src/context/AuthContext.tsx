@@ -15,7 +15,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import { api, setupAxiosAuthBridges } from '../services/api';
+import { api, setupAxiosAuthBridges, getResolvedApiUrl, isStaticDeployment } from '../services/api';
 import { supabase, resolveUnifiedTenantId } from '../lib/supabase';
 import { safeStorage } from '../utils/safeStorage';
 
@@ -120,6 +120,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // ETAPA 5.3: Silent Refresh para renovar o Access Token sem intervenção do usuário
   const silentRefresh = useCallback(async (): Promise<boolean> => {
+    const refreshUrl = getResolvedApiUrl('/api/auth/refresh');
+    if (!refreshUrl) {
+      return false;
+    }
     try {
       const response = await axios.post<{
         success: boolean;

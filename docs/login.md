@@ -49,6 +49,12 @@ A partir de 23 de outubro de 2026, **o e-mail do usuário é a chave única e so
 - **Correção aplicada (`src/services/api.ts`, `src/security/authSecurityService.js`, `src/pages/Auth/Login.jsx`):**
   - Em ambiente `localhost`, todas as chamadas `/api/*` são direcionadas localmente para o middleware do Vite, garantindo funcionamento dos códigos de verificação de 6 dígitos.
 
+### F. Blindagem de Produção Estática (GitHub Pages) & Carregamento de Clientes
+- **Problema anterior:** Em produção no GitHub Pages (`demetriodosanjos.github.io`), a chamada de silent refresh disparava `POST /api/auth/refresh`, resultando em **HTTP 405 Method Not Allowed** e forçando logout ou interrupção do carregamento. Além disso, o filtro estrito de tenant descartava clientes que estivessem associados a identificadores alternativos da barbearia/usuário.
+- **Correção aplicada (`src/services/api.ts`, `src/context/AuthContext.tsx`, `src/App.jsx`):**
+  - No `api.ts` e no `AuthContext.tsx`, antes de tentar disparar `/api/auth/refresh`, valida-se `getResolvedApiUrl('/api/auth/refresh')`. Em ambiente estático puro (GitHub Pages), a tentativa não é disparada, eliminando o erro 405.
+  - No `App.jsx`, a consulta de clientes (`fetchResilient`) e o filtro em memória (`dbClients`) agora agregam todos os UUIDs legítimos (`activeTenantId`, `tenant.id`, `currentUser.barbeariaId`, `currentUser.id`), garantindo o carregamento integral de todos os clientes cadastrados.
+
 ---
 
 ## 3. Arquivos Chave Modificados

@@ -141,6 +141,11 @@ api.interceptors.response.use(
 
     // Detecta erro HTTP 401 (Não Autorizado) e se a requisição ainda não foi reprocessada
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthRoute) {
+      const refreshEndpoint = getResolvedApiUrl('/api/auth/refresh');
+      if (!refreshEndpoint) {
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         // Pausa as requisições paralelas em uma fila de espera até o token ser renovado
         return new Promise<string>((resolve, reject) => {

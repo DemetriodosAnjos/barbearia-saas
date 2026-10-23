@@ -1109,28 +1109,40 @@ export default function App() {
       const appointmentsCacheKey = `saas_appointments_cache_${activeTenantId || 'default'}`;
       const tenantCacheKey = `saas_clients_cache_${activeTenantId || 'default'}`;
 
+      // Coleta todos os UUIDs legítimos vinculados a este usuário e barbearia
+      const validCandidateUuids = Array.from(
+        new Set(
+          [
+            activeTenantId,
+            tenant?.id,
+            currentUser?.barbeariaId,
+            currentUser?.tenant_id,
+            currentUser?.barbershop_id,
+            currentUser?.user_metadata?.barbershop_id,
+            currentUser?.user_metadata?.tenant_id,
+            currentUser?.id,
+          ].filter((id) =>
+            /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(id || ''))
+          )
+        )
+      );
+
       // Helper de consulta resiliente com isolamento estrito de Tenant (anti-vazamento)
       const fetchResilient = async (tables, orderCol, ascending = true) => {
         const tableList = Array.isArray(tables) ? tables : [tables];
-        const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(activeTenantId || ''));
 
-        if (!isUuid) {
-          // Se não há um UUID de tenant válido ativo, não consulta banco para prevenir vazamento cruzado
+        if (validCandidateUuids.length === 0) {
           return { data: [], error: null };
         }
 
         for (const tbl of tableList) {
           try {
-            // 1. Tenta query unificada cobrindo tanto tenant_id quanto barbershop_id e authUid
-            const orFilters = [
-              `tenant_id.eq.${activeTenantId}`,
-              `barbershop_id.eq.${activeTenantId}`,
-            ];
-            const currentUserId = currentUser?.id;
-            if (currentUserId && currentUserId !== activeTenantId && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(currentUserId)) {
-              orFilters.push(`tenant_id.eq.${currentUserId}`);
-              orFilters.push(`barbershop_id.eq.${currentUserId}`);
-            }
+            // 1. Tenta query unificada cobrindo tanto tenant_id quanto barbershop_id para todos os UUIDs válidos
+            const orFilters = [];
+            validCandidateUuids.forEach((uid) => {
+              orFilters.push(`tenant_id.eq.${uid}`);
+              orFilters.push(`barbershop_id.eq.${uid}`);
+            });
 
             const rOr = await supabase.from(tbl).select("*").or(orFilters.join(",")).order(orderCol, { ascending });
             if (!rOr.error && Array.isArray(rOr.data) && rOr.data.length > 0) {
@@ -1230,6 +1242,7 @@ export default function App() {
       let dbClients = rawClients.filter((c) => {
         const cTenant = c.tenant_id || c.barbershop_id;
         return (
+          validCandidateUuids.includes(cTenant) ||
           cTenant === activeTenantId ||
           (currentUser?.id && (c.tenant_id === currentUser.id || c.barbershop_id === currentUser.id))
         );
