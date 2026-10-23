@@ -160,7 +160,9 @@ export default function Login({
     } else if (password.length < 6) {
       errs.password = "A senha deve conter no mínimo 6 caracteres.";
     }
-    // Permite que o CAPTCHA seja autovalidado no clique do botão Entrar
+    if (!captchaToken) {
+      errs.captcha = "Por favor, complete a verificação de segurança antes de entrar.";
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -186,11 +188,19 @@ export default function Login({
     setAuthError("");
 
     try {
-      const resolvedCaptchaToken = captchaToken || generateFreshTestToken();
+      if (!captchaToken) {
+        setIsLoading(false);
+        setErrors((prev) => ({
+          ...prev,
+          captcha: "Por favor, complete a verificação de segurança antes de entrar.",
+        }));
+        return;
+      }
+
       const result = await secureLogin({
         email: email.trim(),
         password: password,
-        captchaToken: resolvedCaptchaToken,
+        captchaToken: captchaToken,
       });
 
       if (!result.success) {
@@ -794,7 +804,7 @@ export default function Login({
             <TurnstileWidget
               provider="turnstile"
               action="login"
-              autoVerifyInDemo={true}
+              autoVerifyInDemo={false}
               resetSignal={captchaResetCount}
               onVerify={(token) => {
                 setCaptchaToken(token);
