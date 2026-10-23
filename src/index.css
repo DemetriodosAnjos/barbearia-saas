@@ -1,0 +1,1752 @@
+@import "tailwindcss";
+
+:root {
+  /* Escala Âmbar Padrão */
+  --brand-50: #fffbeb;
+  --brand-100: #fef3c7;
+  --brand-200: #fde68a;
+  --brand-300: #fcd34d;
+  --brand-400: #fbbf24;
+  --brand-500: #f59e0b;
+  --brand-600: #d97706;
+  --brand-700: #b45309;
+  --brand-800: #92400e;
+  --brand-900: #78350f;
+  --brand-950: #451a03;
+
+  /* Transição suave ao alternar o tema */
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease;
+}
+
+/* ======================================================== */
+/* ACESSIBILIDADE GLOBAL (WCAG 2.2 AA)                      */
+/* ======================================================== */
+
+/* 1. Indicador Visual Claro de Foco (:focus-visible) - WCAG 2.4.7 e 2.4.11 */
+:focus-visible {
+  outline: 2px solid #f59e0b !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.25) !important;
+}
+
+/* Evita anéis de foco indesejados ao clicar com mouse/toque, mantendo apenas para teclado */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 2. Link de Acessibilidade 'Pular para Conteúdo' (Skip Link) - WCAG 2.4.1 */
+.skip-to-content {
+  position: absolute;
+  top: -9999px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #f59e0b;
+  color: #0a0a0a;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 0 0 0.5rem 0.5rem;
+  z-index: 9999;
+  text-decoration: none;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  transition: top 0.2s ease-in-out;
+}
+
+.skip-to-content:focus {
+  top: 0;
+  outline: 3px solid #000000;
+}
+
+/* 3. Utilitário Screen Reader Only (sr-only) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* 4. Respeito a Preferências de Redução de Movimento - WCAG 2.3.3 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 5. Alvo Mínimo de Toque e Clique (Target Size) - WCAG 2.2 Critério 2.5.8 (Mínimo 24x24px) */
+button,
+a,
+input,
+select,
+[role="button"],
+[role="checkbox"],
+[role="radio"] {
+  min-height: 24px;
+  min-width: 24px;
+}
+
+/* ======================================================== */
+/* MODO CLARO GLOBAL - PALETA 3: MINIMALIST EMERALD         */
+/* Inspiração: Clean e Tecnológico (SaaS Foco Produtividade)*/
+/* Cores Dark preservadas integralmente sob a classe .dark  */
+/* ======================================================== */
+
+html:not(.dark) {
+  color-scheme: light;
+  background-color: #fafafa;
+  color: #18181b;
+
+  /* Tokens da Paleta 3: Minimalist Emerald */
+  --brand-50: #ecfdf5;
+  --brand-100: #d1fae5;
+  --brand-200: #a7f3d0;
+  --brand-300: #6ee7b7;
+  --brand-400: #34d399;
+  --brand-500: #10b981;
+  --brand-600: #059669;
+  --brand-700: #047857;
+  --brand-800: #065f46;
+  --brand-900: #064e3b;
+  --brand-950: #022c22;
+}
+
+html:not(.dark) body {
+  background-color: #fafafa;
+  color: #18181b;
+}
+
+/* 1. Superfícies de Fundo (Zinc Clean) */
+html:not(.dark) .bg-neutral-950,
+html:not(.dark) .bg-neutral-950\/80,
+html:not(.dark) .bg-neutral-950\/70,
+html:not(.dark) .bg-neutral-950\/60,
+html:not(.dark) .bg-neutral-950\/40 {
+  background-color: #f4f4f5 !important; /* bg-zinc-100 (#f4f4f5) */
+}
+
+/* 2. Cartões, Menus, Modais e Sidebar (Branco Puro com Contraste Elegante) */
+html:not(.dark) .bg-neutral-900,
+html:not(.dark) .bg-neutral-900\/95,
+html:not(.dark) .bg-neutral-900\/90,
+html:not(.dark) .bg-neutral-900\/80,
+html:not(.dark) .bg-neutral-900\/70,
+html:not(.dark) .bg-neutral-900\/60 {
+  background-color: #ffffff !important;
+}
+
+/* 3. Inputs, Hovers e Elementos Sutis */
+html:not(.dark) .bg-neutral-800,
+html:not(.dark) .bg-neutral-800\/80,
+html:not(.dark) .bg-neutral-800\/60 {
+  background-color: #f4f4f5 !important; /* bg-zinc-100 (#f4f4f5) */
+}
+
+/* 4. Bordas: zinc-200 (#e4e4e7) e zinc-300 (#d4d4d8) */
+html:not(.dark) .border-neutral-800,
+html:not(.dark) .border-neutral-800\/80,
+html:not(.dark) .border-neutral-800\/60,
+html:not(.dark) .border-neutral-800\/40,
+html:not(.dark) .border-neutral-700,
+html:not(.dark) .border-neutral-700\/80,
+html:not(.dark) .border-neutral-700\/60 {
+  border-color: #e4e4e7 !important; /* border-zinc-200 (#e4e4e7) */
+}
+
+/* 5. Títulos / Textos Principais (#18181b - text-zinc-900) */
+html:not(.dark) h1,
+html:not(.dark) h2,
+html:not(.dark) h3,
+html:not(.dark) h4,
+html:not(.dark) h5,
+html:not(.dark) h6,
+html:not(.dark) .text-white:not(button):not(button *):not([class*="bg-emerald-600"] *):not([class*="bg-emerald-700"] *):not([class*="bg-amber-600"] *):not([class*="bg-amber-700"] *):not(.notificationBadge):not(.notification-badge):not([data-notification-badge]):not([class*="notificationBadge"]):not([class*="notification"]),
+html:not(.dark) .text-neutral-100,
+html:not(.dark) .text-neutral-200,
+html:not(.dark) .text-zinc-900 {
+  color: #18181b !important; /* text-zinc-900 (#18181b) */
+}
+
+/* 6. Textos Secundários / Legendas (#52525b - text-zinc-600) */
+html:not(.dark) .text-neutral-300,
+html:not(.dark) .text-neutral-400,
+html:not(.dark) .text-zinc-600 {
+  color: #52525b !important; /* text-zinc-600 (#52525b) */
+}
+
+/* 7. Textos Atenuados / Muted (#71717a - text-zinc-500) */
+html:not(.dark) .text-neutral-500,
+html:not(.dark) .text-zinc-500 {
+  color: #71717a !important; /* text-zinc-500 (#71717a) */
+}
+
+/* 8. Ícones: text-zinc-500 (#71717a) / Ativo: text-emerald-600 (#059669) */
+html:not(.dark) svg.text-neutral-400,
+html:not(.dark) svg.text-neutral-500,
+html:not(.dark) .text-neutral-400 svg,
+html:not(.dark) .text-neutral-500 svg,
+html:not(.dark) [data-color-variant="neutral"] svg {
+  color: #71717a !important; /* text-zinc-500 (#71717a) */
+}
+
+html:not(.dark) svg.text-amber-500,
+html:not(.dark) svg.text-amber-400,
+html:not(.dark) svg.text-amber-600,
+html:not(.dark) .text-amber-500 svg,
+html:not(.dark) .text-amber-400 svg,
+html:not(.dark) [data-color-variant="amber"] svg,
+html:not(.dark) [data-color-variant="brand"] svg,
+html:not(.dark) .icon-active {
+  color: #059669 !important; /* ativo: text-emerald-600 (#059669) */
+}
+
+/* 9. Badges: bg-emerald-50 text-emerald-700 border-emerald-200 (#ecfdf5 / #047857 / #a7f3d0) */
+html:not(.dark) .bg-emerald-950\/40,
+html:not(.dark) .bg-amber-950\/40,
+html:not(.dark) .bg-purple-950\/40,
+html:not(.dark) .badge-emerald,
+html:not(.dark) [data-badge-status] {
+  background-color: #ecfdf5 !important; /* bg-emerald-50 (#ecfdf5) */
+  color: #047857 !important;            /* text-emerald-700 (#047857) */
+  border-color: #a7f3d0 !important;      /* border-emerald-200 (#a7f3d0) */
+}
+
+html:not(.dark) .bg-emerald-950\/40 *,
+html:not(.dark) .bg-amber-950\/40 *,
+html:not(.dark) .bg-purple-950\/40 * {
+  color: #047857 !important;
+}
+
+/* 10. Botão Ativo / Primário: bg-emerald-600 hover:bg-emerald-700 (#059669 / #047857) */
+html:not(.dark) button.bg-amber-700,
+html:not(.dark) button.bg-amber-600,
+html:not(.dark) button.bg-emerald-600,
+html:not(.dark) .btn-primary,
+html:not(.dark) button[data-variant="primary"]:not(:disabled) {
+  background-color: #059669 !important; /* bg-emerald-600 (#059669) */
+  color: #ffffff !important;            /* text-white (#ffffff) */
+  border-color: #059669 !important;
+}
+
+html:not(.dark) button.bg-amber-700:hover,
+html:not(.dark) button.bg-amber-600:hover,
+html:not(.dark) button.bg-emerald-600:hover,
+html:not(.dark) .btn-primary:hover,
+html:not(.dark) button[data-variant="primary"]:not(:disabled):hover {
+  background-color: #047857 !important; /* hover:bg-emerald-700 (#047857) */
+  color: #ffffff !important;
+}
+
+/* Texto dos Botões Principais: text-white (#ffffff) */
+html:not(.dark) button.bg-amber-700 *,
+html:not(.dark) button.bg-amber-600 *,
+html:not(.dark) button.bg-emerald-600 *,
+html:not(.dark) .btn-primary *,
+html:not(.dark) button[data-variant="primary"] * {
+  color: #ffffff !important;
+}
+
+/* 11. Botão Desativado: bg-zinc-200 text-zinc-400 (#e4e4e7 / #a1a1aa) */
+html:not(.dark) button:disabled,
+html:not(.dark) button[disabled],
+html:not(.dark) button[aria-disabled="true"],
+html:not(.dark) button[data-state="disabled"],
+html:not(.dark) .btn-disabled {
+  background-color: #e4e4e7 !important; /* bg-zinc-200 (#e4e4e7) */
+  color: #a1a1aa !important;            /* text-zinc-400 (#a1a1aa) */
+  border-color: #e4e4e7 !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+}
+
+html:not(.dark) button:disabled *,
+html:not(.dark) button[disabled] *,
+html:not(.dark) button[aria-disabled="true"] * {
+  color: #a1a1aa !important;
+}
+
+/* 12. Botão Transparente: bg-transparent hover:bg-zinc-100 text-zinc-700 border border-zinc-300 */
+html:not(.dark) button.bg-transparent:not(:disabled),
+html:not(.dark) button[data-variant="outline"]:not(:disabled),
+html:not(.dark) button[data-variant="ghost"]:not(:disabled),
+html:not(.dark) .btn-transparent:not(:disabled) {
+  background-color: transparent !important;
+  color: #3f3f46 !important;            /* text-zinc-700 (#3f3f46) */
+  border: 1px solid #d4d4d8 !important; /* border-zinc-300 (#d4d4d8) */
+}
+
+html:not(.dark) button.bg-transparent:not(:disabled):hover,
+html:not(.dark) button[data-variant="outline"]:not(:disabled):hover,
+html:not(.dark) button[data-variant="ghost"]:not(:disabled):hover,
+html:not(.dark) .btn-transparent:not(:disabled):hover {
+  background-color: #f4f4f5 !important; /* hover:bg-zinc-100 (#f4f4f5) */
+  color: #3f3f46 !important;
+  border-color: #d4d4d8 !important;
+}
+
+html:not(.dark) button.bg-transparent:not(:disabled) *,
+html:not(.dark) button[data-variant="outline"]:not(:disabled) *,
+html:not(.dark) button[data-variant="ghost"]:not(:disabled) *,
+html:not(.dark) .btn-transparent:not(:disabled) * {
+  color: #3f3f46 !important;
+}
+
+/* 13. Links: text-emerald-600 hover:text-emerald-700 underline (#059669 / #047857) */
+html:not(.dark) a:not([class*="btn"]):not([role="button"]):not(.no-underline),
+html:not(.dark) .link-emerald {
+  color: #059669 !important; /* text-emerald-600 (#059669) */
+  text-decoration-line: underline !important;
+}
+
+html:not(.dark) a:not([class*="btn"]):not([role="button"]):not(.no-underline):hover,
+html:not(.dark) .link-emerald:hover {
+  color: #047857 !important; /* hover:text-emerald-700 (#047857) */
+}
+
+/* 14. Tags: bg-zinc-100 text-zinc-800 border border-zinc-200 (#f4f4f5 / #27272a / #e4e4e7) */
+html:not(.dark) .tag,
+html:not(.dark) [data-tag],
+html:not(.dark) .bg-amber-500\/10.border-amber-500\/40,
+html:not(.dark) [class*="tag-emerald-zinc"] {
+  background-color: #f4f4f5 !important; /* bg-zinc-100 (#f4f4f5) */
+  color: #27272a !important;            /* text-zinc-800 (#27272a) */
+  border: 1px solid #e4e4e7 !important; /* border-zinc-200 (#e4e4e7) */
+}
+
+html:not(.dark) .tag *,
+html:not(.dark) [data-tag] *,
+html:not(.dark) .bg-amber-500\/10.border-amber-500\/40 * {
+  color: #27272a !important;
+}
+
+/* 15. Campos de Entrada (Inputs, Seletores e Textarea) */
+html:not(.dark) input,
+html:not(.dark) select,
+html:not(.dark) textarea {
+  background-color: #ffffff !important;
+  color: #18181b !important;            /* text-zinc-900 */
+  border-color: #d4d4d8 !important;      /* border-zinc-300 */
+}
+
+html:not(.dark) input:focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus {
+  border-color: #059669 !important;      /* border-emerald-600 */
+  outline-color: #059669 !important;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2) !important;
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #a1a1aa !important;            /* text-zinc-400 */
+}
+
+/* 16. Itens de Navegação / Sidebar Ativa no Modo Claro: Especificado na Seção 19.7 Oficial */
+
+/* 17. Sombras Suaves para Profundidade no Modo Claro */
+html:not(.dark) .shadow-2xl,
+html:not(.dark) .shadow-xl,
+html:not(.dark) .shadow-lg,
+html:not(.dark) .shadow-md {
+  box-shadow:
+    0 4px 6px -1px rgba(24, 24, 27, 0.05),
+    0 2px 4px -2px rgba(24, 24, 27, 0.03) !important;
+}
+
+/* 18. Foco e Acessibilidade (WCAG 2.2 AA) no Modo Claro */
+html:not(.dark) :focus-visible {
+  outline: 2px solid #059669 !important; /* emerald-600 */
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.25) !important;
+}
+
+html:not(.dark) .skip-to-content {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+/* 19. Ajustes Específicos da Navbar no Modo Claro */
+/* 19.1. Theme Toggle: Background Transparente e Stroke #D4D4D8 */
+html:not(.dark) [data-theme-toggle],
+html:not(.dark) .theme-toggle-btn,
+html:not(.dark) .theme-toggle-button {
+  background-color: transparent !important;
+  border-color: #D4D4D8 !important;
+}
+
+/* Theme Toggle no Modo Claro: Elipse verde (#059669) e Ícone Sol branco (#ffffff) */
+html:not(.dark) .theme-toggle-sun-active,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) .theme-toggle-sun-active svg,
+html:not(.dark) .theme-toggle-sun-active .icon-sun,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active svg,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active svg.lucide-sun {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* 19.2. Ícone Alert (Sino): Círculo Vermelho (#dc2626) e Texto Branco (#ffffff) */
+html:not(.dark) .notification-badge,
+html:not(.dark) [data-notification-badge],
+html:not(.dark) span.notification-badge,
+html:not(.dark) span[class*="notificationBadge"] {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+html:not(.dark) .notification-badge,
+html:not(.dark) [data-notification-badge],
+html:not(.dark) .notification-badge *,
+html:not(.dark) [data-notification-badge] *,
+html:not(.dark) span[class*="notificationBadge"],
+html:not(.dark) span[class*="notificationBadge"] * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* 19.3. Avatar - "DE": Texto #18181B e Stroke #D4D4D8 */
+html:not(.dark) .navbar-avatar,
+html:not(.dark) [data-navbar-avatar],
+html:not(.dark) div[class*="navbarStyles-avatar"] {
+  color: #18181b !important;
+  background-color: #f4f4f5 !important;
+  border-color: #D4D4D8 !important;
+}
+
+html:not(.dark) .navbar-avatar *,
+html:not(.dark) [data-navbar-avatar] *,
+html:not(.dark) div[class*="navbarStyles-avatar"] * {
+  color: #18181b !important;
+}
+
+/* 19.4. REFINAMENTO DO COMPONENTE AVATAR (THEME TOGGLE LIGHT) */
+/* Estado Ativo (Avatar & Menu Suspenso): Ativo / hover (qdo mouse passa por cima): BG #262626 (expandido) */
+html:not(.dark) [data-avatar-button][data-active="true"],
+html:not(.dark) [data-avatar-button]:hover,
+html:not(.dark) .avatar-user-button-active {
+  background-color: #262626 !important;
+  border-color: #404040 !important;
+}
+
+/* AVATAR: "DE" Permanece na cor cinza claro (#F4F4F5) */
+html:not(.dark) .navbar-avatar,
+html:not(.dark) [data-navbar-avatar],
+html:not(.dark) div[class*="navbarStyles-avatar"] {
+  color: #18181b !important;
+  background-color: #F4F4F5 !important;
+  border-color: #D4D4D8 !important;
+}
+
+html:not(.dark) .navbar-avatar *,
+html:not(.dark) [data-navbar-avatar] *,
+html:not(.dark) div[class*="navbarStyles-avatar"] * {
+  color: #18181b !important;
+}
+
+/* Titulo: Demetrio A L dos Anjos (nome do Profissional) -> Color #059669 (verde) */
+html:not(.dark) [data-user-name],
+html:not(.dark) .avatar-user-name {
+  color: #059669 !important;
+}
+
+/* Administrador: Color #55555E (normal) e #A1A1AA sobre fundo ativo/hover #262626 */
+html:not(.dark) [data-user-role],
+html:not(.dark) .avatar-user-role {
+  color: #55555E !important;
+}
+
+html:not(.dark) [data-avatar-button][data-active="true"] [data-user-role],
+html:not(.dark) [data-avatar-button]:hover [data-user-role] {
+  color: #a1a1aa !important;
+}
+
+/* Menu Suspenso (Dropdown container) */
+html:not(.dark) [data-user-dropdown-menu],
+html:not(.dark) .avatar-dropdown-menu {
+  background-color: #F4F4F5 !important;
+  border-color: #D4D4D8 !important;
+}
+
+/* Menu Suspenso - Itens no Hover (qdo mouse passa por cima): BG #262626 */
+html:not(.dark) .avatar-dropdown-item:hover,
+html:not(.dark) .avatar-dropdown-item:focus {
+  background-color: #262626 !important;
+}
+
+html:not(.dark) .avatar-dropdown-item:hover span,
+html:not(.dark) .avatar-dropdown-item:focus span {
+  color: #ffffff !important;
+}
+
+/* ÍCONES: Meu Perfil, Configurações da Barbearia, Suporte & Ajuda, Sair da plataforma -> Hover #ffffff (branca) */
+.avatar-dropdown-item:hover [data-user-dropdown-icon],
+.avatar-dropdown-item:hover [data-user-dropdown-icon] svg,
+.avatar-dropdown-item:hover svg,
+.avatar-dropdown-item:focus [data-user-dropdown-icon],
+.avatar-dropdown-item:focus [data-user-dropdown-icon] svg,
+.avatar-dropdown-item:focus svg,
+html:not(.dark) .avatar-dropdown-item:hover [data-user-dropdown-icon],
+html:not(.dark) .avatar-dropdown-item:hover [data-user-dropdown-icon] svg,
+html:not(.dark) .avatar-dropdown-item:hover svg,
+html:not(.dark) .avatar-dropdown-item:focus [data-user-dropdown-icon],
+html:not(.dark) .avatar-dropdown-item:focus [data-user-dropdown-icon] svg,
+html:not(.dark) .avatar-dropdown-item:focus svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* ICONES: E-mail & Senha, Meu perfil, Configurações da Barbearia, Suporte & Ajuda -> Color #059669 (verde) */
+html:not(.dark) [data-user-dropdown-icon],
+html:not(.dark) [data-user-dropdown-icon] svg,
+html:not(.dark) [data-user-dropdown-auth] svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* TEXTOS: E-mail & Senha, Meu perfil, Configurações da Barbearia, Suporte & Ajuda, Sair da Plataforma -> Color #55555E */
+html:not(.dark) [data-user-dropdown-text],
+html:not(.dark) [data-user-dropdown-auth],
+html:not(.dark) .avatar-dropdown-item span {
+  color: #55555E !important;
+}
+
+/* Divisores internos no modo claro */
+html:not(.dark) [data-user-dropdown-divider],
+html:not(.dark) [data-user-dropdown-header] {
+  border-color: #E4E4E7 !important;
+}
+
+/* 19.5. ÍCONE HAMBÚRGUER (MENU) - LIGHT: #059669 (VERDE) */
+html:not(.dark) [data-menu-button],
+html:not(.dark) [data-menu-button] svg,
+html:not(.dark) [data-menu-icon],
+html:not(.dark) .navbar-menu-button,
+html:not(.dark) .navbar-menu-button svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+html:not(.dark) [data-menu-button]:hover,
+html:not(.dark) .navbar-menu-button:hover {
+  background-color: #F4F4F5 !important;
+  color: #047857 !important;
+}
+
+/* 19.6. REFINAMENTO DO TOPO DO MENU LATERAL (SIDEBAR) NO MODO CLARO */
+/* Avatar (Container do Ícone Tesoura): #059669 (verde container bg) */
+html:not(.dark) [data-sidebar-brand-logo],
+html:not(.dark) .sidebar-brand-logo {
+  background-color: #059669 !important;
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.25) !important;
+}
+
+/* Avatar Ícone (Tesoura): #ffffff (branca) */
+html:not(.dark) [data-sidebar-brand-logo] svg,
+html:not(.dark) .sidebar-brand-logo svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Título da Barbearia (ex: "Barbearia dos Anjos"): #18181B no Modo Claro */
+html:not(.dark) [data-sidebar-brand-title],
+html:not(.dark) .sidebar-brand-title {
+  color: #18181B !important;
+}
+
+/* Link do Texto: Trial em #059669 (verde) */
+html:not(.dark) [data-sidebar-plan-link],
+html:not(.dark) .sidebar-plan-link,
+html:not(.dark) [data-sidebar-plan-text] {
+  color: #059669 !important;
+}
+
+html:not(.dark) [data-sidebar-plan-link]:hover,
+html:not(.dark) [data-sidebar-plan-link]:hover [data-sidebar-plan-text] {
+  color: #047857 !important;
+}
+
+/* TAG Planos: BG #ECFDF5 (verde claro da tag 'Disponivel' na Navbar) e Texto #059669 (verde) */
+html:not(.dark) [data-sidebar-plan-tag],
+html:not(.dark) .sidebar-plan-tag {
+  background-color: #ECFDF5 !important;
+  color: #059669 !important;
+  border-color: #A7F3D0 !important;
+}
+
+html:not(.dark) [data-sidebar-plan-tag] *,
+html:not(.dark) .sidebar-plan-tag * {
+  color: #059669 !important;
+}
+
+html:not(.dark) [data-sidebar-plan-link]:hover [data-sidebar-plan-tag],
+html:not(.dark) [data-sidebar-plan-tag]:hover {
+  background-color: #D1FAE5 !important;
+  color: #047857 !important;
+}
+
+/* ======================================================== */
+/* 19.7. REFINAMENTO DO MENU LATERAL (SIDEBAR) - THEME LIGHT */
+/* ======================================================== */
+
+/* 1. Itens Inativos em Repouso */
+html:not(.dark) .sidebar-nav-item-inactive,
+html:not(.dark) .sidebar-sub-item-inactive,
+html:not(.dark) .sidebar-collapsed-inactive {
+  color: #55555E !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+html:not(.dark) .sidebar-nav-item-inactive svg,
+html:not(.dark) .sidebar-sub-item-inactive svg,
+html:not(.dark) .sidebar-collapsed-inactive svg {
+  color: #71717A !important;
+  stroke: #71717A !important;
+}
+
+/* 2. ESTADO HOVER (PARA ITENS NÃO ATIVOS):
+   - Fundo: #ECFDF5 (Background container)
+   - Texto: #059669 (verde)
+   - Ícone: #059669 (verde) */
+html:not(.dark) .sidebar-nav-item-inactive:hover,
+html:not(.dark) .sidebar-sub-item-inactive:hover,
+html:not(.dark) .sidebar-collapsed-inactive:hover,
+html:not(.dark) [data-sidebar-active="false"]:hover {
+  background-color: #ECFDF5 !important;
+  color: #059669 !important;
+  border-color: #A7F3D0 !important;
+}
+
+html:not(.dark) .sidebar-nav-item-inactive:hover > span:not(.sidebar-nav-badge):not([data-sidebar-badge]):not([class*="navItemBadge"]),
+html:not(.dark) .sidebar-nav-item-inactive:hover [class*="navItemLabel"],
+html:not(.dark) .sidebar-sub-item-inactive:hover span,
+html:not(.dark) .sidebar-collapsed-inactive:hover span,
+html:not(.dark) [data-sidebar-active="false"]:hover > span:not(.sidebar-nav-badge):not([data-sidebar-badge]):not([class*="navItemBadge"]),
+html:not(.dark) [data-sidebar-active="false"]:hover [class*="navItemLabel"] {
+  color: #059669 !important;
+}
+
+html:not(.dark) .sidebar-nav-item-inactive:hover svg,
+html:not(.dark) .sidebar-sub-item-inactive:hover svg,
+html:not(.dark) .sidebar-collapsed-inactive:hover svg,
+html:not(.dark) [data-sidebar-active="false"]:hover svg,
+html:not(.dark) .sidebar-nav-item:hover .sidebar-chevron {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* 3. TAGS / BADGES DOS MENUS (Agenda de Atendimento, Clientes & Prontuários Técnicos, Indique & Ganhe):
+   - TAG Background: #059669 (verde - container BG)
+   - TAG texto/número: #ffffff (Branco puro) inclusive no estado hover */
+html:not(.dark) .sidebar-nav-badge,
+html:not(.dark) [data-sidebar-badge],
+html:not(.dark) [class*="navItemBadge"],
+html:not(.dark) .sidebar-nav-item:hover .sidebar-nav-badge,
+html:not(.dark) .sidebar-nav-item-inactive:hover .sidebar-nav-badge,
+html:not(.dark) .sidebar-nav-item-active:hover .sidebar-nav-badge,
+html:not(.dark) .sidebar-nav-item:hover [data-sidebar-badge],
+html:not(.dark) .sidebar-nav-item-inactive:hover [data-sidebar-badge],
+html:not(.dark) .sidebar-nav-item-active:hover [data-sidebar-badge],
+html:not(.dark) .sidebar-nav-item:hover [class*="navItemBadge"],
+html:not(.dark) .sidebar-nav-item-inactive:hover [class*="navItemBadge"],
+html:not(.dark) .sidebar-nav-item-active:hover [class*="navItemBadge"],
+html:not(.dark) [data-sidebar-active]:hover .sidebar-nav-badge,
+html:not(.dark) [data-sidebar-active]:hover [data-sidebar-badge],
+html:not(.dark) [data-sidebar-active]:hover [class*="navItemBadge"],
+html:not(.dark) .sidebar-nav-badge:hover,
+html:not(.dark) [data-sidebar-badge]:hover {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.35) !important;
+}
+
+html:not(.dark) .sidebar-nav-badge *,
+html:not(.dark) [data-sidebar-badge] *,
+html:not(.dark) [class*="navItemBadge"] *,
+html:not(.dark) .sidebar-nav-item:hover .sidebar-nav-badge *,
+html:not(.dark) .sidebar-nav-item-inactive:hover .sidebar-nav-badge *,
+html:not(.dark) .sidebar-nav-item-active:hover .sidebar-nav-badge *,
+html:not(.dark) .sidebar-nav-item:hover [data-sidebar-badge] *,
+html:not(.dark) .sidebar-nav-item-inactive:hover [data-sidebar-badge] *,
+html:not(.dark) .sidebar-nav-item-active:hover [data-sidebar-badge] *,
+html:not(.dark) [data-sidebar-active]:hover .sidebar-nav-badge *,
+html:not(.dark) [data-sidebar-active]:hover [data-sidebar-badge] *,
+html:not(.dark) .sidebar-nav-badge:hover *,
+html:not(.dark) [data-sidebar-badge]:hover * {
+  color: #ffffff !important;
+}
+
+/* Ponto badge indicador no modo encolhido */
+html:not(.dark) .sidebar-collapsed-item [class*="bg-amber-500"],
+html:not(.dark) .sidebar-collapsed-badge {
+  background-color: #059669 !important;
+  box-shadow: 0 0 6px rgba(5, 150, 105, 0.6) !important;
+}
+
+/* 4. EVENTO CLIQUE BOTÃO ATIVO:
+   - Fundo ativo (e hover): #262626 (Background container)
+   - Texto e Ícone: #ffffff (branco - texto e ícone)
+   - Efeito "aceso": #059669 (verde) */
+html:not(.dark) .sidebar-nav-item-active,
+html:not(.dark) .sidebar-sub-item-active,
+html:not(.dark) .sidebar-collapsed-active,
+html:not(.dark) [data-sidebar-active="true"] {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  border-color: rgba(5, 150, 105, 0.45) !important;
+  box-shadow: inset 4px 0 0 #059669, 0 4px 14px rgba(5, 150, 105, 0.32) !important;
+}
+
+html:not(.dark) .sidebar-nav-item-active span,
+html:not(.dark) .sidebar-sub-item-active span,
+html:not(.dark) .sidebar-collapsed-active span,
+html:not(.dark) [data-sidebar-active="true"] span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .sidebar-nav-item-active svg,
+html:not(.dark) .sidebar-sub-item-active svg,
+html:not(.dark) .sidebar-collapsed-active svg,
+html:not(.dark) [data-sidebar-active="true"] svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Estado HOVER no BOTÃO ATIVO: Mantém fundo #262626, texto/ícone #ffffff e efeito aceso #059669 */
+html:not(.dark) .sidebar-nav-item-active:hover,
+html:not(.dark) .sidebar-sub-item-active:hover,
+html:not(.dark) .sidebar-collapsed-active:hover,
+html:not(.dark) [data-sidebar-active="true"]:hover {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  box-shadow: inset 4px 0 0 #059669, 0 4px 16px rgba(5, 150, 105, 0.45) !important;
+}
+
+html:not(.dark) .sidebar-nav-item-active:hover span,
+html:not(.dark) .sidebar-sub-item-active:hover span,
+html:not(.dark) .sidebar-collapsed-active:hover span,
+html:not(.dark) [data-sidebar-active="true"]:hover span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .sidebar-nav-item-active:hover svg,
+html:not(.dark) .sidebar-sub-item-active:hover svg,
+html:not(.dark) .sidebar-collapsed-active:hover svg,
+html:not(.dark) [data-sidebar-active="true"]:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Preservação da TAG sobre botão ativo no Light */
+html:not(.dark) .sidebar-nav-item-active .sidebar-nav-badge,
+html:not(.dark) [data-sidebar-active="true"] [data-sidebar-badge] {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+/* Submenu container (linha divisória vertical) */
+html:not(.dark) [class*="submenuList"] {
+  border-left-color: #E4E4E7 !important;
+}
+
+/* Item pai (Menu Financeiro) no momento do clique e no estado ativo:
+   - Fundo no clique, ativo e hover: #262626 (Background container)
+   - Texto e Ícone: #ffffff (branco - texto, ícone e chevron)
+   - Efeito "aceso": #059669 (verde) */
+html:not(.dark) .sidebar-parent-active,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"],
+html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active,
+html:not(.dark) [data-sidebar-item="financeiro_group"]:active {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-color: rgba(5, 150, 105, 0.45) !important;
+  box-shadow: inset 4px 0 0 #059669, 0 4px 14px rgba(5, 150, 105, 0.32) !important;
+}
+
+html:not(.dark) .sidebar-parent-active span,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"] span,
+html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active span,
+html:not(.dark) [data-sidebar-item="financeiro_group"]:active span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .sidebar-parent-active svg,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"] svg,
+html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active svg,
+html:not(.dark) [data-sidebar-item="financeiro_group"]:active svg,
+html:not(.dark) .sidebar-parent-active .sidebar-chevron,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"] .sidebar-chevron,
+html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active .sidebar-chevron {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Estado HOVER no menu Financeiro ativo: Mantém fundo #262626, texto/ícone #ffffff e efeito aceso #059669 */
+html:not(.dark) .sidebar-parent-active:hover,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"]:hover,
+html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active:hover {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  box-shadow: inset 4px 0 0 #059669, 0 4px 16px rgba(5, 150, 105, 0.45) !important;
+}
+
+html:not(.dark) .sidebar-parent-active:hover span,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"]:hover span,
+html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active:hover span {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .sidebar-parent-active:hover svg,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"]:hover svg,
+html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active:hover svg,
+html:not(.dark) .sidebar-parent-active:hover .sidebar-chevron,
+html:not(.dark) [data-sidebar-item="financeiro_group"][data-sidebar-active="true"]:hover .sidebar-chevron,
+html:not(.dark) [data-sidebar-item="financeiro_group"].sidebar-nav-item-active:hover .sidebar-chevron {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* ======================================================== */
+/* PRESERVAÇÃO INTEGRAL DA VERSÃO DARK (PALETA #969696)     */
+/* ======================================================== */
+/* Ativo / Menu Dropdown no Modo Escuro: BG #262626 e Borda #969696 */
+html.dark [data-avatar-button][data-active="true"],
+html.dark [data-user-dropdown-menu],
+html.dark .avatar-dropdown-menu {
+  background-color: #262626 !important;
+  border-color: #969696 !important;
+}
+
+/* 1. Identificador de Usuário (Header do Dropdown): Nome do Administrador em #ffffff (Branca) */
+html.dark [data-user-dropdown-header] [data-user-name],
+html.dark [data-user-dropdown-header] [data-user-dropdown-name],
+html.dark [data-user-dropdown-name],
+html.dark [data-user-dropdown-header] p,
+html.dark [data-user-dropdown-header] p[data-user-dropdown-name] {
+  color: #ffffff !important;
+}
+
+/* Credenciais / detalhes de autenticação no header permanecem em #969696 */
+html.dark [data-user-dropdown-google],
+html.dark [data-user-dropdown-auth],
+html.dark [data-user-dropdown-text="email-senha"] {
+  color: #969696 !important;
+}
+
+/* 3. Linhas Divisórias (Borders / Separators) no Dropdown: #969696 */
+html.dark [data-user-dropdown-header],
+html.dark [data-user-dropdown-divider],
+html.dark .avatar-dropdown-menu [data-user-dropdown-divider],
+html.dark .avatar-dropdown-menu hr,
+html.dark [data-user-dropdown-menu] .border-b,
+html.dark [data-user-dropdown-menu] .border-t {
+  border-color: #969696 !important;
+}
+
+/* Administrador Dark: Color #FFB900 */
+html.dark [data-user-role],
+html.dark .avatar-user-role {
+  color: #FFB900 !important;
+}
+
+/* ICONES Dark: Color #FFC21F (amarelo) em repouso */
+html.dark [data-user-dropdown-icon],
+html.dark [data-user-dropdown-icon] svg {
+  color: #FFC21F !important;
+  stroke: #FFC21F !important;
+}
+
+/* ÍCONES Dark no hover do menu Usuario / Administrador: #ffffff (branca) */
+html.dark .avatar-dropdown-item:hover [data-user-dropdown-icon],
+html.dark .avatar-dropdown-item:hover [data-user-dropdown-icon] svg,
+html.dark .avatar-dropdown-item:hover svg,
+html.dark .avatar-dropdown-item:focus [data-user-dropdown-icon],
+html.dark .avatar-dropdown-item:focus [data-user-dropdown-icon] svg,
+html.dark .avatar-dropdown-item:focus svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html.dark .avatar-dropdown-item:hover,
+html.dark .avatar-dropdown-item:focus {
+  background-color: #3f3f46 !important;
+}
+
+/* 2. Itens de Navegação (Links do Menu) em repouso no Dark: #969696 */
+html.dark .avatar-dropdown-item,
+html.dark .avatar-dropdown-item span,
+html.dark .avatar-dropdown-item [data-user-dropdown-text],
+html.dark [data-user-dropdown-text="perfil"],
+html.dark [data-user-dropdown-text="configuracoes"],
+html.dark [data-user-dropdown-text="suporte"],
+html.dark [data-user-dropdown-text="sair"] {
+  color: #969696 !important;
+}
+
+/* Hover e Foco dos Links: Branco puro (#ffffff) para contraste ótimo */
+html.dark .avatar-dropdown-item:hover span,
+html.dark .avatar-dropdown-item:focus span,
+html.dark .avatar-dropdown-item:hover [data-user-dropdown-text],
+html.dark .avatar-dropdown-item:focus [data-user-dropdown-text] {
+  color: #ffffff !important;
+}
+
+/* Ícone Hambúrguer Dark: Manter #a3a3a3 / hover #ffffff */
+html.dark [data-menu-button],
+html.dark [data-menu-button] svg,
+html.dark [data-menu-icon],
+html.dark .navbar-menu-button,
+html.dark .navbar-menu-button svg {
+  color: #a3a3a3 !important;
+  stroke: #a3a3a3 !important;
+}
+
+html.dark [data-menu-button]:hover,
+html.dark [data-menu-button]:hover svg,
+html.dark .navbar-menu-button:hover,
+html.dark .navbar-menu-button:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Sidebar Top Header no Modo Escuro (Preservação Integral) */
+html.dark [data-sidebar-brand-logo],
+html.dark .sidebar-brand-logo {
+  background-color: #d97706 !important; /* bg-amber-600 */
+}
+
+html.dark [data-sidebar-brand-logo] svg,
+html.dark .sidebar-brand-logo svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html.dark [data-sidebar-plan-link],
+html.dark .sidebar-plan-link,
+html.dark [data-sidebar-plan-text] {
+  color: #f59e0b !important; /* text-amber-500 */
+}
+
+html.dark [data-sidebar-plan-tag],
+html.dark .sidebar-plan-tag {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  color: #fcd34d !important; /* text-amber-300 */
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Título da Barbearia Dark: Preservar neutral-100 (#f5f5f5) */
+html.dark [data-sidebar-brand-title],
+html.dark .sidebar-brand-title {
+  color: #f5f5f5 !important;
+}
+
+/* Versão do Sistema no Rodapé do Sidebar: Light #059669 (verde) / Dark #ffffff (branco) */
+[data-sidebar-version],
+.sidebar-version-text {
+  color: #059669;
+}
+
+html:not(.dark) [data-sidebar-version],
+html:not(.dark) .sidebar-version-text {
+  color: #059669 !important;
+}
+
+html.dark [data-sidebar-version],
+html.dark .sidebar-version-text {
+  color: #ffffff !important;
+}
+
+/* Botão Expandir/Recolher do Menu Lateral - Ícone Chevron Left/Right: #ffffff (branco) */
+[data-sidebar-toggle-collapse] svg,
+[data-sidebar-toggle-collapse] .sidebar-chevron-toggle,
+.sidebar-chevron-toggle {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html:not(.dark) [data-sidebar-toggle-collapse] svg,
+html:not(.dark) [data-sidebar-toggle-collapse] .sidebar-chevron-toggle,
+html:not(.dark) .sidebar-chevron-toggle {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html.dark [data-sidebar-toggle-collapse] svg,
+html.dark [data-sidebar-toggle-collapse] .sidebar-chevron-toggle,
+html.dark .sidebar-chevron-toggle {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* ======================================================== */
+/* REMOVE ÍCONE NATIVO ESCURO DE CALENDÁRIO                 */
+/* Mantém exclusivamente o ícone da biblioteca Lucide em branco #ffffff */
+/* ======================================================== */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+html:not(.dark) input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* ======================================================== */
+/* PRESETS DE CORES WHITE-LABEL                            */
+/* ======================================================== */
+[data-brand="emerald"] {
+  --brand-500: #10b981;
+  --brand-600: #059669;
+  --brand-700: #047857;
+}
+
+[data-brand="ruby"] {
+  --brand-500: #ef4444;
+  --brand-600: #dc2626;
+  --brand-700: #b91c1c;
+}
+
+[data-brand="sapphire"] {
+  --brand-500: #3b82f6;
+  --brand-600: #2563eb;
+  --brand-700: #1d4ed8;
+}
+
+/* ======================================================== */
+/* 20. Banner de Período de Avaliação / Trial (Z-Index 100) */
+/* Prevalência absoluta sobre a Navbar e elementos da UI   */
+/* ======================================================== */
+[data-trial-banner="true"],
+.trial-banner-top {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+
+/* ======================================================== */
+/* 21. Conta Google Vinculada: Cor #55555E                  */
+/* ======================================================== */
+[data-google-auth-text="true"],
+[data-user-dropdown-google="true"],
+.text-google-linked {
+  color: #55555E !important;
+}
+
+/* ======================================================== */
+/* 22. Componente Meu Perfil: Refinamento de Abas e Estados  */
+/* ======================================================== */
+
+/* LINE (Abaixo dos títulos: Dados Pessoais, Contato & Endereço, Perfil & Chave PIX, Segurança & Acesso) */
+/* DEFAULT: #52525B */
+html:not(.dark) .profile-tab-item,
+html:not(.dark) [data-profile-tab] {
+  border-bottom: 2px solid #52525B !important;
+  transition: all 150ms ease-in-out;
+}
+
+/* HOVER: #059669 (verde) */
+html:not(.dark) .profile-tab-item:hover,
+html:not(.dark) [data-profile-tab]:hover {
+  border-bottom-color: #059669 !important;
+}
+
+/* ATIVO: #059669 (verde) */
+html:not(.dark) .profile-tab-item.profile-tab-active,
+html:not(.dark) .profile-tab-item[aria-selected="true"],
+html:not(.dark) [data-profile-tab][aria-selected="true"] {
+  border-bottom-color: #059669 !important;
+}
+
+/* TITULOS (Dados Pessoais, Contato & Endereço, Perfil & Chave PIX, Segurança & Acesso) */
+/* DEFAULT: #52525B */
+html:not(.dark) .profile-tab-item .profile-tab-title,
+html:not(.dark) [data-profile-tab] [data-tab-title] {
+  color: #52525B !important;
+  transition: color 150ms ease-in-out;
+}
+
+/* HOVER: #262626 */
+html:not(.dark) .profile-tab-item:hover .profile-tab-title,
+html:not(.dark) [data-profile-tab]:hover [data-tab-title] {
+  color: #262626 !important;
+}
+
+/* ATIVO: #059669 (verde) */
+html:not(.dark) .profile-tab-item.profile-tab-active .profile-tab-title,
+html:not(.dark) .profile-tab-item[aria-selected="true"] .profile-tab-title,
+html:not(.dark) .profile-tab-item.profile-tab-active:hover .profile-tab-title,
+html:not(.dark) .profile-tab-item[aria-selected="true"]:hover .profile-tab-title,
+html:not(.dark) [data-profile-tab][aria-selected="true"] [data-tab-title],
+html:not(.dark) [data-profile-tab][aria-selected="true"]:hover [data-tab-title] {
+  color: #059669 !important;
+  font-weight: 700 !important;
+}
+
+/* ICONES (Dados Pessoais, Contato & Endereço, Perfil & Chave PIX, Segurança & Acesso) */
+/* DEFAULT: #52525B */
+html:not(.dark) .profile-tab-item .profile-tab-icon,
+html:not(.dark) .profile-tab-item .profile-tab-icon svg,
+html:not(.dark) [data-profile-tab] [data-tab-icon],
+html:not(.dark) [data-profile-tab] [data-tab-icon] svg {
+  color: #52525B !important;
+  stroke: #52525B !important;
+  transition: color 150ms ease-in-out, stroke 150ms ease-in-out;
+}
+
+/* HOVER: #262626 */
+html:not(.dark) .profile-tab-item:hover .profile-tab-icon,
+html:not(.dark) .profile-tab-item:hover .profile-tab-icon svg,
+html:not(.dark) [data-profile-tab]:hover [data-tab-icon],
+html:not(.dark) [data-profile-tab]:hover [data-tab-icon] svg {
+  color: #262626 !important;
+  stroke: #262626 !important;
+}
+
+/* ATIVO: #059669 (verde) */
+html:not(.dark) .profile-tab-item.profile-tab-active .profile-tab-icon,
+html:not(.dark) .profile-tab-item.profile-tab-active .profile-tab-icon svg,
+html:not(.dark) .profile-tab-item[aria-selected="true"] .profile-tab-icon,
+html:not(.dark) .profile-tab-item[aria-selected="true"] .profile-tab-icon svg,
+html:not(.dark) .profile-tab-item.profile-tab-active:hover .profile-tab-icon,
+html:not(.dark) .profile-tab-item.profile-tab-active:hover .profile-tab-icon svg,
+html:not(.dark) .profile-tab-item[aria-selected="true"]:hover .profile-tab-icon,
+html:not(.dark) .profile-tab-item[aria-selected="true"]:hover .profile-tab-icon svg,
+html:not(.dark) [data-profile-tab][aria-selected="true"] [data-tab-icon],
+html:not(.dark) [data-profile-tab][aria-selected="true"] [data-tab-icon] svg,
+html:not(.dark) [data-profile-tab][aria-selected="true"]:hover [data-tab-icon],
+html:not(.dark) [data-profile-tab][aria-selected="true"]:hover [data-tab-icon] svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* ======================================================== */
+/* 23. Componente Configurações da Barbearia (Versão Light) */
+/* OBS: NÃO ALTERAR A VERSÃO DARK (MANTER AS CORES)        */
+/* ======================================================== */
+
+/* LINE (Abaixo dos títulos: Estabelecimento, Regras de Agenda, Funcionamento, Notificação WhatsApp) */
+/* ESTADO DEFAULT: Color #52525B */
+html:not(.dark) .settings-tab-item,
+html:not(.dark) [data-settings-tab] {
+  border-bottom: 2px solid #52525B !important;
+  transition: all 150ms ease-in-out;
+}
+
+/* ESTADO HOVER (qdo mouse passa por cima): Color: #059669 (verde) */
+html:not(.dark) .settings-tab-item:hover,
+html:not(.dark) [data-settings-tab]:hover {
+  border-bottom-color: #059669 !important;
+}
+
+/* ESTADO ATIVO (clique do mouse): Color: #059669 (verde) */
+html:not(.dark) .settings-tab-item.settings-tab-active,
+html:not(.dark) .settings-tab-item[aria-selected="true"],
+html:not(.dark) [data-settings-tab][aria-selected="true"] {
+  border-bottom-color: #059669 !important;
+}
+
+/* TITULOS (Estabelecimento, Regras de Agenda, Funcionamento, Notificação WhatsApp) */
+/* ESTADO DEFAULT: Color #52525B */
+html:not(.dark) .settings-tab-item .settings-tab-title,
+html:not(.dark) [data-settings-tab] [data-tab-title] {
+  color: #52525B !important;
+  transition: color 150ms ease-in-out;
+}
+
+/* ESTADO HOVER (qdo mouse passa por cima): Color: #262626 */
+html:not(.dark) .settings-tab-item:hover .settings-tab-title,
+html:not(.dark) [data-settings-tab]:hover [data-tab-title] {
+  color: #262626 !important;
+}
+
+/* ESTADO ATIVO (clique do mouse): Color: #059669 (verde) */
+html:not(.dark) .settings-tab-item.settings-tab-active .settings-tab-title,
+html:not(.dark) .settings-tab-item[aria-selected="true"] .settings-tab-title,
+html:not(.dark) .settings-tab-item.settings-tab-active:hover .settings-tab-title,
+html:not(.dark) .settings-tab-item[aria-selected="true"]:hover .settings-tab-title,
+html:not(.dark) [data-settings-tab][aria-selected="true"] [data-tab-title],
+html:not(.dark) [data-settings-tab][aria-selected="true"]:hover [data-tab-title] {
+  color: #059669 !important;
+  font-weight: 700 !important;
+}
+
+/* ICONES (Estabelecimento, Regras de Agenda, Funcionamento, Notificação WhatsApp) */
+/* ESTADO DEFAULT: Color #52525B */
+html:not(.dark) .settings-tab-item .settings-tab-icon,
+html:not(.dark) .settings-tab-item .settings-tab-icon svg,
+html:not(.dark) [data-settings-tab] [data-tab-icon],
+html:not(.dark) [data-settings-tab] [data-tab-icon] svg {
+  color: #52525B !important;
+  stroke: #52525B !important;
+  transition: color 150ms ease-in-out, stroke 150ms ease-in-out;
+}
+
+/* ESTADO HOVER (qdo mouse passa por cima): Color: #262626 */
+html:not(.dark) .settings-tab-item:hover .settings-tab-icon,
+html:not(.dark) .settings-tab-item:hover .settings-tab-icon svg,
+html:not(.dark) [data-settings-tab]:hover [data-tab-icon],
+html:not(.dark) [data-settings-tab]:hover [data-tab-icon] svg {
+  color: #262626 !important;
+  stroke: #262626 !important;
+}
+
+/* ESTADO ATIVO (clique do mouse): Color: #059669 (verde) */
+html:not(.dark) .settings-tab-item.settings-tab-active .settings-tab-icon,
+html:not(.dark) .settings-tab-item.settings-tab-active .settings-tab-icon svg,
+html:not(.dark) .settings-tab-item[aria-selected="true"] .settings-tab-icon,
+html:not(.dark) .settings-tab-item[aria-selected="true"] .settings-tab-icon svg,
+html:not(.dark) .settings-tab-item.settings-tab-active:hover .settings-tab-icon,
+html:not(.dark) .settings-tab-item.settings-tab-active:hover .settings-tab-icon svg,
+html:not(.dark) .settings-tab-item[aria-selected="true"]:hover .settings-tab-icon,
+html:not(.dark) .settings-tab-item[aria-selected="true"]:hover .settings-tab-icon svg,
+html:not(.dark) [data-settings-tab][aria-selected="true"] [data-tab-icon],
+html:not(.dark) [data-settings-tab][aria-selected="true"] [data-tab-icon] svg,
+html:not(.dark) [data-settings-tab][aria-selected="true"]:hover [data-tab-icon],
+html:not(.dark) [data-settings-tab][aria-selected="true"]:hover [data-tab-icon] svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* ==========================================================================
+   CARD CONTAINER (BRANCO #FFFFFF) PARA VERSÃO LIGHT
+   Preservando as cores da versão DARK intactas
+   ========================================================================== */
+html:not(.dark) .profile-header-card,
+html:not(.dark) [data-profile-header-card] {
+  background-color: #FFFFFF !important;
+  border: 0 !important;
+  border-color: transparent !important;
+}
+
+html:not(.dark) .barbershop-settings-header-card,
+html:not(.dark) [data-settings-header-card] {
+  background-color: #FFFFFF !important;
+}
+
+html.dark .profile-header-card,
+html.dark [data-profile-header-card],
+html.dark .barbershop-settings-header-card,
+html.dark [data-settings-header-card] {
+  background-color: #171717 !important;
+}
+
+/* ==========================================================================
+   REFINAMENTO DE UI - HEADER (MEU PERFIL) LIGHT THEME
+   - Administrador: #059669 (verde)
+   - Demais elementos: #18181B
+   - Botão Voltar ao Painel: sem contorno, sem bg hover, hover #059669
+   ========================================================================== */
+
+/* 1. Texto Administrador em Verde #059669 */
+html:not(.dark) .profile-header-role,
+html:not(.dark) [data-profile-header-role] {
+  color: #059669 !important;
+}
+
+/* 2. Demais Textos em #18181B */
+html:not(.dark) .profile-header-text-dark,
+html:not(.dark) [data-profile-header-text-dark] {
+  color: #18181B !important;
+}
+
+/* 3. Ícones em #18181B */
+html:not(.dark) .profile-header-icon-dark,
+html:not(.dark) [data-profile-header-icon-dark] {
+  color: #18181B !important;
+  stroke: #18181B !important;
+}
+
+/* 4. Botão Voltar ao Painel (Link) */
+.profile-back-button,
+[data-profile-back-button] {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html:not(.dark) .profile-back-button,
+html:not(.dark) [data-profile-back-button] {
+  color: #18181B !important;
+  border: 0 !important;
+  border-width: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html:not(.dark) .profile-back-button *,
+html:not(.dark) [data-profile-back-button] * {
+  color: #18181B !important;
+  border: 0 !important;
+}
+
+html:not(.dark) .profile-back-button:hover,
+html:not(.dark) [data-profile-back-button]:hover {
+  color: #059669 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+}
+
+html:not(.dark) .profile-back-button:hover *,
+html:not(.dark) [data-profile-back-button]:hover * {
+  color: #059669 !important;
+  stroke: #059669 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.dark .profile-back-button,
+html.dark [data-profile-back-button] {
+  color: #a3a3a3 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html.dark .profile-back-button:hover,
+html.dark [data-profile-back-button]:hover,
+html.dark .profile-back-button:hover * {
+  color: #ffffff !important;
+  background: transparent !important;
+}
+
+/* ==========================================================================
+   BREADCRUMBS NA NAVBAR (CAMINHO DE NAVEGAÇÃO DO USUÁRIO)
+   - Item Atual (ex: "Meu Perfil" / caminho onde está):
+     * Versão Light: #059669 (verde)
+     * Versão Dark: #fbbf24 (cor padrão âmbar / text-amber-400)
+   - Itens Anteriores (ex: "Painel da Barbearia") e Separador "/":
+     * Cores neutras equilibradas
+   ========================================================================== */
+
+/* Item Ativo (Onde o usuário se encontra) */
+html:not(.dark) .navbar-breadcrumb-current,
+html:not(.dark) [data-breadcrumb-current="true"] {
+  color: #059669 !important;
+  font-weight: 600 !important;
+}
+
+html.dark .navbar-breadcrumb-current,
+html.dark [data-breadcrumb-current="true"] {
+  color: #fbbf24 !important;
+  font-weight: 600 !important;
+}
+
+/* Itens Pais e Separadores */
+html:not(.dark) .navbar-breadcrumb-parent {
+  color: #71717a !important;
+}
+
+html:not(.dark) .navbar-breadcrumb-separator {
+  color: #a1a1aa !important;
+}
+
+html.dark .navbar-breadcrumb-parent {
+  color: #a3a3a3 !important;
+}
+
+html.dark .navbar-breadcrumb-separator {
+  color: #52525b !important;
+}
+
+/* ==========================================================================
+   CONTAINER PAI DAS ABAS DO PERFIL (DIV PAI #FFFFFF BRANCO NO MODO CLARO)
+   ========================================================================== */
+html:not(.dark) .profile-tab-content-card,
+html:not(.dark) [data-profile-tab-content-card] {
+  background-color: #ffffff !important;
+  border-color: #e4e4e7 !important;
+}
+
+html.dark .profile-tab-content-card,
+html.dark [data-profile-tab-content-card] {
+  background-color: rgba(23, 23, 23, 0.9) !important;
+  border-color: #262626 !important;
+}
+
+/* ==========================================================================
+   CONTAINERS SEPARADOS DA ABA PERFIL & CHAVE PIX (LIGHT THEME)
+   Container 1: Cadastre sua chave PIX
+   Container 2: Perfil Profissional
+   ========================================================================== */
+html:not(.dark) .profile-pix-container,
+html:not(.dark) [data-profile-pix-container],
+html:not(.dark) .profile-portfolio-container,
+html:not(.dark) [data-profile-portfolio-container] {
+  background-color: #ffffff !important;
+  border: 1px solid #e4e4e7 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.dark .profile-pix-container,
+html.dark [data-profile-pix-container],
+html.dark .profile-portfolio-container,
+html.dark [data-profile-portfolio-container] {
+  background-color: rgba(23, 23, 23, 0.9) !important;
+  border: 1px solid #262626 !important;
+}
+
+/* ==========================================================================
+   ÍCONES DO PERFIL: LIGHT #059669 (VERDE) / DARK AMBER (#f59e0b)
+   ========================================================================== */
+html:not(.dark) .profile-section-icon,
+html:not(.dark) [data-profile-section-icon],
+html:not(.dark) .profile-section-icon svg,
+html:not(.dark) [data-profile-section-icon] svg,
+html:not(.dark) [data-profile-pix-container] .profile-section-icon,
+html:not(.dark) [data-profile-pix-container] .profile-section-icon svg,
+html:not(.dark) [data-profile-portfolio-container] .profile-section-icon,
+html:not(.dark) [data-profile-portfolio-container] .profile-section-icon svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+html.dark .profile-section-icon,
+html.dark [data-profile-section-icon],
+html.dark .profile-section-icon svg,
+html.dark [data-profile-section-icon] svg,
+html.dark [data-profile-pix-container] .profile-section-icon,
+html.dark [data-profile-pix-container] .profile-section-icon svg,
+html.dark [data-profile-portfolio-container] .profile-section-icon,
+html.dark [data-profile-portfolio-container] .profile-section-icon svg {
+  color: #f59e0b !important;
+  stroke: #f59e0b !important;
+}
+
+/* ==========================================================================
+   CONTAINER 2: REFINAMENTO PERFIL PROFISSIONAL & TAGS ATIVAS (LIGHT THEME)
+   ========================================================================== */
+/* Textos no modo claro para #18181B */
+html:not(.dark) [data-profile-portfolio-container] h3,
+html:not(.dark) [data-profile-portfolio-container] p,
+html:not(.dark) [data-profile-portfolio-container] label {
+  color: #18181B;
+}
+
+/* Área de Tags Ativas no Perfil: Container transparente e contorno cinza claro */
+html:not(.dark) .profile-active-tags-container,
+html:not(.dark) [data-active-tags-section] {
+  background-color: transparent !important;
+  border-color: #e4e4e7 !important;
+}
+
+html:not(.dark) [data-active-tags-header] {
+  color: #18181B !important;
+}
+
+html:not(.dark) [data-active-tags-subtitle] {
+  color: #18181B !important;
+}
+
+/* Tags Ativas: Fundo #ECFDF5 e Texto #059669 */
+html:not(.dark) .profile-tag-item,
+html:not(.dark) [data-profile-tag-item] {
+  background-color: #ECFDF5 !important;
+  color: #059669 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html:not(.dark) .profile-tag-item > span,
+html:not(.dark) [data-profile-tag-item] > span {
+  color: #059669 !important;
+}
+
+/* Ícone X (Lucide): Cor #ffffff (Branco) */
+html:not(.dark) .profile-tag-remove-btn,
+html:not(.dark) [data-profile-tag-remove] {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) .profile-tag-remove-btn svg,
+html:not(.dark) [data-profile-tag-remove] svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Sugestões rápidas (Light Theme):
+   Background: transparente
+   Contorno (stroke): Cor #171719
+   Fonte: Cor #171719
+   HOVER:
+   Background: transparente
+   Contorno (stroke): Cor: #059669 (verde)
+   Fonte: Cor: #059669 (verde) */
+html:not(.dark) .profile-suggestion-btn,
+html:not(.dark) [data-profile-suggestion-btn] {
+  background-color: transparent !important;
+  border: 1px solid #171719 !important;
+  color: #171719 !important;
+  transition: all 150ms ease-in-out;
+}
+
+html:not(.dark) .profile-suggestion-btn span,
+html:not(.dark) [data-profile-suggestion-btn] span {
+  color: #171719 !important;
+  transition: color 150ms ease-in-out;
+}
+
+html:not(.dark) .profile-suggestion-btn:hover,
+html:not(.dark) [data-profile-suggestion-btn]:hover {
+  background-color: transparent !important;
+  border-color: #059669 !important;
+  color: #059669 !important;
+}
+
+html:not(.dark) .profile-suggestion-btn:hover span,
+html:not(.dark) [data-profile-suggestion-btn]:hover span {
+  color: #059669 !important;
+}
+
+/* Linha divisória antes do botão Salvar Alterações: Cinza claro */
+html:not(.dark) .profile-save-divider,
+html:not(.dark) [data-profile-save-divider] {
+  border-top-color: #e4e4e7 !important;
+}
+
+/* ==========================================================================
+   BOTÃO UPGRADE / ASSINAR NO BANNER DE TRIAL (MOBILE FIRST)
+   Background: cor âmbar (#d97706 / #b45309 hover)
+   Cor do texto: #ffffff branca
+   ========================================================================== */
+.trial-banner-upgrade-btn,
+[data-trial-upgrade-btn],
+html:not(.dark) .trial-banner-upgrade-btn,
+html:not(.dark) [data-trial-upgrade-btn],
+html.dark .trial-banner-upgrade-btn,
+html.dark [data-trial-upgrade-btn] {
+  background-color: #d97706 !important; /* Âmbar */
+  color: #ffffff !important;            /* Branca */
+  border: 1px solid #d97706 !important;
+  font-weight: 700 !important;
+}
+
+.trial-banner-upgrade-btn:hover,
+[data-trial-upgrade-btn]:hover,
+html:not(.dark) .trial-banner-upgrade-btn:hover,
+html:not(.dark) [data-trial-upgrade-btn]:hover,
+html.dark .trial-banner-upgrade-btn:hover,
+html.dark [data-trial-upgrade-btn]:hover {
+  background-color: #b45309 !important; /* Âmbar Escuro Hover */
+  color: #ffffff !important;
+  border-color: #b45309 !important;
+}
+
+.trial-banner-upgrade-btn *,
+[data-trial-upgrade-btn] *,
+html:not(.dark) .trial-banner-upgrade-btn *,
+html:not(.dark) [data-trial-upgrade-btn] *,
+html.dark .trial-banner-upgrade-btn *,
+html.dark [data-trial-upgrade-btn] * {
+  color: #ffffff !important;
+}
+
+/* ==========================================================================
+   23. REFINAMENTO THEME TOGGLE: 
+   - VERSÃO DARK THEME (MOBILE FIRST): ELIPSE ÂMBAR (#D97706) & ÍCONE LUA BRANCO (#FFFFFF)
+   - VERSÃO LIGHT THEME: PRESERVA ELIPSE VERDE (#059669) & ÍCONE SOL BRANCO (#FFFFFF)
+   ========================================================================== */
+
+/* DARK THEME: Elipse Âmbar (#d97706) e Ícone Lua em Branco (#ffffff) */
+html.dark [data-theme-toggle] [data-theme-active="true"],
+html.dark [data-theme-toggle] .theme-toggle-active,
+html.dark [data-theme-toggle] .theme-toggle-moon-active,
+html.dark .theme-toggle-btn [data-theme-active="true"],
+html.dark .theme-toggle-btn .theme-toggle-moon-active,
+html.dark [data-theme-toggle] [data-theme-moon][data-theme-active="true"] {
+  background-color: #d97706 !important; /* Âmbar */
+  color: #ffffff !important;
+}
+
+html.dark [data-theme-toggle] .icon-moon,
+html.dark [data-theme-toggle] .icon-moon svg,
+html.dark [data-theme-toggle] [data-theme-moon] svg,
+html.dark .theme-toggle-btn .icon-moon svg,
+html.dark .theme-toggle-moon-active svg {
+  color: #ffffff !important; /* Branca */
+  stroke: #ffffff !important;
+}
+
+/* LIGHT THEME (PRESERVAÇÃO INTEGRAL): Elipse Verde (#059669) e Ícone Sol Branco (#ffffff) */
+html:not(.dark) [data-theme-toggle] [data-theme-active="true"],
+html:not(.dark) [data-theme-toggle] .theme-toggle-active,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active,
+html:not(.dark) .theme-toggle-btn [data-theme-active="true"],
+html:not(.dark) .theme-toggle-btn .theme-toggle-sun-active,
+html:not(.dark) [data-theme-toggle] [data-theme-sun][data-theme-active="true"] {
+  background-color: #059669 !important; /* Verde Esmeralda Oficial Light */
+  color: #ffffff !important;
+}
+
+html:not(.dark) [data-theme-toggle] [data-theme-sun][data-theme-active="true"] svg,
+html:not(.dark) [data-theme-toggle] .theme-toggle-sun-active svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html:not(.dark) [data-theme-toggle] [data-theme-moon]:not([data-theme-active="true"]) svg,
+html:not(.dark) [data-theme-toggle] .icon-moon:not(.theme-toggle-active) svg {
+  color: #71717a !important;
+  stroke: #71717a !important;
+}
+
+/* ==========================================================================
+   24. REFINAMENTO NAVBAR MOBILE FIRST (DARK THEME)
+   - Menu hambúrguer: Âmbar no Dark (#f59e0b / #d97706) e Verde Esmeralda no Light (#059669)
+   - Componente Alerta (Sino): Âmbar no Dark (#f59e0b) e Neutro no Light (#71717a / zinc-500)
+   - Preservação estrita da paleta de cores da versão Light
+   ========================================================================== */
+
+/* DARK THEME: Menu Hambúrguer em Âmbar */
+html.dark [data-menu-button],
+html.dark .navbar-menu-button,
+html.dark [data-menu-icon],
+html.dark [data-menu-button] svg,
+html.dark .navbar-menu-button svg {
+  color: #f59e0b !important;
+  stroke: #f59e0b !important;
+}
+
+html.dark [data-menu-button]:hover,
+html.dark .navbar-menu-button:hover,
+html.dark [data-menu-button]:hover svg,
+html.dark .navbar-menu-button:hover svg {
+  color: #fbbf24 !important;
+  stroke: #fbbf24 !important;
+}
+
+/* DARK THEME: Alerta (Sino) em Âmbar */
+html.dark [data-notification-button] svg,
+html.dark [data-notification-bell],
+html.dark [data-notification-bell] svg,
+html.dark .navbar-bell-btn svg {
+  color: #f59e0b !important;
+  stroke: #f59e0b !important;
+}
+
+html.dark [data-notification-button]:hover svg,
+html.dark [data-notification-bell]:hover svg,
+html.dark .navbar-bell-btn:hover svg {
+  color: #fbbf24 !important;
+  stroke: #fbbf24 !important;
+}
+
+/* LIGHT THEME (PRESERVAÇÃO INTEGRAL): Menu Hambúrguer Verde Esmeralda Oficial */
+html:not(.dark) [data-menu-button],
+html:not(.dark) .navbar-menu-button,
+html:not(.dark) [data-menu-icon],
+html:not(.dark) [data-menu-button] svg,
+html:not(.dark) .navbar-menu-button svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+/* LIGHT THEME (PRESERVAÇÃO INTEGRAL): Sino Neutro Oficial */
+html:not(.dark) [data-notification-button] svg,
+html:not(.dark) [data-notification-bell],
+html:not(.dark) [data-notification-bell] svg,
+html:not(.dark) .navbar-bell-btn svg {
+  color: #71717a !important;
+  stroke: #71717a !important;
+}
+
+/* ==========================================================================
+   25. ELEMENTO UNIDADE DA BARBEARIA (AO LADO DO ALERTA / SINO)
+   - Dark Theme:
+     * Cor do texto: #969696 (cinza claro)
+     * Cor do ícone (chevron down/up): #969696 (cinza claro)
+     * Cor do contorno do container (stroke): #969696 (cinza claro)
+   - Light Theme:
+     * Preservação integral da paleta oficial (#55555E / borda #D4D4D8)
+   ========================================================================== */
+
+/* DARK THEME: Unidade da Barbearia */
+html.dark [data-unit-select],
+html.dark select[data-unit-select],
+html.dark [data-unit-container] select {
+  color: #969696 !important;
+  border-color: #969696 !important;
+  background-color: rgba(23, 23, 23, 0.8) !important;
+}
+
+html.dark [data-unit-chevron],
+html.dark [data-unit-chevron] svg,
+html.dark [data-unit-container] [data-unit-chevron] svg {
+  color: #969696 !important;
+  stroke: #969696 !important;
+}
+
+/* LIGHT THEME (PRESERVAÇÃO INTEGRAL) */
+html:not(.dark) [data-unit-select],
+html:not(.dark) select[data-unit-select],
+html:not(.dark) [data-unit-container] select {
+  color: #55555E !important;
+  border-color: #D4D4D8 !important;
+  background-color: #F4F4F5 !important;
+}
+
+html:not(.dark) [data-unit-chevron],
+html:not(.dark) [data-unit-chevron] svg,
+html:not(.dark) [data-unit-container] [data-unit-chevron] svg {
+  color: #55555E !important;
+  stroke: #55555E !important;
+}
+/* ======================================================== */
+/* 24. PROTEÇÃO CONTRA VAZAMENTO DE TEMA NA BOTTOM BAR     */
+/* Garante que o container escuro e cantos arredondados da  */
+/* barra inferior e do popover permaneçam em Dark Theme   */
+/* ======================================================== */
+nav[data-testid="bottom-navigation-bar"],
+[data-testid="bottom-navigation-bar"],
+.bottom-nav-dark-surface,
+[data-testid="bottom-nav-more-popover"] {
+  background-color: #171717 !important;
+  color: #f5f5f5 !important;
+}
+
+nav[data-testid="bottom-navigation-bar"],
+[data-testid="bottom-navigation-bar"],
+.bottom-nav-dark-surface {
+  border-top-left-radius: 1rem !important;
+  border-top-right-radius: 1rem !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}

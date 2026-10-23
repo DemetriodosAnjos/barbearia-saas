@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Barbearia SaaS - Network Egress Control & SSRF Firewall Ruleset",
+  "version": "1.0.0",
+  "updatedAt": "2026-09-29T14:38:00Z",
+  "environment": "production",
+  "compliance": [
+    "OWASP Top 10 A10:2021 - Server-Side Request Forgery (SSRF)",
+    "NIST SP 800-53 Rev. 5 SC-7 Boundary Protection",
+    "PCI-DSS v4.0 Requirement 1.3 - Network Traffic Inbound and Outbound Controls",
+    "AWS IMDSv2 Hop Limit Enforcement (RFC 3927)",
+    "CIS GCP Benchmark v2.0 - Egress Control & Private Google Access"
+  ],
+  "egressFirewallPolicies": [
+    {
+      "id": "EGRESS-RULE-001",
+      "name": "Block Cloud Metadata Service (AWS/GCP/Azure IMDS)",
+      "priority": 100,
+      "action": "DENY",
+      "direction": "EGRESS",
+      "protocol": "TCP",
+      "destinationRanges": [
+        "169.254.169.254/32",
+        "169.254.0.0/16"
+      ],
+      "destinationPorts": ["80", "443", "8080"],
+      "description": "Bloqueia categoricamente requisições de saída direcionadas ao IP de link-local de metadados de instâncias cloud.",
+      "mitigates": "Exfiltração de IAM Credentials, STS Session Tokens e Kubelet tokens."
+    },
+    {
+      "id": "EGRESS-RULE-002",
+      "name": "Block Loopback and Host Internal Traffic",
+      "priority": 110,
+      "action": "DENY",
+      "direction": "EGRESS",
+      "protocol": "ALL",
+      "destinationRanges": [
+        "127.0.0.0/8",
+        "0.0.0.0/8",
+        "::1/128"
+      ],
+      "description": "Impede conexões de saída voltando para o próprio host ou portas de depuração e microsserviços locais (ex: 6379 Redis, 5432 Postgres).",
+      "mitigates": "Acesso não autenticado a daemons locais e sockets UNIX expostos em TCP."
+    },
+    {
+      "id": "EGRESS-RULE-003",
+      "name": "Block Private Subnets (RFC 1918 & IPv6 ULA)",
+      "priority": 120,
+      "action": "DENY",
+      "direction": "EGRESS",
+      "protocol": "ALL",
+      "destinationRanges": [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "100.64.0.0/10",
+        "fc00::/7",
+        "fe80::/10"
+      ],
+      "description": "Bloqueia saída de contêineres de aplicação para sub-redes privadas internas que não possuam rota de peering explícita.",
+      "mitigates": "Varredura interna de portas da VPC, Pivoting e SSRF lateral."
+    },
+    {
+      "id": "EGRESS-RULE-004",
+      "name": "Allow Outbound HTTPS to Approved Payment & Messaging Gateways",
+      "priority": 200,
+      "action": "ALLOW",
+      "direction": "EGRESS",
+      "protocol": "TCP",
+      "destinationPorts": ["443"],
+      "allowlistDomains": [
+        "api.mercadopago.com",
+        "api.stripe.com",
+        "graph.facebook.com",
+        "api.whatsapp.com",
+        "*.supabase.co",
+        "api.resend.com",
+        "maps.googleapis.com"
+      ],
+      "description": "Permite tráfego de saída estritamente criptografado (TLS 1.3) para domínios essenciais das integrações de negócio.",
+      "enforcement": "DNS Firewall / SNI Inspection Proxy (Squid / Envoy / Cloudflare Gateway)"
+    },
+    {
+      "id": "EGRESS-RULE-005",
+      "name": "Default Deny Outbound Traffic",
+      "priority": 65535,
+      "action": "DENY",
+      "direction": "EGRESS",
+      "protocol": "ALL",
+      "destinationRanges": ["0.0.0.0/0", "::/0"],
+      "description": "Regra padrão de negação para qualquer tráfego de saída que não cumpra a allowlist explícita."
+    }
+  ],
+  "nodeJsRuntimeEgressControls": {
+    "module": "src/security/ssrfProtectionEngine.ts",
+    "wrapperFunction": "safeFetch(url, options)",
+    "allowedProtocols": ["https:"],
+    "maxRedirects": 3,
+    "timeoutMs": 5000,
+    "enforceStrictAllowlist": true
+  }
+}

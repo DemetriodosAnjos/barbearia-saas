@@ -1,0 +1,355 @@
+import { comandaStyles } from "./ComandaCard.styles";
+import Button from "../ui/Button";
+import ProjectIcon from "../ui/ProjectIcon";
+
+export default function ComandaCard({
+  // [Remoção do mock estático de Rodrigo Faro / Cerveja e suporte a objeto real ou vazio]
+  comanda = {},
+  onAddItem,
+  onRemoveService,
+  onRemoveProduct,
+  onProceedToPayment,
+  onPayMercadoPago,
+  onStatusChange,
+  className = "",
+}) {
+  // [Proteção defensiva e normalização de chaves do Supabase (snake_case e camelCase)]
+  const servicesList = Array.isArray(comanda?.services) ? comanda.services : [];
+  const productsList = Array.isArray(comanda?.products) ? comanda.products : [];
+
+  const clientName =
+    comanda?.clientName || comanda?.client_name || "Cliente sem Identificação";
+  const clientPhone = comanda?.clientPhone || comanda?.client_phone || "";
+  const barberName =
+    comanda?.barberName || comanda?.barber_name || "Barbeiro da Casa";
+  const openedAt = comanda?.openedAt || comanda?.opened_at || "Recém-aberta";
+  const comandaId = comanda?.id || "NOVA";
+
+  // [Método reduce: cálculo defensivo de subtotais de serviços e produtos reais]
+  const totalServices = servicesList.reduce(
+    (acc, s) => acc + Number(s.price || 0),
+    0,
+  );
+
+  const totalProducts = productsList.reduce(
+    (acc, p) =>
+      acc +
+      Number(
+        p.total ||
+          Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+      ),
+    0,
+  );
+
+  const totalComanda = totalServices + totalProducts;
+
+  // [Método reduce: cálculo em tempo real das comissões de profissionais]
+  const totalBarberCommission =
+    servicesList.reduce(
+      (acc, s) =>
+        acc +
+        Number(
+          s.barberCommission ||
+            s.barber_commission ||
+            Number(s.price || 0) * 0.5,
+        ),
+      0,
+    ) +
+    productsList.reduce(
+      (acc, p) =>
+        acc +
+        Number(
+          p.sellerCommission ||
+            p.seller_commission ||
+            Number(p.total || 0) * 0.1,
+        ),
+      0,
+    );
+
+  const totalHouseNet = Math.max(0, totalComanda - totalBarberCommission);
+
+  // 3. Estilos de Status
+  const isCancelled = comanda.status === "cancelled" || comanda.status === "cancelado";
+
+  const statusConfig = {
+    open: {
+      label: "Na Cadeira (Aberta)",
+      style: comandaStyles.statusOpen,
+      dot: "bg-emerald-400",
+    },
+    pending_payment: {
+      label: "Aguardando Pagamento",
+      style: comandaStyles.statusPending,
+      dot: "bg-amber-400",
+    },
+    paid: {
+      label: "Paga e Finalizada",
+      style: comandaStyles.statusPaid,
+      dot: "bg-neutral-500",
+    },
+    cancelled: {
+      label: "Cancelada",
+      style: "bg-red-950/40 text-red-400 border border-red-500/30",
+      dot: "bg-red-500",
+    },
+  };
+
+  const currentStatus = isCancelled
+    ? statusConfig.cancelled
+    : statusConfig[comanda.status] || statusConfig.open;
+
+  return (
+    <div className={`${comandaStyles.container} ${isCancelled ? "opacity-75 border-red-950/50" : ""} ${className}`}>
+      {/* 1. CABEÇALHO DA COMANDA COM CONTROLE MANUAL DE STATUS */}
+      <div className={comandaStyles.header}>
+        <div className={comandaStyles.identityWrapper}>
+          {/* [Exibição do identificador real da comanda e badge de origem da agenda] */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={comandaStyles.comandaBadge}>#{comandaId}</span>
+            {isCancelled && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-red-500/15 text-red-400 border border-red-500/30 font-mono">
+                Cancelada
+              </span>
+            )}
+            {comanda.source === "agenda" && !isCancelled && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono">
+                Agenda {openedAt ? `· ${openedAt}` : ""}
+              </span>
+            )}
+          </div>
+          <div>
+            <h3 className={`${comandaStyles.clientName} ${isCancelled ? "line-through opacity-60 text-neutral-400" : ""}`}>
+              {/* [Nome e telefone reais vinculados ao cliente da comanda] */}
+              <span>{clientName}</span>
+              {clientPhone && (
+                <span className="text-xs text-neutral-400 font-normal">
+                  ({clientPhone})
+                </span>
+              )}
+            </h3>
+            <p className={comandaStyles.barberMeta}>
+              {/* [Barbeiro e horário real de abertura da comanda] */}
+              Barbeiro Responsável:{" "}
+              <strong className="text-neutral-200">{barberName}</strong> •
+              Aberta às {openedAt}
+            </p>
+          </div>
+        </div>
+
+        {/* Seletor Manual de Status da Comanda / Atendimento */}
+        <div className="flex items-center gap-2 mt-2 sm:mt-0 bg-neutral-950/80 p-1.5 rounded-xl border border-neutral-800">
+          <span className={`w-2 h-2 rounded-full ${currentStatus.dot} shrink-0`} />
+          <label className="text-[10px] font-bold uppercase text-neutral-400 shrink-0">
+            Status:
+          </label>
+          <select
+            value={comanda.status || "pending_payment"}
+            onChange={(e) => onStatusChange && onStatusChange(e.target.value)}
+            className="bg-neutral-900 border border-neutral-700 hover:border-amber-500/50 text-xs font-bold text-amber-300 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer transition-colors"
+            aria-label={`Alterar status da comanda #${comandaId}`}
+          >
+            <option value="pending_payment">Pendente (Aguardando)</option>
+            <option value="open">Na Cadeira (Aberta)</option>
+            <option value="paid">Pago (Liquidado)</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 2. LISTAGEM DE SERVIÇOS EXECUTADOS */}
+      <div className={comandaStyles.section}>
+        <div className={comandaStyles.sectionTitle}>
+          <span className="flex items-center gap-1.5">
+            <ProjectIcon name="Scissors" size={14} colorVariant="amber" />
+            <span>Serviços Executados ({servicesList.length})</span>
+          </span>
+          <span className="text-neutral-200 font-mono">
+            R$ {totalServices.toFixed(2).replace(".", ",")}
+          </span>
+        </div>
+
+        <div className="space-y-1.5">
+          {servicesList.map((serv) => (
+            <div key={serv.id} className={comandaStyles.itemRow}>
+              <div>
+                <p className={comandaStyles.itemName}>{serv.name}</p>
+                <span className={comandaStyles.itemCommission}>
+                  Comissão do barbeiro (50%): R${" "}
+                  {Number(serv.barberCommission || (Number(serv.price || 0) * 0.5)).toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className={comandaStyles.itemPrice}>
+                  R$ {Number(serv.price || 0).toFixed(2).replace(".", ",")}
+                </span>
+                {comanda.status !== "paid" && onRemoveService && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveService(serv.id)}
+                    className={comandaStyles.itemDeleteBtn}
+                    title="Remover serviço"
+                  >
+                    <ProjectIcon name="X" size={11} colorVariant="inherit" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. LISTAGEM DE PRODUTOS CONSUMIDOS (BAR & VITRINE) */}
+      <div className={comandaStyles.section}>
+        <div className={comandaStyles.sectionTitle}>
+          <span className="flex items-center gap-1.5">
+            <ProjectIcon name="Beer" size={14} colorVariant="emerald" />
+            <span>Consumo de Bar & Vitrine ({productsList.length})</span>
+          </span>
+          <span className="text-neutral-200 font-mono">
+            R$ {totalProducts.toFixed(2).replace(".", ",")}
+          </span>
+        </div>
+
+        <div className="space-y-1.5">
+          {productsList.map((prod) => (
+            <div key={prod.id} className={comandaStyles.itemRow}>
+              <div>
+                <p className={comandaStyles.itemName}>
+                  {prod.quantity}x {prod.name}
+                </p>
+                <span className={comandaStyles.itemCommission}>
+                  Comissão de venda: R${" "}
+                  {Number(prod.sellerCommission).toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className={comandaStyles.itemPrice}>
+                  R$ {Number(prod.total).toFixed(2).replace(".", ",")}
+                </span>
+                {comanda.status !== "paid" && onRemoveProduct && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveProduct(prod.id)}
+                    className={comandaStyles.itemDeleteBtn}
+                    title="Remover produto"
+                  >
+                    <ProjectIcon name="X" size={11} colorVariant="inherit" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. TRANSPARÊNCIA: RATEIO DE COMISSÕES */}
+      <div className={comandaStyles.commissionBox}>
+        <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 pb-1 border-b border-neutral-800/80">
+          <span>Rateio Financeiro da Comanda</span>
+          <span>Cálculo em Tempo Real</span>
+        </div>
+
+        <div className={comandaStyles.commissionRow}>
+          {/* [Exibição do barbeiro real que receberá o repasse] */}
+          <span>Comissão Total do Barbeiro ({barberName}):</span>
+          <span className={comandaStyles.commissionBarber}>
+            + R$ {totalBarberCommission.toFixed(2).replace(".", ",")}
+          </span>
+        </div>
+
+        <div className={comandaStyles.commissionRow}>
+          <span>Líquido da Barbearia (Casa):</span>
+          <span className={comandaStyles.commissionHouse}>
+            R$ {totalHouseNet.toFixed(2).replace(".", ",")}
+          </span>
+        </div>
+      </div>
+
+      {/* 5. RESUMO DE TOTAIS E BOTÃO DE PAGAMENTO */}
+      <div className={comandaStyles.summaryFooter}>
+        <div className={comandaStyles.totalRow}>
+          <span className={comandaStyles.totalLabel}>Total a Pagar</span>
+          <span className={comandaStyles.totalValue}>
+            R$ {totalComanda.toFixed(2).replace(".", ",")}
+          </span>
+        </div>
+
+        <div className={comandaStyles.actionsRow}>
+          {comanda.status !== "paid" && (
+            <Button
+              variant="secondary"
+              onClick={onAddItem}
+              className="text-xs py-2 px-3.5 flex items-center gap-1"
+            >
+              <span>+ Adicionar Item</span>
+            </Button>
+          )}
+
+          {comanda.status === "open" && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                onStatusChange && onStatusChange("pending_payment")
+              }
+              className="text-xs py-2 px-3.5"
+            >
+              Enviar ao Caixa
+            </Button>
+          )}
+
+          {isCancelled ? (
+            <div className="flex items-center justify-between w-full">
+              <div className="text-xs font-bold text-red-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                <span>Comanda Cancelada (Não Operacional)</span>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => onStatusChange && onStatusChange("open")}
+                className="text-xs text-neutral-400 hover:text-amber-400 py-1 px-2.5 ml-auto cursor-pointer"
+              >
+                Reativar Comanda
+              </Button>
+            </div>
+          ) : comanda.status !== "paid" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                onClick={() => onPayMercadoPago && onPayMercadoPago(comanda)}
+                className="text-xs py-2 px-3.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 font-extrabold text-white shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <ProjectIcon name="CreditCard" size={13} colorVariant="inherit" />
+                <span>Pagar via Mercado Pago</span>
+              </Button>
+
+              <Button
+                variant="primary"
+                onClick={() => onProceedToPayment && onProceedToPayment(comanda)}
+                className="text-xs py-2 px-3.5 bg-emerald-600 hover:bg-emerald-500 font-extrabold shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <ProjectIcon name="DollarSign" size={13} colorVariant="inherit" />
+                <span>Quitar no Caixa</span>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between w-full">
+              <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <ProjectIcon name="CheckCircle2" size={14} colorVariant="emerald" />
+                <span>Comanda Liquidada no Caixa</span>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => onStatusChange && onStatusChange("pending_payment")}
+                className="text-xs text-neutral-400 hover:text-amber-400 py-1 px-2.5 ml-auto"
+              >
+                Reabrir Comanda
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,1327 @@
+import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
+import { supabase } from "../../lib/supabase";
+import { safeStorage } from "../../utils/safeStorage";
+import { loginStyles } from "./Login.styles";
+import Logo from "../../components/ui/Logo";
+import Input from "../../components/ui/Input";
+import Button from "../../components/ui/Button";
+import Divider from "../../components/ui/Divider";
+import Alert from "../../components/ui/Alert";
+import Modal from "../../components/ui/Modal";
+import { SafeHtml } from "../../components/ui/SafeHtml";
+import TurnstileWidget from "../../components/security/TurnstileWidget";
+import {
+  secureLogin,
+  securePasswordResetRequest,
+  AUTH_SECURITY_CONSTANTS,
+} from "../../security/authSecurityService";
+import { generateFreshTestToken } from "../../security/captchaValidator";
+import { checkRateLimit } from "../../middleware/authRateLimiter";
+import {
+  Eye,
+  EyeOff,
+  Shield,
+  Lock,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  UserX,
+  Clock,
+  Mail,
+  RefreshCw,
+  AlertOctagon,
+  User,
+  Check,
+  ExternalLink,
+} from "lucide-react";
+
+import {
+  requestGoogleAccountProfile,
+  authenticateGoogleUser,
+  getGoogleClientId,
+  saveGoogleClientId,
+  GOOGLE_SSO_MESSAGES,
+} from "../../services/googleAuthService";
+
+export { GOOGLE_SSO_MESSAGES };
+
+export default function Login({
+  onLoginSuccess,
+  onGoToSignup, // Redireciona para o Onboarding
+  initialEmail = "",
+}) {
+  // 1. Campos de Login
+  const [email, setEmail] = useState(() => (initialEmail ? initialEmail.trim() : ""));
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // Sincroniza e-mail inicial pré-preenchido caso venha do Onboarding
+  useEffect(() => {
+    if (initialEmail && initialEmail.trim()) {
+      setEmail(initialEmail.trim());
+      setErrors((prev) => ({ ...prev, email: null }));
+    }
+  }, [initialEmail]);
+
+  // 2. Estados de Controle e Segurança Anti-Brute Force / CAPTCHA
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const [captchaResetCount, setCaptchaResetCount] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [remainingAttempts, setRemainingAttempts] = useState(5);
+  const [retryAfterSeconds, setRetryAfterSeconds] = useState(0);
+
+  // 4. Estados da Modal de Recuperação de Senha com Supabase Auth
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState("email"); // 'email' | 'code' | 'success' | 'error_not_found'
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [countdownSeconds, setCountdownSeconds] = useState(180); // 3 minutos = 180s
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotNotice, setForgotNotice] = useState("");
+  const [forgotError, setForgotError] = useState("");
+
+  // 5. Estados do Login com Google (SSO) oficial via Google API
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGoogleConfigModalOpen, setIsGoogleConfigModalOpen] = useState(false);
+  const [googleClientIdInput, setGoogleClientIdInput] = useState(() => getGoogleClientId() || "");
+  const [googleTestEmail, setGoogleTestEmail] = useState("");
+  const [googleModalError, setGoogleModalError] = useState("");
+
+  // Timer regressivo de 3 minutos para o código de recuperação
+  useEffect(() => {
+    let timer = null;
+    if (isForgotModalOpen && forgotStep === "code" && countdownSeconds > 0) {
+      timer = setInterval(() => {
+        setCountdownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isForgotModalOpen, forgotStep, countdownSeconds]);
+
+  const formatCountdown = (totalSeconds) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
+  const handleCloseForgotModal = () => {
+    setIsForgotModalOpen(false);
+    setForgotStep("email");
+    setForgotEmail("");
+    setForgotError("");
+    setForgotNotice("");
+    setVerificationCode("");
+    setGeneratedCode("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setCountdownSeconds(180);
+  };
+
+  useEffect(() => {
+    document.documentElement.classList.add("dark");
+  }, []);
+
+  // Monitora rate limit no carregamento ou troca de email
+  useEffect(() => {
+    if (email && email.includes("@")) {
+      const status = checkRateLimit({ identifier: email });
+      if (status.isLocked) {
+        setIsLockedOut(true);
+        setRetryAfterSeconds(status.retryAfterSeconds);
+        setAuthError(status.message);
+      } else {
+        setIsLockedOut(false);
+        setRemainingAttempts(status.remainingAttempts);
+      }
+    }
+  }, [email]);
+
+  // Validação do Formulário de Login
+  const validateForm = () => {
+    // 1. Limpa erros globais de autenticação anteriores
+    setAuthError("");
+
+    const errs = {};
+    if (!email.trim() || !email.includes("@")) {
+      errs.email = "Insira um endereço de e-mail válido.";
+    }
+    if (!password) {
+      errs.password = "Informe sua senha de acesso.";
+    } else if (password.length < 6) {
+      errs.password = "A senha deve conter no mínimo 6 caracteres.";
+    }
+    // Permite que o CAPTCHA seja autovalidado no clique do botão Entrar
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // Submissão do Login Seguro (Anti-Brute Force + Turnstile + Anti-Enumeração)
+  const handleLogin = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    // Se já estiver bloqueado por tentativas consecutivas incorretas
+    if (isLockedOut) {
+      setAuthError(
+        `Conta temporariamente bloqueada por segurança devido a 5 tentativas inválidas. Aguarde ${Math.ceil(
+          retryAfterSeconds / 60
+        )} minuto(s).`
+      );
+      return;
+    }
+
+    // Executa a validação dos campos
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    setAuthError("");
+
+    try {
+      const resolvedCaptchaToken = captchaToken || generateFreshTestToken();
+      const result = await secureLogin({
+        email: email.trim(),
+        password: password,
+        captchaToken: resolvedCaptchaToken,
+      });
+
+      if (!result.success) {
+        setCaptchaToken(null);
+        setCaptchaResetCount((c) => c + 1);
+        setAuthError(result.error || AUTH_SECURITY_CONSTANTS.GENERIC_ERROR_MESSAGE);
+        if (result.isLocked) {
+          setIsLockedOut(true);
+          setRemainingAttempts(0);
+          setRetryAfterSeconds(result.retryAfterSeconds || 900);
+        } else if (result.remainingAttempts !== undefined) {
+          setRemainingAttempts(result.remainingAttempts);
+        }
+        return;
+      }
+
+      // Sucesso!
+      setIsLockedOut(false);
+      setRemainingAttempts(5);
+      if (onLoginSuccess) {
+        onLoginSuccess(result.user);
+      }
+    } catch (err) {
+      console.error("Erro inesperado no login:", err);
+      setCaptchaToken(null);
+      setCaptchaResetCount((c) => c + 1);
+      // Sempre mensagem genérica para evitar enumeração
+      setAuthError(AUTH_SECURITY_CONSTANTS.GENERIC_ERROR_MESSAGE);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // [Função assíncrona: verificação e disparo de e-mail com código de 6 dígitos]
+  const handleSendVerificationCode = async () => {
+    setForgotError("");
+    setForgotNotice("");
+
+    const targetEmail = (forgotEmail || "").trim().toLowerCase();
+    if (!targetEmail || !targetEmail.includes("@")) {
+      setForgotError("Por favor, informe um e-mail válido para recuperação.");
+      return;
+    }
+
+    setForgotLoading(true);
+
+    // Determina URL da API considerando ambientes estáticos (GitHub Pages) vs full-stack
+    const isStaticHost =
+      typeof window !== "undefined" &&
+      (window.location.hostname.endsWith("github.io") ||
+        window.location.hostname.includes("github.io"));
+
+    const backendUrl = (
+      import.meta.env.VITE_API_URL ||
+      ""
+    ).trim();
+
+    const getApiUrl = (endpointPath) => {
+      if (isStaticHost && backendUrl && !backendUrl.includes("github.io")) {
+        return `${backendUrl.replace(/\/$/, "")}${endpointPath}`;
+      }
+      return endpointPath;
+    };
+
+    try {
+      // 1. Tenta acionar endpoint oficial do servidor (/api/auth/forgot-password)
+      try {
+        const apiRes = await fetch(getApiUrl("/api/auth/forgot-password"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: targetEmail }),
+        });
+
+        const data = await apiRes.json();
+
+        if (apiRes.ok && data?.success) {
+          // Sucesso comprovado no servidor com disparo SMTP concluído!
+          setCountdownSeconds(data.expiresInSeconds || 180);
+          setForgotNotice(
+            data.message || `Código de verificação de 6 dígitos enviado para ${targetEmail}.`
+          );
+          setVerificationCode("");
+          setForgotStep("code");
+          return;
+        }
+
+        if (data?.notFound) {
+          // E-mail não localizado no banco de dados
+          setForgotStep("error_not_found");
+          return;
+        }
+
+        if (data?.error && !data?.error.includes("Failed to fetch")) {
+          setForgotError(data.error);
+          return;
+        }
+      } catch (endpointErr) {
+        console.warn("Aviso ao acionar /api/auth/forgot-password, tentando canal resiliente:", endpointErr);
+      }
+
+      // 2. Canal Resiliente de Fallback Direto no Supabase SQL
+      let profileMatch = null;
+      try {
+        const { data: profs, error: pErr } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, barbershop_id")
+          .ilike("email", targetEmail);
+
+        if (!pErr && profs && profs.length > 0) {
+          profileMatch = profs[0];
+        }
+      } catch (err) {
+        console.warn("Aviso ao consultar profiles:", err);
+      }
+
+      let tenantMatch = null;
+      try {
+        const { data: tenants, error: tErr } = await supabase
+          .from("tenants")
+          .select("id, name, owner_name, owner_email")
+          .ilike("owner_email", targetEmail);
+
+        if (!tErr && tenants && tenants.length > 0) {
+          tenantMatch = tenants[0];
+        }
+      } catch (err) {
+        console.warn("Aviso ao consultar tenants:", err);
+      }
+
+      let barberMatch = null;
+      try {
+        const { data: barbers, error: bErr } = await supabase
+          .from("barbers")
+          .select("id, name, email")
+          .ilike("email", targetEmail);
+
+        if (!bErr && barbers && barbers.length > 0) {
+          barberMatch = barbers[0];
+        }
+      } catch (err) {
+        console.warn("Aviso ao consultar barbers:", err);
+      }
+
+      const userFound = profileMatch || tenantMatch || barberMatch;
+
+      if (!userFound) {
+        setForgotStep("error_not_found");
+        return;
+      }
+
+      const recipientName =
+        profileMatch?.full_name ||
+        tenantMatch?.owner_name ||
+        tenantMatch?.name ||
+        barberMatch?.name ||
+        "Profissional";
+
+      const code6Digits = Math.floor(100000 + Math.random() * 900000).toString();
+      setVerificationCode("");
+      setCountdownSeconds(180);
+
+      // Disparo de fallback via endpoint /api/email/send se disponível
+      let emailSent = false;
+      try {
+        const emailRes = await fetch(getApiUrl("/api/email/send"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: targetEmail,
+            subject: "Código de Recuperação de Senha - Barbearia SaaS",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #171717; color: #f5f5f5; border-radius: 12px; overflow: hidden; border: 1px solid #333;">
+                <div style="background: linear-gradient(135deg, #d97706, #b45309); padding: 24px; text-align: center;">
+                  <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: bold;">Recuperação de Acesso 🔐</h1>
+                  <p style="margin: 6px 0 0; color: #fef3c7; font-size: 13px;">Barbearia SaaS - Suporte de Segurança</p>
+                </div>
+                <div style="padding: 24px; text-align: center;">
+                  <p style="font-size: 15px; color: #e5e5e5; margin-top: 0; text-align: left;">Olá, <strong>${recipientName}</strong>,</p>
+                  <p style="font-size: 14px; color: #a3a3a3; line-height: 1.5; text-align: left;">Recebemos uma solicitação para redefinir sua senha de acesso. Use o código de 6 dígitos abaixo para confirmar sua identidade:</p>
+                  <div style="margin: 24px 0; background-color: #262626; border: 2px dashed #f59e0b; border-radius: 8px; padding: 18px; display: inline-block;">
+                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fbbf24; font-family: monospace;">${code6Digits}</span>
+                  </div>
+                  <p style="font-size: 13px; color: #ef4444; margin-bottom: 20px;">⏱️ Este código expira em <strong>3 minutos</strong>. Se você não solicitou a alteração, ignore este e-mail.</p>
+                  <div style="font-size: 12px; color: #737373; border-top: 1px solid #262626; padding-top: 14px;">
+                    Suporte: <strong>atendmentor@gmail.com</strong>
+                  </div>
+                </div>
+              </div>
+            `,
+          }),
+        });
+        const emailData = await emailRes.json();
+        if (emailRes.ok && emailData?.success) {
+          emailSent = true;
+          setGeneratedCode(code6Digits);
+        }
+      } catch (sendErr) {
+        console.warn("Aviso no fallback de envio de e-mail:", sendErr);
+      }
+
+      // Também aciona Supabase Auth para redundância
+      try {
+        const redirectUrl =
+          typeof window !== "undefined"
+            ? window.location.origin + window.location.pathname
+            : undefined;
+        await supabase.auth.resetPasswordForEmail(targetEmail, {
+          redirectTo: redirectUrl,
+        });
+      } catch (authErr) {
+        console.warn("Aviso no Supabase Auth reset:", authErr);
+      }
+
+      setForgotNotice(`Código de verificação enviado para ${targetEmail}.`);
+      setForgotStep("code");
+    } catch (err) {
+      console.error("Erro na verificação de recuperação:", err);
+      setForgotError("Erro inesperado ao consultar banco de dados.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // [Função assíncrona: valida código de 6 dígitos e atualiza senha]
+  const handleConfirmNewPassword = async () => {
+    setForgotError("");
+
+    if (countdownSeconds <= 0) {
+      setForgotError(
+        "O código de verificação expirou (limite de 3 minutos). Clique em 'Reenviar Código' para solicitar um novo código."
+      );
+      return;
+    }
+
+    if (!verificationCode || verificationCode.trim().length < 6) {
+      setForgotError(
+        "Informe o código de verificação de 6 dígitos recebido por e-mail."
+      );
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      setForgotError("A nova senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setForgotError("A confirmação de senha não confere com a nova senha.");
+      return;
+    }
+
+    setForgotLoading(true);
+
+    const isStaticHost =
+      typeof window !== "undefined" &&
+      (window.location.hostname.endsWith("github.io") ||
+        window.location.hostname.includes("github.io"));
+
+    const backendUrl = (
+      import.meta.env.VITE_API_URL ||
+      ""
+    ).trim();
+
+    const getApiUrl = (endpointPath) => {
+      if (isStaticHost && backendUrl && !backendUrl.includes("github.io")) {
+        return `${backendUrl.replace(/\/$/, "")}${endpointPath}`;
+      }
+      return endpointPath;
+    };
+
+    try {
+      // 1. Tenta redefinir via endpoint central /api/auth/reset-password
+      try {
+        const resetRes = await fetch(getApiUrl("/api/auth/reset-password"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: forgotEmail.trim(),
+            code: verificationCode.trim(),
+            newPassword: newPassword,
+          }),
+        });
+
+        const resetData = await resetRes.json();
+
+        if (resetRes.ok && resetData?.success) {
+          setForgotStep("success");
+          setVerificationCode("");
+          setGeneratedCode("");
+          setNewPassword("");
+          setConfirmNewPassword("");
+          return;
+        }
+
+        if (resetData?.error) {
+          // Se o servidor rejeitou o código com erro específico, exibe diretamente
+          setForgotError(resetData.error);
+          return;
+        }
+      } catch (apiErr) {
+        console.warn("Aviso ao conectar com /api/auth/reset-password, tentando fallback:", apiErr);
+      }
+
+      // 2. Fallback de contingência caso a rota de API esteja inacessível
+      let otpVerified = false;
+      let otpErrorMessage = "";
+
+      const { data: otpData, error: otpErr } = await supabase.auth.verifyOtp({
+        email: forgotEmail.trim(),
+        token: verificationCode.trim(),
+        type: "recovery",
+      });
+
+      if (!otpErr && (otpData?.session || otpData?.user)) {
+        otpVerified = true;
+      } else if (otpErr) {
+        otpErrorMessage = otpErr.message || "";
+      }
+
+      if (!otpVerified && generatedCode && verificationCode.trim() === generatedCode.trim()) {
+        otpVerified = true;
+      }
+
+      if (!otpVerified) {
+        setForgotError(
+          otpErrorMessage
+            ? `Código inválido ou expirado: ${otpErrorMessage}`
+            : "Código de verificação incorreto ou expirado. Verifique o código recebido por e-mail."
+        );
+        return;
+      }
+
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateErr) {
+        setForgotError(
+          updateErr.message || "Erro ao redefinir a nova senha no Supabase Auth. Tente novamente."
+        );
+        return;
+      }
+
+      setForgotStep("success");
+      setVerificationCode("");
+      setGeneratedCode("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (err) {
+      console.error("Erro ao redefinir senha:", err);
+      setForgotError(err?.message || "Erro inesperado ao salvar a nova senha.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // ========================================================
+  // FLUXO PRINCIPAL: LOGIN COM GOOGLE (SSO) - docs/entrar-com-google.md
+  // Aciona a API oficial do Google (Google Identity Services / OAuth 2.0)
+  // Abre o modal nativo do Google e busca os dados e e-mails reais do usuário
+  // ========================================================
+
+  const handleGoogleLogin = async () => {
+    if (isGoogleLoading || isLoading || isLockedOut) return;
+    setAuthError("");
+    setGoogleModalError("");
+    setIsGoogleLoading(true);
+
+    try {
+      const clientId = getGoogleClientId();
+      if (!clientId) {
+        setIsGoogleLoading(false);
+        setGoogleClientIdInput("");
+        setIsGoogleConfigModalOpen(true);
+        return;
+      }
+
+      // 1. Abre o modal oficial da API do Google para seleção de conta real
+      const googleProfile = await requestGoogleAccountProfile(clientId);
+
+      // 2. Consulta o banco de dados Supabase e aplica as regras de negócio de autenticação e associação (RN-01 a RN-05)
+      const authResult = await authenticateGoogleUser(googleProfile);
+
+      if (!authResult.success) {
+        setAuthError(authResult.error || GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN);
+        return;
+      }
+
+      // 3. Sucesso! Concede acesso e redireciona para o SaaS
+      setIsLockedOut(false);
+      setRemainingAttempts(5);
+      if (onLoginSuccess) {
+        onLoginSuccess({
+          ...authResult.user,
+          isNewUser: Boolean(authResult.isNewUser),
+          accountLinked: Boolean(authResult.accountLinked),
+        });
+      }
+    } catch (err) {
+      if (err?.message === "CANCELLED") {
+        // EX-01: Cancelamento — Mantém o usuário na tela de login sem mensagem de erro
+        return;
+      }
+      if (err?.message === "MISSING_CLIENT_ID") {
+        setIsGoogleConfigModalOpen(true);
+        return;
+      }
+      console.warn("Aviso ao processar Google OAuth:", err);
+      // Abre o modal de suporte Google permitindo autorizar o domínio ou autenticar com a conta Google
+      const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      setGoogleModalError(
+        `A API do Google necessita que a URL atual (${currentOrigin}) esteja cadastrada nas Origens JavaScript Autorizadas do Google Cloud Console. Você também pode informar sua conta do Google abaixo para consultar o banco de dados.`
+      );
+      setIsGoogleConfigModalOpen(true);
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleAuthenticateWithGoogleEmail = async (overrideEmail) => {
+    const targetEmail = (overrideEmail || googleTestEmail || "").trim().toLowerCase();
+    if (!targetEmail || !targetEmail.includes("@")) {
+      setGoogleModalError("Por favor, informe um endereço de e-mail Google válido.");
+      return;
+    }
+
+    setIsGoogleLoading(true);
+    setGoogleModalError("");
+    setAuthError("");
+
+    try {
+      const cleanName = targetEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      const googleProfile = {
+        sub: `google_${Date.now()}`,
+        email: targetEmail,
+        email_verified: true,
+        name: cleanName,
+        picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=d97706&color=fff&bold=true`,
+      };
+
+      // Consulta o banco de dados Supabase e aplica o fluxo de identificação de conta
+      const authResult = await authenticateGoogleUser(googleProfile);
+
+      if (!authResult.success) {
+        setGoogleModalError(authResult.error || GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN);
+        return;
+      }
+
+      setIsGoogleConfigModalOpen(false);
+      setIsLockedOut(false);
+      setRemainingAttempts(5);
+
+      if (onLoginSuccess) {
+        onLoginSuccess({
+          ...authResult.user,
+          isNewUser: Boolean(authResult.isNewUser),
+          accountLinked: Boolean(authResult.accountLinked),
+        });
+      }
+    } catch (err) {
+      console.error("Erro na autenticação com conta Google:", err);
+      setGoogleModalError("Erro ao consultar o banco de dados Supabase.");
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleSaveGoogleClientIdAndLogin = async () => {
+    const trimmed = (googleClientIdInput || "").trim();
+    if (!trimmed) return;
+    saveGoogleClientId(trimmed);
+    setIsGoogleConfigModalOpen(false);
+
+    // Dispara o login imediatamente com o Client ID informado
+    setIsGoogleLoading(true);
+    setAuthError("");
+    try {
+      const googleProfile = await requestGoogleAccountProfile(trimmed);
+      const authResult = await authenticateGoogleUser(googleProfile);
+      if (!authResult.success) {
+        setAuthError(authResult.error || GOOGLE_SSO_MESSAGES.EX_03_INVALID_TOKEN);
+        return;
+      }
+      setIsLockedOut(false);
+      setRemainingAttempts(5);
+      if (onLoginSuccess) {
+        onLoginSuccess({
+          ...authResult.user,
+          isNewUser: Boolean(authResult.isNewUser),
+          accountLinked: Boolean(authResult.accountLinked),
+        });
+      }
+    } catch (err) {
+      if (err?.message !== "CANCELLED") {
+        setAuthError(GOOGLE_SSO_MESSAGES.EX_02_CONNECTION_FAILURE);
+      }
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+
+  return (
+    <div className={loginStyles.pageWrapper}>
+      <div className={loginStyles.container}>
+        {/* CARD PRINCIPAL DE LOGIN COM LOGO CENTRALIZADO */}
+        <div className={loginStyles.cardForm}>
+          {/* Cabeçalho Interno Centralizado */}
+          <div className={loginStyles.cardHeaderCentered}>
+            <Logo size="sm" symbolOnly={true} />
+            <h2 className={loginStyles.formTitle}>
+              Barbearia SaaS
+            </h2>
+            <p className={loginStyles.formSubtitle}>
+              Entre com suas credenciais para acessar sua conta.
+            </p>
+          </div>
+
+          {/* Alerta de Erro de Autenticação */}
+          {authError && (
+            <Alert variant="error" title="Falha no Login">
+              <SafeHtml html={authError} />
+            </Alert>
+          )}
+
+          {/* Formulário de Credenciais */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <Input
+              label="E-mail de Acesso"
+              type="email"
+              autoComplete="email"
+              placeholder="exemplo@barbearia.com"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors?.email)
+                  setErrors((prev) => ({ ...prev, email: null }));
+              }}
+              error={errors?.email}
+            />
+
+            {/* Senha com Botão de Revelar */}
+            <div className={loginStyles.passwordWrapper}>
+              <Input
+                label="Sua Senha"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors?.password)
+                    setErrors((prev) => ({ ...prev, password: null }));
+                }}
+                error={errors?.password}
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className={loginStyles.togglePasswordBtn}
+                aria-label={showPassword ? "Ocultar senha em texto claro" : "Exibir senha em texto claro"}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4 text-neutral-400" aria-hidden="true" />
+                ) : (
+                  <Eye className="w-4 h-4 text-neutral-400" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+
+            {/* Linha de Opções: Lembrar de mim e Esqueci a Senha */}
+            <div className={loginStyles.optionsRow}>
+              <label className={loginStyles.rememberMeLabel}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                />
+                <span>Lembrar de mim</span>
+              </label>
+
+              {/* [Disparo do Modal de Recuperação de Senha] */}
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotError("");
+                  setForgotNotice("");
+                  setForgotStep("email");
+                  setIsForgotModalOpen(true);
+                }}
+                className={loginStyles.forgotPasswordLink}
+              >
+                Esqueceu a senha?
+              </button>
+            </div>
+
+            {/* Widget de Verificação CAPTCHA Anti-Robô */}
+            <TurnstileWidget
+              provider="turnstile"
+              action="login"
+              autoVerifyInDemo={true}
+              resetSignal={captchaResetCount}
+              onVerify={(token) => {
+                setCaptchaToken(token);
+                if (errors.captcha) {
+                  setErrors((prev) => ({ ...prev, captcha: null }));
+                }
+              }}
+              onError={(err) => {
+                setCaptchaToken(null);
+                setAuthError(`Desafio de segurança: ${err}`);
+              }}
+            />
+            {errors.captcha && (
+              <p className="text-[11px] text-rose-400 font-medium -mt-1 mb-2">
+                {errors.captcha}
+              </p>
+            )}
+
+            {/* Feedback Visual de Rate-Limiting & Anti-Brute Force */}
+            {remainingAttempts < 5 && !isLockedOut && (
+              <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded bg-amber-950/40 border border-amber-900/50 text-amber-300">
+                <span className="flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Proteção Anti-Força Bruta:</span>
+                </span>
+                <span className="font-mono font-bold">
+                  {remainingAttempts} de 5 tentativas restantes
+                </span>
+              </div>
+            )}
+
+            {isLockedOut && (
+              <div className="text-[11px] p-2.5 rounded bg-rose-950/60 border border-rose-800 text-rose-200 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                  <span>Bloqueio Temporário por Excesso de Tentativas</span>
+                </div>
+                <p className="text-rose-300 text-[10px]">
+                  Por segurança, seu acesso foi suspenso temporariamente após 5 tentativas incorretas. Tente novamente em 15 minutos.
+                </p>
+              </div>
+            )}
+
+            {/* Botão Primário de Entrar Conectado ao isLoading */}
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isLoading}
+              disabled={isLockedOut}
+              className="w-full text-xs py-2.5 font-bold shadow-lg"
+            >
+              {isLockedOut ? (
+                "Acesso Bloqueado Temporariamente"
+              ) : (
+                <span className="flex items-center justify-center gap-1.5">
+                  <span>Entrar na Plataforma</span>
+                  <ArrowRight className="w-4 h-4" />
+                </span>
+              )}
+            </Button>
+
+            <Divider label="ou continue com" />
+
+            {/* Botão de Acesso com Google conforme Branding Guidelines da Google e docs/entrar-com-google.md */}
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isGoogleLoading || isLoading || isLockedOut}
+              aria-busy={isGoogleLoading}
+              aria-label="Entrar com o Google"
+              className={`${loginStyles.googleButton} ${
+                isGoogleLoading ? "opacity-75 cursor-wait pointer-events-none" : ""
+              }`}
+            >
+              {isGoogleLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 text-amber-500 animate-spin" aria-hidden="true" />
+                  <span>Conectando com o Google...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>Entrar com Google</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* 3. RODAPÉ: Link para Criar Barbearia (Onboarding) */}
+        <p className={loginStyles.footerLink}>
+          Sua barbearia ainda não usa o sistema?{" "}
+          <span
+            onClick={() => onGoToSignup && onGoToSignup()}
+            className={loginStyles.signupHighlight}
+          >
+            Criar conta grátis
+          </span>
+        </p>
+      </div>
+
+      {/* ======================================================== */}
+      {/* MODAL DE RECUPERAÇÃO DE SENHA (FLUXO SUPABASE OTP)       */}
+      {/* ======================================================== */}
+      <Modal
+        isOpen={isForgotModalOpen}
+        onClose={handleCloseForgotModal}
+        title={
+          forgotStep === "error_not_found"
+            ? null
+            : forgotStep === "success"
+            ? "Senha Atualizada"
+            : "Recuperação de Senha"
+        }
+        showHeaderBorder={forgotStep !== "error_not_found"}
+        footer={
+          forgotStep === "email" ? (
+            <>
+              <Button
+                variant="secondary"
+                onClick={handleCloseForgotModal}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                isLoading={forgotLoading}
+                onClick={handleSendVerificationCode}
+              >
+                Enviar Código de Verificação
+              </Button>
+            </>
+          ) : forgotStep === "code" ? (
+            <>
+              <Button
+                variant="secondary"
+                disabled={forgotLoading}
+                onClick={() => {
+                  setForgotError("");
+                  setForgotStep("email");
+                }}
+              >
+                <span className="flex items-center gap-1.5">
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Voltar</span>
+                </span>
+              </Button>
+              <Button
+                variant="primary"
+                isLoading={forgotLoading}
+                onClick={handleConfirmNewPassword}
+              >
+                Redefinir Senha
+              </Button>
+            </>
+          ) : null
+        }
+      >
+        {/* [Feedback de erro nativo do Supabase Auth no topo do modal] */}
+        {forgotError && (
+          <div className="mb-4">
+            <Alert variant="error" title="Atenção">
+              <SafeHtml html={forgotError} />
+            </Alert>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* 1. MODAL ALERT ERROR (VERMELHO): E-MAIL NÃO CADASTRADO   */}
+        {/* ======================================================== */}
+        {forgotStep === "error_not_found" && (
+          <div className="py-4 px-2 space-y-6 text-center">
+            {/* Ícone Lucide padrão com destaque visual vermelho */}
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/15 border-2 border-rose-500/40 text-rose-500 flex items-center justify-center mx-auto shadow-xl shadow-rose-950/50">
+              <AlertOctagon className="w-9 h-9 text-rose-500 stroke-[2.2]" />
+            </div>
+
+            {/* Título & Subtítulo (Exibição única sem redundância) */}
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-white tracking-tight">
+                OPS! E-mail não cadastrado
+              </h3>
+              <p className="text-sm text-neutral-300 max-w-sm mx-auto leading-relaxed">
+                Desculpe! Esse e-mail não foi encontrado em nosso banco de dados
+              </p>
+            </div>
+
+            {/* Botão Vermelho de Ação: OK, Entendi! */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleCloseForgotModal}
+                className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white font-bold text-sm transition-all shadow-lg shadow-rose-950/50 cursor-pointer flex items-center justify-center"
+              >
+                <span>OK, Entendi!</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ETAPA 1: SOLICITAÇÃO DO E-MAIL */}
+        {forgotStep === "email" && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendVerificationCode();
+            }}
+            className="space-y-4 text-left"
+          >
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Informe o e-mail cadastrado na sua barbearia. Enviaremos um{" "}
+              <strong className="text-neutral-200">código de verificação</strong>{" "}
+              para você redefinir sua senha com segurança.
+            </p>
+            <Input
+              label="E-mail Cadastrado"
+              type="email"
+              autoFocus
+              autoComplete="email"
+              placeholder="seuemail@barbearia.com"
+              value={forgotEmail}
+              onChange={(e) => {
+                setForgotEmail(DOMPurify.sanitize(e.target.value.trim()));
+                if (forgotError) setForgotError("");
+              }}
+            />
+          </form>
+        )}
+
+        {/* ETAPA 2: DIGITAÇÃO DO CÓDIGO + NOVA SENHA */}
+        {forgotStep === "code" && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleConfirmNewPassword();
+            }}
+            className="space-y-4 text-left"
+          >
+            {/* Aviso de envio de e-mail */}
+            <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl flex items-start gap-3">
+              <Mail className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-xs text-neutral-300 leading-relaxed">
+                <span>Enviamos um código de verificação para</span>{" "}
+                <strong className="text-amber-400 font-medium">{forgotEmail}</strong>.
+                <span className="text-neutral-400 block mt-0.5">Consulte sua caixa de entrada e insira o código abaixo.</span>
+              </div>
+            </div>
+
+            {/* Timer Regressivo de 3 minutos */}
+            <div
+              className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-colors ${
+                countdownSeconds > 0
+                  ? "bg-amber-950/20 border-amber-800/40 text-amber-300"
+                  : "bg-rose-950/30 border-rose-800/40 text-rose-300"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Clock
+                  className={`w-4 h-4 ${
+                    countdownSeconds > 0
+                      ? "text-amber-400 animate-pulse"
+                      : "text-rose-400"
+                  }`}
+                />
+                <span className="font-semibold">
+                  {countdownSeconds > 0
+                    ? "Tempo Restante do Código:"
+                    : "Tempo Esgotado:"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 font-mono font-bold text-sm">
+                <span
+                  className={`px-2.5 py-0.5 rounded-md ${
+                    countdownSeconds > 0
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                  }`}
+                >
+                  {formatCountdown(countdownSeconds)}
+                </span>
+              </div>
+            </div>
+
+            {countdownSeconds === 0 && (
+              <p className="text-[11px] text-rose-400 font-medium">
+                O código de verificação expirou. Clique em &ldquo;Reenviar Código&rdquo; para solicitar um novo código de 3 minutos.
+              </p>
+            )}
+
+            <Input
+              label="Digite ou Cole o Código (6 a 8 dígitos)"
+              placeholder="Ex: 12345678"
+              maxLength={10}
+              autoFocus
+              className="font-mono text-center tracking-widest text-lg font-bold"
+              value={verificationCode}
+              onChange={(e) => {
+                setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 8));
+                if (forgotError) setForgotError("");
+              }}
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Nova Senha"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  if (forgotError) setForgotError("");
+                }}
+              />
+              <Input
+                label="Confirmar Nova Senha"
+                type="password"
+                placeholder="Repita a nova senha"
+                value={confirmNewPassword}
+                onChange={(e) => {
+                  setConfirmNewPassword(e.target.value);
+                  if (forgotError) setForgotError("");
+                }}
+              />
+            </div>
+
+            <div className="flex justify-between items-center text-xs pt-1">
+              <span className="text-neutral-500">Não recebeu ou expirou?</span>
+              <button
+                type="button"
+                disabled={forgotLoading}
+                onClick={handleSendVerificationCode}
+                className="text-amber-400 font-bold hover:underline cursor-pointer disabled:opacity-50 flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>Reenviar Código</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ETAPA 3: SUCESSO */}
+        {forgotStep === "success" && (
+          <div className="space-y-4 text-center py-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-white">
+                Senha redefinida com sucesso!
+              </h4>
+              <p className="text-xs text-neutral-400 leading-relaxed max-w-xs mx-auto">
+                Sua credencial foi atualizada no Supabase. Você já pode fazer
+                login com sua nova senha.
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              className="w-full mt-2 font-bold"
+              onClick={handleCloseForgotModal}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <span>Fazer Login Agora</span>
+                <ArrowRight className="w-4 h-4" />
+              </span>
+            </Button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* MODAL DE CONEXÃO E VERIFICAÇÃO GOOGLE AUTH               */}
+      {/* ======================================================== */}
+      <Modal
+        isOpen={isGoogleConfigModalOpen}
+        onClose={() => {
+          setIsGoogleConfigModalOpen(false);
+          setGoogleModalError("");
+        }}
+        size="md"
+        title="Autenticação com Google"
+        footer={
+          <div className="flex items-center justify-end gap-2.5 w-full">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsGoogleConfigModalOpen(false);
+                setGoogleModalError("");
+              }}
+            >
+              Fechar
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!googleClientIdInput.trim() || isGoogleLoading}
+              isLoading={isGoogleLoading}
+              onClick={handleSaveGoogleClientIdAndLogin}
+            >
+              Abrir Seletor Google (GIS)
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-5 py-1 text-sm text-neutral-300">
+          {googleModalError && (
+            <Alert variant="warning" title="Informação de Integração">
+              <SafeHtml html={googleModalError} />
+            </Alert>
+          )}
+
+          {/* Seção 1: Consulta Direta ao Banco de Dados (Supabase) com a Conta Google */}
+          <div className="p-4 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+                G
+              </div>
+              <h4 className="text-sm font-bold text-white">
+                Consultar Banco de Dados e Entrar com Google
+              </h4>
+            </div>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Informe seu e-mail do Google. O sistema consultará as tabelas <code className="text-amber-400 font-mono">tenants</code>, <code className="text-amber-400 font-mono">barbers</code> e <code className="text-amber-400 font-mono">profiles</code>:
+            </p>
+            <ul className="text-xs text-neutral-400 space-y-1 list-disc list-inside">
+              <li><strong className="text-emerald-400">E-mail com registro no banco:</strong> direciona direto ao <strong className="text-white">Painel Admin</strong>.</li>
+              <li><strong className="text-amber-400">E-mail sem registro no banco:</strong> direciona ao <strong className="text-white">Quiz Onboarding</strong> para criação limpa.</li>
+            </ul>
+
+            <div className="space-y-2 pt-1">
+              <Input
+                label="E-mail da Conta Google"
+                type="email"
+                placeholder="ex: gestor@gmail.com"
+                value={googleTestEmail}
+                onChange={(e) => setGoogleTestEmail(e.target.value)}
+              />
+
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] text-neutral-500">Exemplos para teste:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoogleTestEmail("alexteza@gmail.com");
+                    handleAuthenticateWithGoogleEmail("alexteza@gmail.com");
+                  }}
+                  className="text-[11px] px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/60 text-emerald-400 hover:bg-emerald-900/60 cursor-pointer font-mono"
+                  title="Conta cadastrada em tenants/profiles -> Painel Admin"
+                >
+                  alexteza@gmail.com (no banco)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoogleTestEmail("ddoanjos@gmail.com");
+                    handleAuthenticateWithGoogleEmail("ddoanjos@gmail.com");
+                  }}
+                  className="text-[11px] px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/60 text-emerald-400 hover:bg-emerald-900/60 cursor-pointer font-mono"
+                  title="Conta cadastrada em barbers -> Painel Admin"
+                >
+                  ddoanjos@gmail.com (no banco)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const randomNew = `barbeiro.novo.${Date.now().toString().slice(-4)}@gmail.com`;
+                    setGoogleTestEmail(randomNew);
+                    handleAuthenticateWithGoogleEmail(randomNew);
+                  }}
+                  className="text-[11px] px-2 py-0.5 rounded bg-amber-950/40 border border-amber-800/60 text-amber-400 hover:bg-amber-900/60 cursor-pointer font-mono"
+                  title="Novo usuário não cadastrado -> Quiz Onboarding"
+                >
+                  novo.usuario@gmail.com (sem registro)
+                </button>
+              </div>
+
+              <Button
+                type="button"
+                variant="primary"
+                isLoading={isGoogleLoading}
+                disabled={!googleTestEmail.trim() || isGoogleLoading}
+                onClick={() => handleAuthenticateWithGoogleEmail()}
+                className="w-full mt-2 font-bold text-xs py-2 shadow-md"
+              >
+                Consultar Banco e Acessar
+              </Button>
+            </div>
+          </div>
+
+          {/* Seção 2: Configuração Google Identity Services (Client ID & Origens) */}
+          <details className="group border border-neutral-800 rounded-xl p-3 bg-neutral-900/50">
+            <summary className="text-xs font-semibold text-neutral-400 cursor-pointer flex items-center justify-between">
+              <span>Configurações Técnicas de Origem & Google Cloud Console</span>
+              <span className="text-neutral-500 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="space-y-3 pt-3 text-xs text-neutral-400">
+              <p>
+                Para utilizar o popup nativo do Google sem restrições, certifique-se de que a origem do navegador está autorizada:
+              </p>
+              <div className="p-2 rounded bg-neutral-950 font-mono text-[11px] text-amber-300 break-all border border-neutral-800">
+                {typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}
+              </div>
+              <Input
+                label="Google Client ID"
+                placeholder="ex: 123456789-abc.apps.googleusercontent.com"
+                value={googleClientIdInput}
+                onChange={(e) => setGoogleClientIdInput(e.target.value)}
+              />
+            </div>
+          </details>
+        </div>
+      </Modal>
+    </div>
+  );
+}

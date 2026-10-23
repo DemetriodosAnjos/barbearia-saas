@@ -1,0 +1,77 @@
+export const sidebarStyles = {
+  backdrop:
+    "fixed inset-x-0 bottom-0 bg-black/80 backdrop-blur-xs z-30 md:hidden transition-opacity duration-300",
+  backdropTrial: "top-[98px]",
+  backdropNormal: "top-[57px]",
+
+  drawer:
+    "fixed md:sticky left-0 z-40 md:z-30 bg-neutral-900 border-r border-neutral-800 flex flex-col shrink-0 select-none shadow-2xl md:shadow-none transition-all duration-300 ease-in-out",
+  drawerTrial:
+    "top-[98px] md:top-[41px] h-[calc(100vh-98px)] md:h-[calc(100vh-41px)] min-h-[calc(100vh-98px)] md:min-h-[calc(100vh-41px)] max-h-[calc(100vh-98px)] md:max-h-[calc(100vh-41px)]",
+  drawerNormal:
+    "top-[57px] md:top-0 h-[calc(100vh-57px)] md:h-screen min-h-[calc(100vh-57px)] md:min-h-screen max-h-[calc(100vh-57px)] md:max-h-screen",
+  drawerExpanded: "w-72 md:w-64",
+  drawerCollapsed: "w-72 md:w-20",
+  drawerOpen: "translate-x-0",
+  drawerClosed: "-translate-x-full md:translate-x-0",
+
+  header:
+    "p-4 border-b border-neutral-800/80 flex items-center justify-between shrink-0 transition-all",
+  headerCollapsed:
+    "p-3 border-b border-neutral-800/80 flex flex-col items-center justify-center shrink-0 gap-2 transition-all",
+  brandWrapper: "flex items-center gap-3 overflow-hidden min-w-0",
+  brandLogo:
+    "w-10 h-10 rounded-xl bg-[#059669] dark:bg-amber-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-emerald-950/20 dark:shadow-amber-900/40 shrink-0 cursor-pointer sidebar-brand-logo transition-transform hover:scale-105",
+  brandInfo: "flex flex-col text-left truncate min-w-0",
+  brandTitle:
+    "text-sm font-bold text-[#18181B] dark:text-neutral-100 tracking-tight leading-tight truncate sidebar-brand-title",
+  brandPlan:
+    "text-[11px] font-semibold text-[#059669] dark:text-amber-500 uppercase tracking-wider mt-0.5",
+  collapseButton:
+    "hidden md:flex text-white hover:text-white p-1.5 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors shrink-0 items-center justify-center",
+  closeMobileButton:
+    "md:hidden text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 cursor-pointer transition-colors",
+
+  nav: "flex-1 px-3 py-4 space-y-1.5 overflow-y-auto",
+  navCollapsed: "flex-1 px-2 py-4 space-y-2 overflow-y-auto flex flex-col items-center",
+
+  // Itens normais e itens-pai
+  navItem:
+    "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-amber-500/40",
+  navItemCollapsed:
+    "w-12 h-12 flex items-center justify-center rounded-xl transition-all duration-150 cursor-pointer focus:outline-none relative group",
+  navItemActive:
+    "bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold shadow-xs",
+  navItemInactive:
+    "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800/60 border border-transparent",
+
+  navItemIcon: "w-5 h-5 shrink-0 flex items-center justify-center dark:text-amber-500 transition-colors",
+  navItemLabel: "flex-1 truncate",
+  navItemBadge:
+    "text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-600 text-white shadow-xs",
+
+  // Estilos para submenus
+  chevronIcon:
+    "w-4 h-4 text-neutral-500 transition-transform duration-200 shrink-0",
+  chevronExpanded: "rotate-180 text-amber-400",
+
+  // Lista com recuo à esquerda e linha divisória sutil
+  submenuList:
+    "pl-6 pr-1 py-1 space-y-1 border-l-2 border-neutral-800/80 ml-5 my-1 animate-in fade-in duration-150",
+  subItem:
+    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer text-left focus:outline-none",
+  subItemActive: "bg-amber-500/15 text-amber-400 font-bold",
+  subItemInactive:
+    "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50",
+
+  footer:
+    "p-3.5 border-t border-neutral-800/80 mt-auto flex items-center justify-between bg-neutral-900/60 shrink-0",
+  footerCollapsed:
+    "p-3 border-t border-neutral-800/80 mt-auto flex flex-col items-center justify-center gap-2 bg-neutral-900/60 shrink-0",
+  userWrapper: "flex items-center gap-3 text-left overflow-hidden min-w-0",
+  userInfo: "flex flex-col truncate min-w-0",
+  userName: "text-xs font-semibold text-neutral-200 truncate",
+  userVersion: "text-[11px] font-mono font-bold text-[#059669] dark:text-[#ffffff] truncate mt-0.5",
+  logoutButton:
+    "text-neutral-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-neutral-800/80 transition-colors cursor-pointer shrink-0",
+};

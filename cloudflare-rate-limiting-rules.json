@@ -1,0 +1,100 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/cloudflare-docs/production/src/rulesets/schemas/rate-limiting.json",
+  "description": "Cloudflare WAF Rate Limiting Ruleset - Barbearia SaaS Multi-Tenant (Prompt 22)",
+  "version": "1.0.0",
+  "zone_name": "barbeariasaas.com.br",
+  "managed_rulesets": [
+    {
+      "id": "rule-edge-login-bruteforce",
+      "description": "Shield Anti-Brute Force para /auth/login - Max 5 req/min por IP",
+      "expression": "(http.request.uri.path eq \"/auth/login\" and http.request.method eq \"POST\")",
+      "action": "block",
+      "ratelimit": {
+        "characteristics": ["ip.src"],
+        "period": 60,
+        "requests_per_period": 5,
+        "mitigation_timeout": 300,
+        "counting_expression": "(http.request.uri.path eq \"/auth/login\")"
+      },
+      "action_parameters": {
+        "response": {
+          "status_code": 429,
+          "content_type": "application/json",
+          "content": "{\"statusCode\": 429, \"error\": \"Too Many Requests\", \"message\": \"Taxa de requisições excedida na autenticação. Tente novamente mais tarde.\", \"retryAfterSeconds\": 300}"
+        },
+        "headers": [
+          { "name": "Retry-After", "value": "300" },
+          { "name": "X-RateLimit-Limit", "value": "5" },
+          { "name": "X-WAF-Rule", "value": "Cloudflare-Edge-Auth-Shield" }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "rule-edge-payment-antifraud",
+      "description": "Shield Anti-Carding & DDoS para /api/payment - Max 10 req/min por IP",
+      "expression": "(http.request.uri.path contains \"/api/payment\" and (http.request.method eq \"POST\" or http.request.method eq \"PUT\"))",
+      "action": "block",
+      "ratelimit": {
+        "characteristics": ["ip.src"],
+        "period": 60,
+        "requests_per_period": 10,
+        "mitigation_timeout": 60,
+        "counting_expression": "(http.request.uri.path contains \"/api/payment\")"
+      },
+      "action_parameters": {
+        "response": {
+          "status_code": 429,
+          "content_type": "application/json",
+          "content": "{\"statusCode\": 429, \"error\": \"Too Many Requests\", \"message\": \"Taxa de requisições excedida no gateway de pagamentos. Operação bloqueada para segurança.\", \"retryAfterSeconds\": 60}"
+        },
+        "headers": [
+          { "name": "Retry-After", "value": "60" },
+          { "name": "X-RateLimit-Limit", "value": "10" },
+          { "name": "X-WAF-Rule", "value": "Cloudflare-Edge-Payment-Shield" }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "rule-edge-general-api",
+      "description": "Proteção Volumétrica para Rotas Gerais /api/* - Max 100 req/min por IP",
+      "expression": "(http.request.uri.path starts_with \"/api/\")",
+      "action": "block",
+      "ratelimit": {
+        "characteristics": ["ip.src"],
+        "period": 60,
+        "requests_per_period": 100,
+        "mitigation_timeout": 60,
+        "counting_expression": "(http.request.uri.path starts_with \"/api/\")"
+      },
+      "action_parameters": {
+        "response": {
+          "status_code": 429,
+          "content_type": "application/json",
+          "content": "{\"statusCode\": 429, \"error\": \"Too Many Requests\", \"message\": \"Limite global de chamadas à API atingido para este IP.\", \"retryAfterSeconds\": 60}"
+        },
+        "headers": [
+          { "name": "Retry-After", "value": "60" },
+          { "name": "X-RateLimit-Limit", "value": "100" },
+          { "name": "X-WAF-Rule", "value": "Cloudflare-Edge-API-Shield" }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "rule-edge-global-ddos",
+      "description": "Defesa Perimetral Global Anycast contra Ataques Volumétricos - Max 300 req/min por IP",
+      "expression": "(http.request.uri.path ne \"/favicon.ico\" and not (http.request.uri.path starts_with \"/assets/\"))",
+      "action": "managed_challenge",
+      "ratelimit": {
+        "characteristics": ["ip.src"],
+        "period": 60,
+        "requests_per_period": 300,
+        "mitigation_timeout": 600,
+        "counting_expression": "true"
+      },
+      "enabled": true
+    }
+  ]
+}

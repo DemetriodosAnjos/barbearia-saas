@@ -1,0 +1,15 @@
+# Semgrep Ignore Rules
+dist/
+reports/
+node_modules/
+.vitest/
+cypress/
+wrapper-*.zip
+src/tests/
+tests/
+test-*.js
+**/*.test.*
+**/*.spec.*
+**/*.stories.*
+scripts/
+.storybook/

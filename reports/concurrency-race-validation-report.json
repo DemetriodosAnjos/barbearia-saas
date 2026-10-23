@@ -1,0 +1,263 @@
+{
+  "title": "Relatório de Validação de Segurança & Resiliência contra Race Conditions",
+  "timestamp": "2026-09-28T17:32:47.780Z",
+  "executionTimeMs": 92,
+  "environment": "Node.js Concurrency Test Runner",
+  "target": {
+    "endpoint": "POST /api/appointments",
+    "tenantId": "tenant_matriz",
+    "barberId": "barber_diego",
+    "date": "2026-10-15",
+    "timeSlot": "14:00 - 14:45"
+  },
+  "metrics": {
+    "totalRequests": 10,
+    "approvedCount": 1,
+    "conflictRejectedCount": 9,
+    "unexpectedErrorsCount": 0,
+    "databaseInsertedRecords": 1,
+    "databaseDuplicatesCount": 0,
+    "doubleBookingPrevented": true
+  },
+  "auditStatus": "PASSED",
+  "conformanceCriteria": [
+    {
+      "criterion": "Disparo de 10 requisições HTTP paralelas simultâneas via Promise.all",
+      "status": "PASSED",
+      "actual": "10 requisições enviadas"
+    },
+    {
+      "criterion": "Apenas 1 requisição com sucesso HTTP 200/201",
+      "status": "PASSED",
+      "actual": "1 aprovada(s)"
+    },
+    {
+      "criterion": "9 requisições rejeitadas com HTTP 409 Conflict",
+      "status": "PASSED",
+      "actual": "9 rejeitada(s) com 409"
+    },
+    {
+      "criterion": "Banco de dados sem nenhum registro duplicado (Double Booking = 0)",
+      "status": "PASSED",
+      "actual": "1 registro(s) encontrado(s)"
+    }
+  ],
+  "requestsDetail": [
+    {
+      "index": 1,
+      "client": "Cliente Concorrente HTTP #1",
+      "httpStatus": 201,
+      "success": true,
+      "isConflict": false,
+      "responseBody": {
+        "status": 201,
+        "success": true,
+        "data": {
+          "id": "apt_atom_1790616767749_exmsp",
+          "tenant_id": "tenant_matriz",
+          "barber_id": "barber_diego",
+          "client_name": "Cliente Concorrente HTTP #1",
+          "service_name": "Corte Degradê Navalhado",
+          "booking_date": "2026-10-15",
+          "start_time": "14:00",
+          "end_time": "14:45",
+          "price": 70,
+          "status": "confirmed"
+        },
+        "message": "Agendamento reservado com sucesso de forma atômica.",
+        "strategyUsed": "IN_MEMORY_TRANSACTIONAL_MUTEX",
+        "latencyMs": 38
+      },
+      "latencyMs": 72
+    },
+    {
+      "index": 2,
+      "client": "Cliente Concorrente HTTP #2",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.759Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-2-1790616767689"
+        }
+      },
+      "latencyMs": 70
+    },
+    {
+      "index": 3,
+      "client": "Cliente Concorrente HTTP #3",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.761Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-3-1790616767690"
+        }
+      },
+      "latencyMs": 72
+    },
+    {
+      "index": 4,
+      "client": "Cliente Concorrente HTTP #4",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.752Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-4-1790616767690"
+        }
+      },
+      "latencyMs": 68
+    },
+    {
+      "index": 5,
+      "client": "Cliente Concorrente HTTP #5",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.757Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-5-1790616767691"
+        }
+      },
+      "latencyMs": 68
+    },
+    {
+      "index": 6,
+      "client": "Cliente Concorrente HTTP #6",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.764Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-6-1790616767691"
+        }
+      },
+      "latencyMs": 74
+    },
+    {
+      "index": 7,
+      "client": "Cliente Concorrente HTTP #7",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.766Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-7-1790616767692"
+        }
+      },
+      "latencyMs": 76
+    },
+    {
+      "index": 8,
+      "client": "Cliente Concorrente HTTP #8",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.770Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-8-1790616767692"
+        }
+      },
+      "latencyMs": 79
+    },
+    {
+      "index": 9,
+      "client": "Cliente Concorrente HTTP #9",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.772Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-9-1790616767692"
+        }
+      },
+      "latencyMs": 81
+    },
+    {
+      "index": 10,
+      "client": "Cliente Concorrente HTTP #10",
+      "httpStatus": 409,
+      "success": false,
+      "isConflict": true,
+      "responseBody": {
+        "status": 409,
+        "error": "Conflict",
+        "code": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT",
+        "message": "SLOT_OCCUPIED_CONCURRENCY_CONFLICT: O barbeiro selecionado já possui um agendamento conflitante neste intervalo.",
+        "isConcurrencyConflict": true,
+        "incident": {
+          "timestamp": "2026-09-28T17:32:47.775Z",
+          "path": "/api/appointments",
+          "method": "POST",
+          "correlationId": "cli-race-10-1790616767693"
+        }
+      },
+      "latencyMs": 83
+    }
+  ]
+}
