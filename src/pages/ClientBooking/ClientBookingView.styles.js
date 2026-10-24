@@ -1,10 +1,11 @@
 export const clientBookingStyles = {
   pageWrapper:
-    "min-h-screen bg-neutral-950 text-neutral-100 flex flex-col justify-between select-none text-left relative overflow-x-hidden",
+    "min-h-screen min-h-[100dvh] bg-neutral-950 text-neutral-100 flex flex-col justify-start select-none text-left relative overflow-x-hidden overflow-y-auto touch-pan-y",
 
-  // pb-48 garante espaço de sobra para o conteúdo nunca ficar atrás da barra fixa!
+  // Tolerância ampliada de scroll com pb-72/pb-80/pb-96 e scroll-pb para que todos os campos e seleções fiquem confortavelmente acessíveis acima da barra fixa
+  // Tolerância ampliada de scroll com pb-96/pb-[26rem]/pb-[30rem] e scroll-pb para garantir acesso livre e folgado a todos os campos, horários e inputs acima da barra fixa
   appContainer:
-    "w-full max-w-lg mx-auto flex-1 flex flex-col p-4 sm:p-6 space-y-6 pb-48",
+    "w-full max-w-lg mx-auto flex-1 flex flex-col p-4 sm:p-6 space-y-6 pb-96 sm:pb-[26rem] md:pb-[30rem] scroll-pb-60 sm:scroll-pb-72",
 
   deepLinkBanner:
     "p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-300 animate-in fade-in duration-200",
@@ -23,7 +24,7 @@ export const clientBookingStyles = {
   stepDescription: "text-xs text-neutral-400 leading-relaxed",
 
   bottomDock:
-    "fixed bottom-0 inset-x-0 bg-neutral-900/95 backdrop-blur-md border-t border-neutral-800 p-4 z-40 shadow-2xl",
+    "fixed bottom-0 inset-x-0 bg-neutral-900/95 backdrop-blur-md border-t border-neutral-800 p-4 pb-[max(1rem,env(safe-area-inset-bottom,1rem))] z-40 shadow-2xl",
   dockContent: "max-w-lg mx-auto flex items-center justify-between gap-4",
   dockTotalBox: "flex flex-col text-left",
   dockPrice: "text-lg font-black text-amber-500 font-mono leading-tight",

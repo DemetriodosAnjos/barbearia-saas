@@ -35,6 +35,37 @@ const baseTimeSlots = [
   { time: "18:00", available: true },
 ];
 
+// Catálogo padrão de serviços para contingência caso a resposta assíncrona do banco atrase
+const DEFAULT_CATALOG_SERVICES = [
+  {
+    id: "serv-corte-tradicional",
+    name: "Corte Tradicional",
+    category: "Cabelo",
+    durationMinutes: 30,
+    duration_minutes: 30,
+    price: 40.0,
+    active: true,
+  },
+  {
+    id: "serv-barba-terapia",
+    name: "Barba Terapia",
+    category: "Barba",
+    durationMinutes: 30,
+    duration_minutes: 30,
+    price: 35.0,
+    active: true,
+  },
+  {
+    id: "serv-corte-barba",
+    name: "Corte + Barba Completo",
+    category: "Combo",
+    durationMinutes: 60,
+    duration_minutes: 60,
+    price: 70.0,
+    active: true,
+  },
+];
+
 // [Função componente: recebe tenant real e zera os fallbacks estáticos de cliente/barbeiro]
 export default function ClientBookingView({
   tenant,
@@ -55,12 +86,30 @@ export default function ClientBookingView({
   const [simulateHighLatency, setSimulateHighLatency] = useState(false);
   const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(false);
 
-  // Serviços ativos no catálogo
-  const activeServicesList = services.filter((s) => s.active !== false);
+  // Serviços ativos no catálogo (com contingência graciosa para prevenir lista vazia)
+  const catalogServices =
+    Array.isArray(services) && services.length > 0
+      ? services
+      : DEFAULT_CATALOG_SERVICES;
+
+  const activeServicesList = catalogServices.filter((s) => s.active !== false);
 
   const [selectedServices, setSelectedServices] = useState(
-    activeServicesList.length > 0 ? [activeServicesList[0]] : [],
+    activeServicesList.length > 0 ? [activeServicesList[0]] : [DEFAULT_CATALOG_SERVICES[0]],
   );
+
+  // Sincroniza seleção quando os serviços do catálogo forem carregados assincronamente
+  useEffect(() => {
+    if (Array.isArray(services) && services.length > 0) {
+      const active = services.filter((s) => s.active !== false);
+      if (active.length > 0) {
+        setSelectedServices((prev) => {
+          const hasMatching = prev.some((p) => active.some((a) => a.id === p.id));
+          return hasMatching && prev.length > 0 ? prev : [active[0]];
+        });
+      }
+    }
+  }, [services]);
 
   // FILTRA APENAS OS BARBEIROS ATIVOS (Exclui quem está de férias ou inativo!)
   const activeBarbersList = barbers.filter((b) => b.status === "active");
@@ -134,15 +183,20 @@ export default function ClientBookingView({
     else setBookingTime("");
   }, [bookingDate]);
 
-  // Cálculos de Totais
-  const totalDuration = selectedServices.reduce(
-    (a, s) => a + (s.durationMinutes || 0),
-    0,
-  );
-  const totalPrice = selectedServices.reduce(
-    (a, s) => a + (Number(s.price) || 0),
-    0,
-  );
+  const isUuid = (val) =>
+    typeof val === "string" &&
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(val);
+
+  // Cálculos de Totais com suporte a durationMinutes (camelCase) e duration_minutes (snake_case)
+  const totalDuration = selectedServices.reduce((a, s) => {
+    const mins = Number(s.durationMinutes ?? s.duration_minutes ?? s.duration ?? 30);
+    return a + (isNaN(mins) || mins <= 0 ? 30 : mins);
+  }, 0);
+
+  const totalPrice = selectedServices.reduce((a, s) => {
+    const val = Number(s.price ?? s.valor ?? 0);
+    return a + (isNaN(val) || val < 0 ? 0 : val);
+  }, 0);
 
   // Identifica o barbeiro selecionado
   const selectedBarberObj =
@@ -185,18 +239,36 @@ export default function ClientBookingView({
       return;
     }
 
+    // Garante que haja ao menos um serviço selecionado com fallback defensivo
+    const effectiveSelectedServices =
+      selectedServices && selectedServices.length > 0
+        ? selectedServices
+        : activeServicesList.length > 0
+          ? [activeServicesList[0]]
+          : [DEFAULT_CATALOG_SERVICES[0]];
+
+    const resolvedServiceName = effectiveSelectedServices
+      .map((s) => (s.name || s.nome || s.service_name || "Serviço").trim())
+      .filter(Boolean)
+      .join(" + ") || "Corte Tradicional";
+
+    const resolvedDuration = Math.max(
+      totalDuration > 0 ? totalDuration : 30,
+      15
+    );
+
     setIsSubmittingBooking(true);
 
     const [startH, startM] = effectiveTime.split(":").map(Number);
-    const totalMins = startH * 60 + startM + totalDuration;
+    const totalMins = startH * 60 + startM + resolvedDuration;
     const endH = Math.floor(totalMins / 60);
     const endM = totalMins % 60;
     const computedEndTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
 
     // Atribui ao primeiro barbeiro livre se escolheu a opção coringa
-    const finalBarber = selectedBarberObj.isAnyProfessional
+    const finalBarber = selectedBarberObj?.isAnyProfessional
       ? activeBarbersList[0] || selectedBarberObj
-      : selectedBarberObj;
+      : selectedBarberObj || availableBarbersForClient[0];
 
     const protocolId = `AG-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -206,9 +278,9 @@ export default function ClientBookingView({
       clientPhone: effectivePhone,
       barberId: finalBarber.id,
       barberName: finalBarber.name,
-      services: selectedServices.map((s) => s.name).join(" + "),
+      services: resolvedServiceName,
       totalPrice,
-      totalDuration,
+      totalDuration: resolvedDuration,
       dateFormatted: bookingDate.toLocaleDateString("pt-BR"),
       time: effectiveTime,
       endTime: computedEndTime,
@@ -218,10 +290,10 @@ export default function ClientBookingView({
     const rawAppointment = {
       client_name: DOMPurify.sanitize(effectiveName.trim(), { ALLOWED_TAGS: [] }),
       client_phone: DOMPurify.sanitize(effectivePhone.trim(), { ALLOWED_TAGS: [] }),
-      barber_id: finalBarber.id !== "any" ? finalBarber.id : "any",
-      barber_name: DOMPurify.sanitize(finalBarber.name, { ALLOWED_TAGS: [] }),
-      service_name: selectedServices.map((s) => DOMPurify.sanitize(s.name, { ALLOWED_TAGS: [] })).join(" + "),
-      duration_minutes: totalDuration,
+      barber_id: finalBarber?.id && finalBarber.id !== "any" ? finalBarber.id : "any",
+      barber_name: DOMPurify.sanitize(finalBarber?.name || "Barbeiro", { ALLOWED_TAGS: [] }),
+      service_name: DOMPurify.sanitize(resolvedServiceName, { ALLOWED_TAGS: [] }),
+      duration_minutes: resolvedDuration,
       price: totalPrice,
       start_time: effectiveTime,
       end_time: computedEndTime,
@@ -240,18 +312,24 @@ export default function ClientBookingView({
     }
 
     try {
-      const targetTenantId = tenant?.id || null;
+      const targetTenantId = (tenant?.id && isUuid(tenant.id)) ? tenant.id : null;
+      const targetBarberId = isUuid(validation.sanitized.barber_id) ? validation.sanitized.barber_id : null;
+      const appointmentId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : "10000000-1000-4000-8000-" + String(Date.now()).padStart(12, "0").slice(-12);
+
       const appointmentDateStr = bookingDate instanceof Date
         ? bookingDate.toISOString().slice(0, 10)
         : String(bookingDate).slice(0, 10);
 
       // Método Supabase: insere apenas os campos sanitizados e validados com suporte dúplice
       const insertPayload = {
+        id: appointmentId,
         tenant_id: targetTenantId,
         barbershop_id: targetTenantId,
         date: appointmentDateStr,
         ...validation.sanitized,
-        barber_id: validation.sanitized.barber_id !== "any" ? validation.sanitized.barber_id : null,
+        barber_id: targetBarberId,
         status: "confirmed",
         is_paid: false, // is_paid fixado pelo servidor, nunca confiado do cliente
       };
@@ -686,6 +764,9 @@ export default function ClientBookingView({
             )}
           </div>
         )}
+
+        {/* Espaçador de rolagem generoso para garantir acesso total aos campos, horários e botões acima da barra inferior fixa */}
+        <div className="h-44 sm:h-52 w-full shrink-0 select-none pointer-events-none" aria-hidden="true" />
       </main>
 
       {/* BARRA FLUTUANTE */}
@@ -706,8 +787,19 @@ export default function ClientBookingView({
               variant="primary"
               isLoading={isSubmittingBooking}
               onClick={() => {
-                if (currentStep === 4) handleConfirmReservation();
-                else setCurrentStep((prev) => prev + 1);
+                if (currentStep === 1) {
+                  if (selectedServices.length === 0) {
+                    setBookingErrorMessage("Você precisa selecionar pelo menos 1 serviço antes de avançar.");
+                    return;
+                  }
+                  setBookingErrorMessage("");
+                  setCurrentStep(2);
+                } else if (currentStep === 4) {
+                  handleConfirmReservation();
+                } else {
+                  setBookingErrorMessage("");
+                  setCurrentStep((prev) => prev + 1);
+                }
               }}
               className="text-xs py-2.5 px-6 font-extrabold shadow-lg bg-amber-600 hover:bg-amber-500 cursor-pointer"
             >
