@@ -514,11 +514,11 @@ export default function ClientBookingView({
         }
       }
 
-      // 2. Se a RPC não estiver instalada ou falhou sem conflito, executa a inserção com colunas oficiais do Supabase
+      // 2. Persistência direta no Supabase estritamente com colunas existentes na tabela appointments (zero erro 400)
       if (!atomicBooked && supabase) {
-        const corePayload = {
+        const appointmentPayload = {
           id: appointmentId,
-          barbershop_id: isUuid(targetTenantId) ? targetTenantId : null,
+          ...(isUuid(targetTenantId) ? { tenant_id: targetTenantId, barbershop_id: targetTenantId } : {}),
           barber_id: targetBarberId,
           barber_name: DOMPurify.sanitize(finalBarber?.name || "Barbeiro", { ALLOWED_TAGS: [] }),
           client_name: DOMPurify.sanitize(effectiveName.trim(), { ALLOWED_TAGS: [] }),
@@ -531,26 +531,10 @@ export default function ClientBookingView({
           price: Number(totalPrice) || 0,
           status: "confirmed",
           is_paid: false,
-          notes: DOMPurify.sanitize(`Agendamento via link online. Pagamento: ${effectivePayment}. Protocolo: ${protocolId}`, { ALLOWED_TAGS: [] }),
+          notes: DOMPurify.sanitize(`Agendamento online (No Local). Protocolo: ${protocolId}`, { ALLOWED_TAGS: [] }),
         };
 
-        const extendedPayload = {
-          ...corePayload,
-          ...(isUuid(targetTenantId) ? { tenant_id: targetTenantId } : {}),
-          payment_method: effectivePayment,
-          protocol: protocolId,
-          pix_payload: generatedPixBrCode || null,
-          source: "client_link",
-          idempotency_key: idempotencyKey,
-        };
-
-        let { error: insertError } = await supabase.from("appointments").insert([extendedPayload]);
-
-        // Se der erro por coluna não existente no schema cache, tenta com o corePayload estrito
-        if (insertError && (insertError.message?.includes("column") || insertError.code === "42703" || insertError.code === "PGRST204")) {
-          const coreRes = await supabase.from("appointments").insert([corePayload]);
-          insertError = coreRes.error;
-        }
+        let { error: insertError } = await supabase.from("appointments").insert([appointmentPayload]);
 
         if (insertError && (insertError.code === "42P01" || insertError.message?.includes("does not exist"))) {
           const fallbackRes = await supabase.from("agendamentos").insert([corePayload]);
@@ -1043,65 +1027,21 @@ export default function ClientBookingView({
                 onChange={(e) => setClientPhone(DOMPurify.sanitize(e.target.value.trim(), { ALLOWED_TAGS: [] }))}
               />
 
-              {/* SELEÇÃO DE FORMA DE PAGAMENTO (FLEXÍVEL) */}
-              <div className="space-y-2 pt-2">
-                <label className="block text-xs font-bold text-neutral-300">
-                  Forma de Pagamento
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("no_local")}
-                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                      paymentMethod === "no_local"
-                        ? "bg-amber-500/10 border-amber-500 text-white shadow-md shadow-amber-500/10 ring-1 ring-amber-500/50"
-                        : "bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-neutral-700"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <ProjectIcon
-                          name="Store"
-                          size={16}
-                          className={paymentMethod === "no_local" ? "text-amber-400" : "text-neutral-400"}
-                        />
-                        <span className="font-bold text-xs">Pagar no Local</span>
-                      </div>
-                      {paymentMethod === "no_local" && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                      )}
-                    </div>
-                    <p className="text-[11px] text-neutral-400 leading-tight">
-                      Pague no caixa da recepção após o atendimento (Dinheiro, Cartão ou Pix).
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("pix")}
-                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                      paymentMethod === "pix"
-                        ? "bg-emerald-500/10 border-emerald-500 text-white shadow-md shadow-emerald-500/10 ring-1 ring-emerald-500/50"
-                        : "bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-neutral-700"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <ProjectIcon
-                          name="QrCode"
-                          size={16}
-                          className={paymentMethod === "pix" ? "text-emerald-400" : "text-neutral-400"}
-                        />
-                        <span className="font-bold text-xs">Pagar com Pix</span>
-                      </div>
-                      {paymentMethod === "pix" && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                      )}
-                    </div>
-                    <p className="text-[11px] text-neutral-400 leading-tight">
-                      Gera QR Code Pix instantâneo para reserva antecipada.
-                    </p>
-                  </button>
+              {/* Informação Clara de Pagamento no Local (Sem atrito de Pix) */}
+              <div className="p-3.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+                  <ProjectIcon name="Store" size={18} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                    <span>Pagamento no Local</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      Sem cobrança agora
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-tight mt-0.5">
+                    Você só paga na recepção ao ser atendido (Dinheiro, Cartão ou Pix).
+                  </p>
                 </div>
               </div>
             </div>
@@ -1173,66 +1113,7 @@ export default function ClientBookingView({
               </div>
             </div>
 
-            {/* SE PAGAMENTO FOR PIX: EXIBE QR CODE E CHAVE COPIA E COLA */}
-            {confirmedBooking.paymentMethod === "pix" && (
-              <div className="p-4 bg-neutral-950 border border-emerald-500/30 rounded-2xl space-y-3 text-center">
-                <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
-                  <div className="flex items-center gap-2 text-left">
-                    <ProjectIcon name="QrCode" size={18} className="text-emerald-400" />
-                    <div>
-                      <h4 className="font-bold text-xs text-white">Pagamento Pix Antecipado</h4>
-                      <p className="text-[10px] text-neutral-400">Escaneie o QR Code ou copie o código</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-black font-mono text-emerald-400">
-                    R$ {confirmedBooking.totalPrice.toFixed(2).replace(".", ",")}
-                  </span>
-                </div>
 
-                {confirmedBooking.pixQrCodeUrl ? (
-                  <div className="flex justify-center py-2">
-                    <div className="p-3 bg-white rounded-2xl shadow-xl inline-block">
-                      <img
-                        src={confirmedBooking.pixQrCodeUrl}
-                        alt="QR Code Pix"
-                        className="w-44 h-44 sm:w-48 sm:h-48 object-contain"
-                      />
-                    </div>
-                  </div>
-                ) : null}
-
-                {confirmedBooking.pixPayload ? (
-                  <div className="space-y-2">
-                    <div className="p-2.5 bg-neutral-900 rounded-xl border border-neutral-800 text-left">
-                      <span className="text-[10px] text-neutral-400 font-medium block mb-1">
-                        Código Pix Copia e Cola:
-                      </span>
-                      <p className="font-mono text-[11px] text-neutral-300 break-all select-all line-clamp-2">
-                        {confirmedBooking.pixPayload}
-                      </p>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(confirmedBooking.pixPayload);
-                        setCopiedPixKey(true);
-                        setTimeout(() => setCopiedPixKey(false), 3000);
-                      }}
-                      className="w-full text-xs py-2 font-bold cursor-pointer"
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        <ProjectIcon
-                          name={copiedPixKey ? "Check" : "Copy"}
-                          size={14}
-                          className={copiedPixKey ? "text-emerald-400" : "text-neutral-400"}
-                        />
-                        <span>{copiedPixKey ? "Código Pix Copiado com Sucesso!" : "Copiar Código Pix (Copia e Cola)"}</span>
-                      </span>
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            )}
 
             {/* RESUMO DOS DADOS */}
             <div className="space-y-2 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
