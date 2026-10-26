@@ -1979,6 +1979,21 @@ export default function ScheduleView({
           </p>
         </div>
       </Modal>
+
+      {/* MODAL 8: NOVO AGENDAMENTO A PARTIR DO SLOT DA AGENDA */}
+      <NewAppointmentModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        onSaveAppointment={handleSaveNewAppointment}
+        onAddService={onAddService}
+        tenant={tenant}
+        barbers={activeBarbers}
+        services={services}
+        clients={clients}
+        prefilledBarberId={prefilledBarberId}
+        prefilledTime={prefilledTime}
+        prefilledDate={prefilledDate}
+      />
     </div>
   );
 }

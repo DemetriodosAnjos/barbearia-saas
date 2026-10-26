@@ -23,6 +23,10 @@ import { supabase } from "../../lib/supabase";
 import { safeStorage } from "../../utils/safeStorage";
 import { normalizeClientRecord } from "../../pages/BarbershopAdmin/ClientsDirectoryView";
 
+export const isUuid = (val) =>
+  typeof val === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
 export default function NewAppointmentModal({
   isOpen = false,
   onClose,
@@ -336,7 +340,7 @@ export default function NewAppointmentModal({
       }
 
       // Validação do horário pré-preenchido ou seleção automática do primeiro horário futuro
-      if (prefilledTime && timeOptions.some((opt) => opt.value === prefilledTime)) {
+      if (prefilledTime) {
         setBookingTime(prefilledTime);
       } else if (timeOptions.length > 0) {
         setBookingTime((prev) => {
@@ -455,20 +459,28 @@ export default function NewAppointmentModal({
       ? crypto.randomUUID()
       : "10000000-1000-4000-8000-" + String(Date.now()).padStart(12, "0").slice(-12);
 
-    const targetBarbershopId =
-      tenant?.id || "a0000000-0000-0000-0000-000000000001";
+    const resolvedTenantId =
+      (tenant?.id && isUuid(tenant.id))
+        ? tenant.id
+        : (() => {
+            try {
+              const u = JSON.parse(safeStorage.getItem("saas_auth_user") || "{}");
+              const candidate = u?.barbeariaId || u?.tenant_id || u?.barbershop_id || u?.user_metadata?.barbershop_id;
+              return candidate && isUuid(candidate) ? candidate : null;
+            } catch {
+              return null;
+            }
+          })() || null;
 
-    const isUuid = (val) =>
-      typeof val === "string" &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    // Se o barber_id for um UUID válido, tenta vinculá-lo; senão usa null para não quebrar a FK appointments_barber_id_fkey
+    const validBarberId = isUuid(resolvedBarberId) ? resolvedBarberId : null;
 
-    // Payload compatível com tabelas legadas e novas (tenant_id e barbershop_id)
+    // Payload contendo ESTRITAMENTE as colunas reais existentes na tabela public.appointments do Supabase
     const supabasePayload = {
       id: appointmentId,
-      tenant_id: targetBarbershopId,
-      barbershop_id: targetBarbershopId,
-      client_id: selectedClient?.id && isUuid(selectedClient.id) ? selectedClient.id : null,
-      barber_id: isUuid(resolvedBarberId) ? resolvedBarberId : null,
+      barbershop_id: resolvedTenantId,
+      tenant_id: resolvedTenantId,
+      barber_id: validBarberId,
       barber_name: resolvedBarberName,
       client_name: clientName.trim(),
       client_phone: clientPhone.trim(),
@@ -516,19 +528,34 @@ export default function NewAppointmentModal({
         .from("appointments")
         .insert([supabasePayload]);
 
+      // Se falhar por violação de FK no barber_id ou barbershop_id, retira os IDs e re-tenta imediatamente
+      if (insertError && (insertError.code === "23503" || insertError.message?.includes("foreign key"))) {
+        console.warn("[Supabase] FK violation detectada. Persistindo agendamento com chaves relaxadas...", insertError.message);
+        const relaxedPayload = {
+          ...supabasePayload,
+          barber_id: null,
+          barbershop_id: insertError.message.includes("barbershop_id") ? null : supabasePayload.barbershop_id,
+          tenant_id: insertError.message.includes("tenant_id") ? null : supabasePayload.tenant_id,
+        };
+        const retryRes = await supabase.from("appointments").insert([relaxedPayload]);
+        insertError = retryRes.error;
+      }
+
       if (insertError && (insertError.code === "42P01" || insertError.message?.includes("does not exist"))) {
         const fallbackRes = await supabase.from("agendamentos").insert([supabasePayload]);
         insertError = fallbackRes.error;
       }
 
       if (insertError) {
-        console.warn(
-          "[Supabase] Aviso ao persistir agendamento (aplicando contingência tolerante):",
+        console.error(
+          "[Supabase] Erro ao persistir agendamento no Supabase:",
           insertError,
         );
+      } else {
+        console.info("[Supabase] Agendamento salvo com sucesso no banco de dados!");
       }
     } catch (dbErr) {
-      console.warn("[Supabase] Falha de rede ao persistir agendamento:", dbErr);
+      console.error("[Supabase] Falha de rede ao persistir agendamento:", dbErr);
     }
 
     // 3. Temporização calibrada da UX (2s a 3s no total):

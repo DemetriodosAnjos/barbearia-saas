@@ -435,7 +435,9 @@ export default function ClientBookingView({
 
     try {
       const targetTenantId = (tenant?.id && isUuid(tenant.id)) ? tenant.id : (tenant?.id || "default");
-      const targetBarberId = isUuid(validation.sanitized.barber_id) ? validation.sanitized.barber_id : finalBarber.id;
+      // Se o barbeiro possuir um UUID válido registrado no banco, vincula a FK; senão usa null para NUNCA travar a agenda do cliente por foreign key constraint
+      const isRealBarberUuid = isUuid(finalBarber?.id) && finalBarber.id !== "any" && !String(finalBarber.id).startsWith("barber-mock");
+      const targetBarberId = isRealBarberUuid ? finalBarber.id : null;
       const appointmentId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : "10000000-1000-4000-8000-" + String(Date.now()).padStart(12, "0").slice(-12);
@@ -472,13 +474,13 @@ export default function ClientBookingView({
         }
       }
 
-      // 1. Tenta a Invocação Atômica Transacional (RPC book_appointment_atomic com Advisory Lock)
+      // 1. Tenta a Invocação Atômica Transacional apenas se houver UUID real de tenant e barbeiro
       let atomicBooked = false;
-      if (supabase && typeof supabase.rpc === "function") {
+      if (supabase && typeof supabase.rpc === "function" && isUuid(targetTenantId) && isUuid(targetBarberId)) {
         try {
           const { data: rpcData, error: rpcError } = await supabase.rpc("book_appointment_atomic", {
             p_tenant_id: targetTenantId,
-            p_barber_id: finalBarber.id,
+            p_barber_id: targetBarberId,
             p_client_id: `guest-${effectivePhone.replace(/\D/g, "")}`,
             p_client_name: effectiveName.trim(),
             p_client_phone: effectivePhone.trim(),
@@ -553,6 +555,14 @@ export default function ClientBookingView({
         if (insertError && (insertError.code === "42P01" || insertError.message?.includes("does not exist"))) {
           const fallbackRes = await supabase.from("agendamentos").insert([corePayload]);
           insertError = fallbackRes.error;
+        }
+
+        // Blindagem de Resiliência: se a foreign key do barbeiro violar no banco (código 23503), retenta imediatamente com barber_id = null
+        if (insertError && (insertError.code === "23503" || insertError.message?.includes("foreign key") || insertError.message?.includes("appointments_barber_id_fkey"))) {
+          console.warn("[Agendamento Resiliente] Chave estrangeira de barbeiro inexistente no banco. Desacoplando barber_id para garantir a confirmação do cliente.");
+          const safeCorePayload = { ...corePayload, barber_id: null };
+          const safeRes = await supabase.from("appointments").insert([safeCorePayload]);
+          insertError = safeRes.error;
         }
 
         if (insertError) {
