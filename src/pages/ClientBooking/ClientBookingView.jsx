@@ -158,6 +158,81 @@ export default function ClientBookingView({
     }
   }, [initialBarberId]);
 
+  const [occupiedAppointments, setOccupiedAppointments] = useState([]);
+  const [isFetchingSlots, setIsFetchingSlots] = useState(false);
+
+  const formattedBookingDate = (() => {
+    if (!bookingDate) return "";
+    const d = bookingDate instanceof Date ? bookingDate : new Date(bookingDate);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  })();
+
+  const targetTenantId = tenant?.id || "";
+
+  // 1. Consulta em tempo real os agendamentos já cadastrados no Supabase para o dia selecionado
+  const fetchOccupiedAppointments = async () => {
+    if (!formattedBookingDate || !supabase) return;
+    setIsFetchingSlots(true);
+    try {
+      let query = supabase
+        .from("appointments")
+        .select("id, tenant_id, barbershop_id, barber_id, barber_name, date, booking_date, appointment_date, start_time, end_time, appointment_time, duration_minutes, duration, status")
+        .not("status", "in", '("cancelled","rejected")');
+
+      // Filtra por data
+      query = query.or(`date.eq.${formattedBookingDate},booking_date.eq.${formattedBookingDate},appointment_date.eq.${formattedBookingDate}`);
+
+      // Filtra por tenant da barbearia se informado
+      if (targetTenantId) {
+        query = query.or(`tenant_id.eq.${targetTenantId},barbershop_id.eq.${targetTenantId}`);
+      }
+
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        setOccupiedAppointments(data);
+      }
+    } catch (err) {
+      console.warn("Aviso ao consultar slots ocupados no Supabase:", err);
+    } finally {
+      setIsFetchingSlots(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOccupiedAppointments();
+  }, [formattedBookingDate, targetTenantId]);
+
+  // 2. Supabase Realtime: Atualiza os slots instantaneamente caso outro cliente confirme um horário
+  useEffect(() => {
+    if (!formattedBookingDate || !supabase || typeof supabase.channel !== "function") return;
+
+    let slotChannel;
+    try {
+      slotChannel = supabase
+        .channel(`realtime-public-slots-${targetTenantId || "all"}-${formattedBookingDate}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "appointments" },
+          () => {
+            fetchOccupiedAppointments();
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn("Aviso ao ativar Realtime de slots:", err);
+    }
+
+    return () => {
+      if (slotChannel) {
+        supabase.removeChannel(slotChannel);
+      }
+    };
+  }, [formattedBookingDate, targetTenantId]);
+
   // Trava de horários passados no dia de hoje
   const isSelectedDateToday = () => {
     if (!bookingDate) return false;
@@ -177,25 +252,75 @@ export default function ClientBookingView({
     return slotH * 60 + slotM <= currentMinutes;
   };
 
-  const computedTimeSlots = baseTimeSlots.map((slot) => ({
-    ...slot,
-    available: isSlotInPast(slot.time) ? false : slot.available,
-  }));
-
-  useEffect(() => {
-    const firstFreeSlot = computedTimeSlots.find((s) => s.available);
-    if (firstFreeSlot) setBookingTime(firstFreeSlot.time);
-    else setBookingTime("");
-  }, [bookingDate]);
-
-  const isUuid = (val) =>
-    typeof val === "string" &&
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(val);
+  const parseTimeToMinutes = (t) => {
+    if (!t) return 0;
+    const str = String(t).trim();
+    const clean = str.includes("T") ? str.split("T")[1] : str.includes(" ") ? str.split(" ")[1] : str;
+    const [h, m] = clean.split(":").map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
 
   const totalDuration = selectedServices.reduce((a, s) => {
     const mins = Number(s.durationMinutes ?? s.duration_minutes ?? s.duration ?? 30);
     return a + (isNaN(mins) || mins <= 0 ? 30 : mins);
   }, 0);
+
+  // Verifica se o slot colide com algum agendamento existente para o barbeiro selecionado
+  const isSlotOccupied = (slotTimeStr) => {
+    const slotStart = parseTimeToMinutes(slotTimeStr);
+    const slotEnd = slotStart + (totalDuration > 0 ? totalDuration : 30);
+
+    const relevantAppts = occupiedAppointments.filter((a) => {
+      const aStart = parseTimeToMinutes(a.start_time || a.startTime || a.appointment_time);
+      const aEnd = (a.end_time || a.endTime)
+        ? parseTimeToMinutes(a.end_time || a.endTime)
+        : aStart + Number(a.duration_minutes || a.duration || 30);
+      return slotStart < aEnd && slotEnd > aStart;
+    });
+
+    if (relevantAppts.length === 0) return false;
+
+    // Se o cliente escolheu um barbeiro específico:
+    if (selectedBarberId && selectedBarberId !== "any") {
+      return relevantAppts.some((a) => {
+        const apptBarberId = a.barber_id || a.barberId;
+        const apptBarberName = (a.barber_name || a.barberName || "").toLowerCase().trim();
+        const selectedName = (selectedBarberObj?.name || "").toLowerCase().trim();
+        return (apptBarberId && apptBarberId === selectedBarberId) ||
+               (selectedName && apptBarberName === selectedName);
+      });
+    }
+
+    // Se escolheu "Qualquer Barbeiro Livre" (any):
+    // Só é considerado ocupado se todos os barbeiros ativos da barbearia estiverem ocupados
+    if (activeBarbersList.length > 0) {
+      const busyBarberIds = new Set(relevantAppts.map((a) => a.barber_id || a.barberId));
+      return activeBarbersList.every((b) => busyBarberIds.has(b.id));
+    }
+
+    return false;
+  };
+
+  const computedTimeSlots = baseTimeSlots.map((slot) => {
+    const isPast = isSlotInPast(slot.time);
+    const isOccupied = isSlotOccupied(slot.time);
+    return {
+      ...slot,
+      isPast,
+      isOccupied,
+      available: !isPast && !isOccupied,
+    };
+  });
+
+  useEffect(() => {
+    const firstFreeSlot = computedTimeSlots.find((s) => s.available);
+    if (firstFreeSlot) setBookingTime(firstFreeSlot.time);
+    else setBookingTime("");
+  }, [bookingDate, selectedBarberId, occupiedAppointments]);
+
+  const isUuid = (val) =>
+    typeof val === "string" &&
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(val);
 
   const totalPrice = selectedServices.reduce((a, s) => {
     const val = Number(s.price ?? s.valor ?? 0);
@@ -301,8 +426,8 @@ export default function ClientBookingView({
     }
 
     try {
-      const targetTenantId = (tenant?.id && isUuid(tenant.id)) ? tenant.id : null;
-      const targetBarberId = isUuid(validation.sanitized.barber_id) ? validation.sanitized.barber_id : null;
+      const targetTenantId = (tenant?.id && isUuid(tenant.id)) ? tenant.id : (tenant?.id || "default");
+      const targetBarberId = isUuid(validation.sanitized.barber_id) ? validation.sanitized.barber_id : finalBarber.id;
       const appointmentId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : "10000000-1000-4000-8000-" + String(Date.now()).padStart(12, "0").slice(-12);
@@ -310,6 +435,9 @@ export default function ClientBookingView({
       const appointmentDateStr = bookingDate instanceof Date
         ? bookingDate.toISOString().slice(0, 10)
         : String(bookingDate).slice(0, 10);
+
+      // Chave de idempotência estrita (impede duplicidades no mesmo segundo/horário)
+      const idempotencyKey = `${targetTenantId}_${finalBarber.id}_${appointmentDateStr}_${effectiveTime}_${effectivePhone.replace(/\D/g, "")}`;
 
       // Se escolheu Pix, gera o payload BR Code e imagem QR Code real
       let generatedPixBrCode = "";
@@ -336,26 +464,103 @@ export default function ClientBookingView({
         }
       }
 
-      const insertPayload = {
-        id: appointmentId,
-        tenant_id: targetTenantId,
-        barbershop_id: targetTenantId,
-        date: appointmentDateStr,
-        ...validation.sanitized,
-        barber_id: targetBarberId,
-        status: "confirmed",
-        is_paid: false,
-      };
+      // 1. Tenta a Invocação Atômica Transacional (RPC book_appointment_atomic com Advisory Lock)
+      let atomicBooked = false;
+      if (supabase && typeof supabase.rpc === "function") {
+        try {
+          const { data: rpcData, error: rpcError } = await supabase.rpc("book_appointment_atomic", {
+            p_tenant_id: targetTenantId,
+            p_barber_id: finalBarber.id,
+            p_client_id: `guest-${effectivePhone.replace(/\D/g, "")}`,
+            p_client_name: effectiveName.trim(),
+            p_client_phone: effectivePhone.trim(),
+            p_service_id: effectiveSelectedServices[0]?.id || "srv-default",
+            p_service_name: resolvedServiceName,
+            p_booking_date: appointmentDateStr,
+            p_start_time: effectiveTime,
+            p_end_time: computedEndTime,
+            p_price: totalPrice,
+          });
 
-      let { error: insertError } = await supabase.from("appointments").insert([insertPayload]);
+          if (rpcError) {
+            const isConflict =
+              rpcError.message?.includes("SLOT_OCCUPIED_CONCURRENCY_CONFLICT") ||
+              rpcError.code === "P0001" ||
+              rpcError.code === "23P01";
 
-      if (insertError && (insertError.code === "42P01" || insertError.message?.includes("does not exist"))) {
-        const fallbackRes = await supabase.from("agendamentos").insert([insertPayload]);
-        insertError = fallbackRes.error;
+            if (isConflict) {
+              setBookingErrorMessage(
+                `⚠️ O horário das ${effectiveTime}h acabou de ser reservado por outro cliente no mesmo segundo. Por favor, escolha outro horário na grade.`
+              );
+              setIsSubmittingBooking(false);
+              fetchOccupiedAppointments();
+              return;
+            }
+          } else if (rpcData?.success) {
+            atomicBooked = true;
+          }
+        } catch (rpcErr) {
+          console.warn("RPC atômica não disponível ou com erro, usando inserção com idempotência:", rpcErr);
+        }
       }
 
-      if (insertError) {
-        console.warn("Aviso retornado pelo banco ao persistir agendamento:", insertError.message);
+      // 2. Se a RPC não estiver instalada ou falhou sem conflito, executa a inserção com todas as colunas
+      if (!atomicBooked && supabase) {
+        const insertPayload = {
+          id: appointmentId,
+          tenant_id: targetTenantId,
+          barbershop_id: targetTenantId,
+          date: appointmentDateStr,
+          booking_date: appointmentDateStr,
+          appointment_date: appointmentDateStr,
+          client_id: `guest-${effectivePhone.replace(/\D/g, "")}`,
+          client_name: DOMPurify.sanitize(effectiveName.trim(), { ALLOWED_TAGS: [] }),
+          client_phone: DOMPurify.sanitize(effectivePhone.trim(), { ALLOWED_TAGS: [] }),
+          barber_id: targetBarberId,
+          barber_name: DOMPurify.sanitize(finalBarber?.name || "Barbeiro", { ALLOWED_TAGS: [] }),
+          service_id: effectiveSelectedServices[0]?.id || "srv-default",
+          service_name: DOMPurify.sanitize(resolvedServiceName, { ALLOWED_TAGS: [] }),
+          duration_minutes: resolvedDuration,
+          duration: resolvedDuration,
+          price: totalPrice,
+          total_price: totalPrice,
+          start_time: effectiveTime,
+          end_time: computedEndTime,
+          appointment_time: effectiveTime,
+          payment_method: effectivePayment,
+          protocol: protocolId,
+          pix_payload: generatedPixBrCode,
+          source: "client_link",
+          idempotency_key: idempotencyKey,
+          status: "confirmed",
+          is_paid: false,
+        };
+
+        let { error: insertError } = await supabase.from("appointments").insert([insertPayload]);
+
+        if (insertError && (insertError.code === "42P01" || insertError.message?.includes("does not exist"))) {
+          const fallbackRes = await supabase.from("agendamentos").insert([insertPayload]);
+          insertError = fallbackRes.error;
+        }
+
+        if (insertError) {
+          const isConflict =
+            insertError.code === "23505" ||
+            insertError.code === "23P01" ||
+            insertError.message?.includes("duplicate") ||
+            insertError.message?.includes("concurrency") ||
+            insertError.message?.includes("conflict");
+
+          if (isConflict) {
+            setBookingErrorMessage(
+              `⚠️ Este horário das ${effectiveTime}h já foi ocupado por outro agendamento. Por favor, escolha outro horário.`
+            );
+            setIsSubmittingBooking(false);
+            fetchOccupiedAppointments();
+            return;
+          }
+          console.warn("Aviso retornado pelo banco ao persistir agendamento:", insertError.message);
+        }
       }
 
       const bookingPayload = {
@@ -685,15 +890,29 @@ export default function ClientBookingView({
                         type="button"
                         disabled={isDisabled}
                         onClick={() => setBookingTime(slot.time)}
-                        className={`py-2 px-1 rounded-xl text-xs font-mono font-bold transition-all text-center cursor-pointer ${
+                        title={
+                          slot.isOccupied
+                            ? `Horário das ${slot.time}h já está ocupado por outro agendamento`
+                            : slot.isPast
+                              ? `Horário das ${slot.time}h já passou`
+                              : `Clique para selecionar ${slot.time}h`
+                        }
+                        className={`py-2 px-1 rounded-xl text-xs font-mono font-bold transition-all text-center flex flex-col items-center justify-center min-h-[46px] ${
                           isSelected
                             ? "bg-amber-500 text-neutral-950 font-black shadow-md shadow-amber-500/20 scale-105"
-                            : isDisabled
-                              ? "bg-neutral-950 text-neutral-600 border border-neutral-800/40 line-through cursor-not-allowed opacity-50"
-                              : "bg-neutral-950 text-neutral-300 border border-neutral-800 hover:border-amber-500/50 hover:text-white"
+                            : slot.isOccupied
+                              ? "bg-rose-950/20 text-rose-400/70 border border-rose-900/30 cursor-not-allowed"
+                              : slot.isPast
+                                ? "bg-neutral-950 text-neutral-600 border border-neutral-800/40 line-through cursor-not-allowed opacity-40"
+                                : "bg-neutral-950 text-neutral-300 border border-neutral-800 hover:border-amber-500/50 hover:text-white cursor-pointer"
                         }`}
                       >
-                        {slot.time}
+                        <span>{slot.time}</span>
+                        {slot.isOccupied && (
+                          <span className="text-[9px] font-sans font-medium text-rose-400/90 leading-none mt-0.5">
+                            Ocupado
+                          </span>
+                        )}
                       </button>
                     );
                   })}

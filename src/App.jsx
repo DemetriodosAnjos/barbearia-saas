@@ -962,6 +962,105 @@ export default function App() {
     });
   }, [tenant?.id, currentUser?.id, currentUser?.user_metadata?.barbershop_id]);
 
+  // Sincronização em tempo real de agendamentos via Supabase Realtime (reflete agendamentos do link instantaneamente)
+  useEffect(() => {
+    const activeTenantId = tenant?.id || currentUser?.user_metadata?.barbershop_id || currentUser?.id;
+    if (!activeTenantId || !supabase || typeof supabase.channel !== "function") return;
+
+    let apptsChannel;
+    try {
+      apptsChannel = supabase
+        .channel(`realtime-admin-appointments-${activeTenantId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "appointments" },
+          (payload) => {
+            const row = payload.new || payload.old;
+            if (!row) return;
+            const rowTenant = row.tenant_id || row.barbershop_id;
+            if (rowTenant && rowTenant !== activeTenantId && rowTenant !== currentUser?.id) {
+              return;
+            }
+
+            if (payload.eventType === "INSERT") {
+              const newAppt = {
+                ...payload.new,
+                id: payload.new.id || `apt-${Date.now()}`,
+                barberId: payload.new.barberId || payload.new.barber_id || null,
+                barberName: payload.new.barberName || payload.new.barber_name || "Barbeiro",
+                clientName: payload.new.clientName || payload.new.client_name || "Cliente",
+                clientPhone: payload.new.clientPhone || payload.new.client_phone || "",
+                serviceName: payload.new.serviceName || payload.new.service_name || "Serviço",
+                startTime: payload.new.startTime || payload.new.start_time || payload.new.appointment_time || "09:00",
+                endTime: payload.new.endTime || payload.new.end_time || "09:45",
+                durationMinutes: Number(payload.new.durationMinutes || payload.new.duration_minutes || payload.new.duration || 30),
+                price: Number(payload.new.price || payload.new.total_price || 0),
+                status: payload.new.status || "confirmed",
+                isPaid: Boolean(payload.new.isPaid ?? payload.new.is_paid),
+                isVip: Boolean(payload.new.isVip ?? payload.new.is_vip),
+                notes: payload.new.notes || "",
+                date: payload.new.date || payload.new.booking_date || payload.new.appointment_date || getTodayLocalYMD(),
+              };
+
+              setAppointments((prev) => {
+                if (prev.some((a) => a.id === newAppt.id)) return prev;
+                const updated = [...prev, newAppt];
+                try {
+                  safeStorage.setItem(`saas_appointments_cache_${activeTenantId}`, JSON.stringify(updated));
+                } catch {}
+                return updated;
+              });
+            } else if (payload.eventType === "UPDATE") {
+              const updatedAppt = {
+                ...payload.new,
+                id: payload.new.id,
+                barberId: payload.new.barberId || payload.new.barber_id,
+                barberName: payload.new.barberName || payload.new.barber_name,
+                clientName: payload.new.clientName || payload.new.client_name,
+                clientPhone: payload.new.clientPhone || payload.new.client_phone,
+                serviceName: payload.new.serviceName || payload.new.service_name,
+                startTime: payload.new.startTime || payload.new.start_time || payload.new.appointment_time,
+                endTime: payload.new.endTime || payload.new.end_time,
+                durationMinutes: Number(payload.new.durationMinutes || payload.new.duration_minutes || payload.new.duration || 30),
+                price: Number(payload.new.price || payload.new.total_price || 0),
+                status: payload.new.status,
+                isPaid: Boolean(payload.new.isPaid ?? payload.new.is_paid),
+                date: payload.new.date || payload.new.booking_date || payload.new.appointment_date,
+              };
+
+              setAppointments((prev) => {
+                const updated = prev.map((a) => (a.id === updatedAppt.id ? { ...a, ...updatedAppt } : a));
+                try {
+                  safeStorage.setItem(`saas_appointments_cache_${activeTenantId}`, JSON.stringify(updated));
+                } catch {}
+                return updated;
+              });
+            } else if (payload.eventType === "DELETE") {
+              const deletedId = payload.old?.id;
+              if (deletedId) {
+                setAppointments((prev) => {
+                  const updated = prev.filter((a) => a.id !== deletedId);
+                  try {
+                    safeStorage.setItem(`saas_appointments_cache_${activeTenantId}`, JSON.stringify(updated));
+                  } catch {}
+                  return updated;
+                });
+              }
+            }
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn("Aviso ao subscrever canal de agendamentos em tempo real:", err);
+    }
+
+    return () => {
+      if (apptsChannel) {
+        supabase.removeChannel(apptsChannel);
+      }
+    };
+  }, [tenant?.id, currentUser?.id, currentUser?.user_metadata?.barbershop_id]);
+
   // Sincronização reativa e persistência de Clientes no cache local segmentado por tenant
   const handleUpdateClients = useCallback((updatedClients) => {
     const list = Array.isArray(updatedClients) ? updatedClients : [];
