@@ -17,21 +17,21 @@ export const CNPJ_REGEX = /^\d{14}$/;
 export const mercadoPagoPreferenceSchema = z
   .object({
     planId: z
-      .string({ required_error: "Identificador de plano é obrigatório" })
+      .string()
       .trim()
-      .min(1, "Identificador de plano não pode ser vazio")
+      .min(1, "Identificador de plano é obrigatório")
       .max(64, "Identificador de plano muito longo"),
     planName: z
-      .string({ required_error: "Nome do plano é obrigatório" })
+      .string()
       .trim()
       .min(2, "Nome do plano deve ter no mínimo 2 caracteres")
       .max(100, "Nome do plano não pode exceder 100 caracteres"),
     price: z
-      .number({ required_error: "Preço é obrigatório" })
+      .number()
       .positive("O preço deve ser maior que zero")
       .max(50000, "Preço máximo por transação excedido"),
     tenantId: z
-      .string({ required_error: "ID da barbearia (tenant) é obrigatório" })
+      .string()
       .trim()
       .min(1, "Tenant ID não pode ser vazio")
       .max(64, "Tenant ID muito longo"),
@@ -41,8 +41,9 @@ export const mercadoPagoPreferenceSchema = z
       .max(120, "Nome da barbearia muito longo")
       .default("Barbearia Cliente"),
     payerEmail: z
-      .string({ required_error: "E-mail do pagador é obrigatório" })
+      .string()
       .trim()
+      .min(1, "E-mail do pagador é obrigatório")
       .email("E-mail do pagador inválido")
       .max(150, "E-mail muito longo"),
     payerName: z
@@ -57,7 +58,7 @@ export const mercadoPagoPreferenceSchema = z
       .max(20, "Telefone muito longo")
       .optional(),
     billingPeriod: z
-      .enum(["monthly", "quarterly", "annual"])
+      .enum(["monthly", "quarterly", "annual"] as const)
       .default("monthly"),
     backUrl: z
       .string()
@@ -75,7 +76,7 @@ export const mercadoPagoPixPaymentSchema = z
   .object({
     planId: z.string().trim().min(1, "ID do plano é obrigatório"),
     amount: z
-      .number({ required_error: "Valor do Pix é obrigatório" })
+      .number()
       .positive("O valor deve ser positivo")
       .max(50000, "Valor máximo excedido"),
     tenantId: z.string().trim().min(1, "Tenant ID é obrigatório"),
@@ -85,8 +86,9 @@ export const mercadoPagoPixPaymentSchema = z
       .max(200, "Descrição muito longa")
       .default("Assinatura BarberSaaS Enterprise"),
     payerEmail: z
-      .string({ required_error: "E-mail do pagador é obrigatório" })
+      .string()
       .trim()
+      .min(1, "E-mail do pagador é obrigatório")
       .email("E-mail inválido"),
     payerFirstName: z.string().trim().max(60).default("Gestor"),
     payerLastName: z.string().trim().max(60).default("Barbearia"),

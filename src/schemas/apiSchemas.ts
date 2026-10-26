@@ -1,20 +1,14 @@
 /**
- * src/schemas/apiSchemas.ts
- *
- * Schemas de Validação Server-Side com Zod para Todas as Rotas da API.
+ * Central de Schemas de Validação Zod (Defesa em Profundidade contra Injeções, Mass Assignment e BOLA)
  * 
- * Diretrizes Arquiteturais:
- * 1. Todos os schemas utilizam .strip() explicitamente para eliminar quaisquer propriedades
- *    não declaradas (Defesa contra Mass Assignment / Parameter Injection).
- * 2. Validação rigorosa de tipo, tamanho máximo de string, regex de email, UUID,
- *    telefones e limites de números/valores monetários.
- * 3. Sanitização contra injeção de scripts e payloads excessivos.
+ * Regra: Nenhuma requisição transita pelo backend sem sanitização e validação estrita de tipos,
+ * tamanhos de campos e valores permitidos.
  */
 
 import { z } from "zod";
 
 // ============================================================================
-// PADRÕES REUTILIZÁVEIS & VALIDAÇÕES ATÔMICAS
+// VALIDADORES PRIMITIVOS & REGEX REUTILIZÁVEIS
 // ============================================================================
 
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -26,17 +20,18 @@ export const PHONE_BR_REGEX = /^\(?\d{2}\)?[\s-]?\d{4,5}-?\d{4}$/;
  * UUID v4 estrito com mensagem customizada
  */
 export const uuidSchema = z
-  .string({ required_error: "ID é obrigatório" })
+  .string()
   .trim()
+  .min(1, "ID é obrigatório")
   .regex(UUID_REGEX, { message: "Formato de UUID inválido" });
 
 /**
  * Identificador de recurso (UUID ou string alfanumérica segura com prefixo, max 64 chars)
  */
 export const resourceIdSchema = z
-  .string({ required_error: "Identificador de recurso é obrigatório" })
+  .string()
   .trim()
-  .min(1, "Identificador não pode ser vazio")
+  .min(1, "Identificador de recurso é obrigatório")
   .max(64, "Identificador não pode exceder 64 caracteres")
   .regex(/^[a-zA-Z0-9_-]+$/, { message: "Identificador contém caracteres inválidos" });
 
@@ -56,12 +51,11 @@ export const paginationQuerySchema = z
       .int("Offset deve ser um número inteiro")
       .min(0, "Offset não pode ser negativo")
       .default(0),
-    search: z.string().trim().max(100, "Busca não pode exceder 100 caracteres").optional(),
   })
   .strip();
 
 // ============================================================================
-// 1. ROTAS DE AUTENTICAÇÃO & GESTÃO DE SESSÃO
+// 1. ROTAS DE AUTENTICAÇÃO (/api/auth)
 // ============================================================================
 
 /**
@@ -71,12 +65,13 @@ export const loginSchema = {
   body: z
     .object({
       email: z
-        .string({ required_error: "E-mail é obrigatório" })
+        .string()
         .trim()
+        .min(1, "E-mail é obrigatório")
         .email("Formato de e-mail inválido")
         .max(255, "E-mail não pode exceder 255 caracteres"),
       password: z
-        .string({ required_error: "Senha é obrigatória" })
+        .string()
         .min(8, "Senha deve ter no mínimo 8 caracteres")
         .max(128, "Senha não pode exceder 128 caracteres"),
       captchaToken: z
@@ -102,17 +97,18 @@ export const registerSchema = {
   body: z
     .object({
       name: z
-        .string({ required_error: "Nome é obrigatório" })
+        .string()
         .trim()
         .min(2, "Nome deve ter no mínimo 2 caracteres")
         .max(120, "Nome não pode exceder 120 caracteres"),
       email: z
-        .string({ required_error: "E-mail é obrigatório" })
+        .string()
         .trim()
+        .min(1, "E-mail é obrigatório")
         .email("Formato de e-mail inválido")
         .max(255, "E-mail não pode exceder 255 caracteres"),
       password: z
-        .string({ required_error: "Senha é obrigatória" })
+        .string()
         .min(8, "A senha deve ter no mínimo 8 caracteres")
         .max(128, "A senha não pode exceder 128 caracteres"),
       phone: z
@@ -121,9 +117,7 @@ export const registerSchema = {
         .regex(PHONE_BR_REGEX, "Telefone inválido (formato esperado: (XX) 9XXXX-XXXX)")
         .optional(),
       role: z
-        .enum(["superadmin", "barbershop_admin", "barber", "receptionist", "client"], {
-          errorMap: () => ({ message: "Papel de usuário inválido" }),
-        })
+        .enum(["superadmin", "barbershop_admin", "barber", "receptionist", "client"] as const)
         .default("client"),
       barbershop_name: z.string().trim().max(120).optional(),
     })
@@ -137,7 +131,7 @@ export const refreshTokenSchema = {
   body: z
     .object({
       refreshToken: z
-        .string({ required_error: "Refresh token é obrigatório" })
+        .string()
         .trim()
         .min(10, "Refresh token inválido")
         .max(4096, "Refresh token excede o tamanho permitido"),
@@ -159,8 +153,7 @@ export const revokeSessionsSchema = {
           "profile_update_by_admin",
           "user_blocked",
           "session_compromised",
-        ],
-        { errorMap: () => ({ message: "Gatilho de revogação inválido" }) }
+        ] as const
       ),
       reason: z
         .string()
@@ -173,7 +166,7 @@ export const revokeSessionsSchema = {
 };
 
 // ============================================================================
-// 2. ROTAS DE AGENDAMENTOS (/api/appointments)
+// 2. ROTAS DE AGENDAMENTO (/api/appointments)
 // ============================================================================
 
 /**
@@ -183,41 +176,42 @@ export const createAppointmentSchema = {
   body: z
     .object({
       client_name: z
-        .string({ required_error: "Nome do cliente é obrigatório" })
+        .string()
         .trim()
         .min(2, "Nome deve ter pelo menos 2 caracteres")
         .max(100, "Nome não pode ultrapassar 100 caracteres"),
       client_phone: z
-        .string({ required_error: "Telefone do cliente é obrigatório" })
+        .string()
         .trim()
+        .min(1, "Telefone do cliente é obrigatório")
         .max(20, "Telefone não pode exceder 20 caracteres"),
       barber_id: resourceIdSchema,
       barber_name: z
-        .string({ required_error: "Nome do barbeiro é obrigatório" })
+        .string()
         .trim()
-        .min(2)
+        .min(2, "Nome do barbeiro é obrigatório")
         .max(100),
       service_id: resourceIdSchema.optional(),
       service_name: z
-        .string({ required_error: "Nome do serviço é obrigatório" })
+        .string()
         .trim()
-        .min(2)
+        .min(2, "Nome do serviço é obrigatório")
         .max(100),
       duration_minutes: z.coerce
-        .number({ required_error: "Duração é obrigatória" })
+        .number()
         .int("Duração deve ser um valor inteiro")
         .min(5, "Duração mínima é de 5 minutos")
         .max(480, "Duração máxima permitida é 480 minutos (8 horas)"),
       price: z.coerce
-        .number({ required_error: "Preço é obrigatório" })
+        .number()
         .positive("Preço deve ser positivo")
         .max(50000, "Valor do serviço excede o limite operacional de R$ 50.000"),
       start_time: z
-        .string({ required_error: "Horário inicial é obrigatório" })
+        .string()
         .trim()
         .regex(TIME_HH_MM_REGEX, "Horário inicial inválido (use HH:MM)"),
       end_time: z
-        .string({ required_error: "Horário final é obrigatório" })
+        .string()
         .trim()
         .regex(TIME_HH_MM_REGEX, "Horário final inválido (use HH:MM)"),
       date: z
@@ -242,22 +236,22 @@ export const createAppointmentSchema = {
 export const getAppointmentsSchema = {
   query: z
     .object({
-      clientName: z.string().trim().max(100).optional(),
-      barberId: resourceIdSchema.optional(),
-      status: z
-        .enum(["pending", "confirmed", "in_progress", "completed", "cancelled"])
-        .optional(),
+      date: z.string().trim().regex(DATE_ISO_REGEX, "Formato AAAA-MM-DD").optional(),
       startDate: z.string().trim().regex(DATE_ISO_REGEX, "Formato AAAA-MM-DD").optional(),
       endDate: z.string().trim().regex(DATE_ISO_REGEX, "Formato AAAA-MM-DD").optional(),
-      limit: z.coerce.number().int().min(1).max(100).default(50),
+      barberId: resourceIdSchema.optional(),
+      clientId: resourceIdSchema.optional(),
+      status: z
+        .enum(["pending", "confirmed", "in_progress", "completed", "cancelled"] as const)
+        .optional(),
+      limit: z.coerce.number().int().min(1).max(200).default(50),
       offset: z.coerce.number().int().min(0).default(0),
     })
     .strip(),
 };
 
 /**
- * GET /api/appointments/:id
- * DELETE /api/appointments/:id
+ * GET /api/appointments/:id & DELETE /api/appointments/:id
  */
 export const appointmentParamsSchema = {
   params: z
@@ -268,29 +262,22 @@ export const appointmentParamsSchema = {
 };
 
 /**
- * PUT & PATCH /api/appointments/:id (Atualização de Agendamento)
- * Prevenção de Mass Assignment: tenant_id, barbershop_id e id NÃO são permitidos no body.
+ * PATCH /api/appointments/:id
  */
 export const updateAppointmentSchema = {
-  params: z
-    .object({
-      id: resourceIdSchema,
-    })
-    .strip(),
+  params: z.object({ id: resourceIdSchema }).strip(),
   body: z
     .object({
       client_name: z.string().trim().min(2).max(100).optional(),
       client_phone: z.string().trim().max(20).optional(),
-      service_name: z.string().trim().min(2).max(100).optional(),
+      barber_id: resourceIdSchema.optional(),
       barber_name: z.string().trim().min(2).max(100).optional(),
       duration_minutes: z.coerce.number().int().min(5).max(480).optional(),
       price: z.coerce.number().positive().max(50000).optional(),
       start_time: z.string().trim().regex(TIME_HH_MM_REGEX, "Formato HH:MM").optional(),
       end_time: z.string().trim().regex(TIME_HH_MM_REGEX, "Formato HH:MM").optional(),
       status: z
-        .enum(["pending", "confirmed", "in_progress", "completed", "cancelled"], {
-          errorMap: () => ({ message: "Status de agendamento inválido" }),
-        })
+        .enum(["pending", "confirmed", "in_progress", "completed", "cancelled"] as const)
         .optional(),
       notes: z.string().trim().max(500).optional(),
     })
@@ -315,7 +302,7 @@ export const createComandaSchema = {
           z
             .object({
               id: resourceIdSchema,
-              type: z.enum(["service", "product"]),
+              type: z.enum(["service", "product"] as const),
               name: z.string().trim().min(1).max(100),
               price: z.coerce.number().min(0).max(50000),
               quantity: z.coerce.number().int().min(1).max(100).default(1),
@@ -324,9 +311,7 @@ export const createComandaSchema = {
         )
         .min(1, "Comanda deve conter ao menos um item")
         .max(50, "Comanda não pode exceder 50 itens"),
-      payment_method: z.enum(["pix", "credit_card", "debit_card", "cash"], {
-        errorMap: () => ({ message: "Forma de pagamento não suportada" }),
-      }),
+      payment_method: z.enum(["pix", "credit_card", "debit_card", "cash"] as const),
       discount: z.coerce.number().min(0).max(10000).default(0),
       notes: z.string().trim().max(300).optional(),
     })
