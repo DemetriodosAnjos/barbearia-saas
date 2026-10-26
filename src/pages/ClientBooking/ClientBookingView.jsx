@@ -180,27 +180,30 @@ export default function ClientBookingView({
     try {
       let query = supabase
         .from("appointments")
-        .select("id, barbershop_id, barber_id, barber_name, date, start_time, end_time, duration_minutes, status")
+        .select("id, barbershop_id, tenant_id, barber_id, barber_name, date, start_time, end_time, duration_minutes, status")
         .not("status", "in", '("cancelled","rejected")')
         .eq("date", formattedBookingDate);
 
-      // Filtra por barbearia/tenant se informado
+      // Filtra por barbearia/tenant se informado (compatível tanto com barbershop_id quanto tenant_id)
       if (targetTenantId) {
-        query = query.eq("barbershop_id", targetTenantId);
+        query = query.or(`barbershop_id.eq.${targetTenantId},tenant_id.eq.${targetTenantId}`);
       }
 
       const { data, error } = await query;
       if (!error && Array.isArray(data)) {
         setOccupiedAppointments(data);
       } else if (error) {
-        // Fallback defensivo: se falhar com filtro de barbershop_id, busca por data
+        // Fallback defensivo: se falhar com filtro .or, busca por data e filtra em memória
         const fallbackQuery = await supabase
           .from("appointments")
-          .select("id, barber_id, barber_name, date, start_time, end_time, duration_minutes, status")
+          .select("id, barbershop_id, tenant_id, barber_id, barber_name, date, start_time, end_time, duration_minutes, status")
           .not("status", "in", '("cancelled","rejected")')
           .eq("date", formattedBookingDate);
         if (!fallbackQuery.error && Array.isArray(fallbackQuery.data)) {
-          setOccupiedAppointments(fallbackQuery.data);
+          const filtered = targetTenantId
+            ? fallbackQuery.data.filter((a) => a.barbershop_id === targetTenantId || a.tenant_id === targetTenantId || !a.barbershop_id)
+            : fallbackQuery.data;
+          setOccupiedAppointments(filtered);
         }
       }
     } catch (err) {
@@ -290,23 +293,33 @@ export default function ClientBookingView({
 
     // Se o cliente escolheu um barbeiro específico:
     if (selectedBarberId && selectedBarberId !== "any") {
-      return relevantAppts.some((a) => {
+      const selectedName = (selectedBarberObj?.name || "").toLowerCase().trim();
+      const hasConflictForThisBarber = relevantAppts.some((a) => {
         const apptBarberId = a.barber_id || a.barberId;
         const apptBarberName = (a.barber_name || a.barberName || "").toLowerCase().trim();
-        const selectedName = (selectedBarberObj?.name || "").toLowerCase().trim();
         return (apptBarberId && apptBarberId === selectedBarberId) ||
                (selectedName && apptBarberName === selectedName);
       });
+
+      // Se a barbearia tiver apenas 1 profissional (ou nenhum registrado formalmente além do próprio barbeiro),
+      // qualquer agendamento nesse horário já ocupa a agenda
+      if (activeBarbersList.length <= 1) {
+        return relevantAppts.length > 0;
+      }
+
+      return hasConflictForThisBarber;
     }
 
-    // Se escolheu "Qualquer Barbeiro Livre" (any):
-    // Só é considerado ocupado se todos os barbeiros ativos da barbearia estiverem ocupados
-    if (activeBarbersList.length > 0) {
-      const busyBarberIds = new Set(relevantAppts.map((a) => a.barber_id || a.barberId));
-      return activeBarbersList.every((b) => busyBarberIds.has(b.id));
+    // Se escolheu "Qualquer Barbeiro Livre" (any) ou fluxo direto:
+    // 1. Se a barbearia tem 1 ou nenhum barbeiro cadastrado: 1 agendamento esgota o horário
+    const totalActiveBarbers = Math.max(activeBarbersList.length, 1);
+    if (totalActiveBarbers <= 1) {
+      return relevantAppts.length >= 1;
     }
 
-    return false;
+    // 2. Se a barbearia possui múltiplos barbeiros (ex: 2, 3, etc):
+    // Só é considerado ocupado se o número de agendamentos no horário atingir a quantidade total de barbeiros ativos
+    return relevantAppts.length >= totalActiveBarbers;
   };
 
   const computedTimeSlots = baseTimeSlots.map((slot) => {
@@ -514,6 +527,43 @@ export default function ClientBookingView({
         }
       }
 
+      // 1.5. Verificação de Concorrência e Idempotência direta no Supabase antes de inserir
+      if (supabase) {
+        try {
+          const { data: existingAppts } = await supabase
+            .from("appointments")
+            .select("id, barber_id, barber_name, start_time, end_time, status")
+            .not("status", "in", '("cancelled","rejected")')
+            .eq("date", appointmentDateStr)
+            .eq("start_time", effectiveTime);
+
+          if (Array.isArray(existingAppts) && existingAppts.length > 0) {
+            const totalBarbers = Math.max(activeBarbersList.length, 1);
+            const isSingleBarber = totalBarbers <= 1;
+
+            let conflict = false;
+            if (isSingleBarber) {
+              conflict = true;
+            } else if (targetBarberId && isUuid(targetBarberId)) {
+              conflict = existingAppts.some((a) => a.barber_id === targetBarberId);
+            } else {
+              conflict = existingAppts.length >= totalBarbers;
+            }
+
+            if (conflict) {
+              setBookingErrorMessage(
+                `⚠️ O horário das ${effectiveTime}h acabou de ser reservado por outro cliente. Por favor, selecione outro horário disponível.`
+              );
+              setIsSubmittingBooking(false);
+              fetchOccupiedAppointments();
+              return;
+            }
+          }
+        } catch (checkErr) {
+          console.warn("Aviso na checagem prévia de concorrência:", checkErr);
+        }
+      }
+
       // 2. Persistência direta no Supabase estritamente com colunas existentes na tabela appointments (zero erro 400)
       if (!atomicBooked && supabase) {
         const appointmentPayload = {
@@ -537,15 +587,15 @@ export default function ClientBookingView({
         let { error: insertError } = await supabase.from("appointments").insert([appointmentPayload]);
 
         if (insertError && (insertError.code === "42P01" || insertError.message?.includes("does not exist"))) {
-          const fallbackRes = await supabase.from("agendamentos").insert([corePayload]);
+          const fallbackRes = await supabase.from("agendamentos").insert([appointmentPayload]);
           insertError = fallbackRes.error;
         }
 
         // Blindagem de Resiliência: se a foreign key do barbeiro violar no banco (código 23503), retenta imediatamente com barber_id = null
         if (insertError && (insertError.code === "23503" || insertError.message?.includes("foreign key") || insertError.message?.includes("appointments_barber_id_fkey"))) {
           console.warn("[Agendamento Resiliente] Chave estrangeira de barbeiro inexistente no banco. Desacoplando barber_id para garantir a confirmação do cliente.");
-          const safeCorePayload = { ...corePayload, barber_id: null };
-          const safeRes = await supabase.from("appointments").insert([safeCorePayload]);
+          const safeAppointmentPayload = { ...appointmentPayload, barber_id: null };
+          const safeRes = await supabase.from("appointments").insert([safeAppointmentPayload]);
           insertError = safeRes.error;
         }
 
