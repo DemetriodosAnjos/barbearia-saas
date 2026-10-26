@@ -180,20 +180,28 @@ export default function ClientBookingView({
     try {
       let query = supabase
         .from("appointments")
-        .select("id, tenant_id, barbershop_id, barber_id, barber_name, date, booking_date, appointment_date, start_time, end_time, appointment_time, duration_minutes, duration, status")
-        .not("status", "in", '("cancelled","rejected")');
+        .select("id, barbershop_id, barber_id, barber_name, date, start_time, end_time, duration_minutes, status")
+        .not("status", "in", '("cancelled","rejected")')
+        .eq("date", formattedBookingDate);
 
-      // Filtra por data
-      query = query.or(`date.eq.${formattedBookingDate},booking_date.eq.${formattedBookingDate},appointment_date.eq.${formattedBookingDate}`);
-
-      // Filtra por tenant da barbearia se informado
+      // Filtra por barbearia/tenant se informado
       if (targetTenantId) {
-        query = query.or(`tenant_id.eq.${targetTenantId},barbershop_id.eq.${targetTenantId}`);
+        query = query.eq("barbershop_id", targetTenantId);
       }
 
       const { data, error } = await query;
       if (!error && Array.isArray(data)) {
         setOccupiedAppointments(data);
+      } else if (error) {
+        // Fallback defensivo: se falhar com filtro de barbershop_id, busca por data
+        const fallbackQuery = await supabase
+          .from("appointments")
+          .select("id, barber_id, barber_name, date, start_time, end_time, duration_minutes, status")
+          .not("status", "in", '("cancelled","rejected")')
+          .eq("date", formattedBookingDate);
+        if (!fallbackQuery.error && Array.isArray(fallbackQuery.data)) {
+          setOccupiedAppointments(fallbackQuery.data);
+        }
       }
     } catch (err) {
       console.warn("Aviso ao consultar slots ocupados no Supabase:", err);
@@ -504,42 +512,46 @@ export default function ClientBookingView({
         }
       }
 
-      // 2. Se a RPC não estiver instalada ou falhou sem conflito, executa a inserção com todas as colunas
+      // 2. Se a RPC não estiver instalada ou falhou sem conflito, executa a inserção com colunas oficiais do Supabase
       if (!atomicBooked && supabase) {
-        const insertPayload = {
+        const corePayload = {
           id: appointmentId,
-          tenant_id: targetTenantId,
-          barbershop_id: targetTenantId,
-          date: appointmentDateStr,
-          booking_date: appointmentDateStr,
-          appointment_date: appointmentDateStr,
-          client_id: `guest-${effectivePhone.replace(/\D/g, "")}`,
-          client_name: DOMPurify.sanitize(effectiveName.trim(), { ALLOWED_TAGS: [] }),
-          client_phone: DOMPurify.sanitize(effectivePhone.trim(), { ALLOWED_TAGS: [] }),
+          barbershop_id: isUuid(targetTenantId) ? targetTenantId : null,
           barber_id: targetBarberId,
           barber_name: DOMPurify.sanitize(finalBarber?.name || "Barbeiro", { ALLOWED_TAGS: [] }),
-          service_id: effectiveSelectedServices[0]?.id || "srv-default",
+          client_name: DOMPurify.sanitize(effectiveName.trim(), { ALLOWED_TAGS: [] }),
+          client_phone: DOMPurify.sanitize(effectivePhone.trim(), { ALLOWED_TAGS: [] }),
           service_name: DOMPurify.sanitize(resolvedServiceName, { ALLOWED_TAGS: [] }),
-          duration_minutes: resolvedDuration,
-          duration: resolvedDuration,
-          price: totalPrice,
-          total_price: totalPrice,
+          date: appointmentDateStr,
           start_time: effectiveTime,
           end_time: computedEndTime,
-          appointment_time: effectiveTime,
-          payment_method: effectivePayment,
-          protocol: protocolId,
-          pix_payload: generatedPixBrCode,
-          source: "client_link",
-          idempotency_key: idempotencyKey,
+          duration_minutes: Number(resolvedDuration) || 30,
+          price: Number(totalPrice) || 0,
           status: "confirmed",
           is_paid: false,
+          notes: DOMPurify.sanitize(`Agendamento via link online. Pagamento: ${effectivePayment}. Protocolo: ${protocolId}`, { ALLOWED_TAGS: [] }),
         };
 
-        let { error: insertError } = await supabase.from("appointments").insert([insertPayload]);
+        const extendedPayload = {
+          ...corePayload,
+          ...(isUuid(targetTenantId) ? { tenant_id: targetTenantId } : {}),
+          payment_method: effectivePayment,
+          protocol: protocolId,
+          pix_payload: generatedPixBrCode || null,
+          source: "client_link",
+          idempotency_key: idempotencyKey,
+        };
+
+        let { error: insertError } = await supabase.from("appointments").insert([extendedPayload]);
+
+        // Se der erro por coluna não existente no schema cache, tenta com o corePayload estrito
+        if (insertError && (insertError.message?.includes("column") || insertError.code === "42703" || insertError.code === "PGRST204")) {
+          const coreRes = await supabase.from("appointments").insert([corePayload]);
+          insertError = coreRes.error;
+        }
 
         if (insertError && (insertError.code === "42P01" || insertError.message?.includes("does not exist"))) {
-          const fallbackRes = await supabase.from("agendamentos").insert([insertPayload]);
+          const fallbackRes = await supabase.from("agendamentos").insert([corePayload]);
           insertError = fallbackRes.error;
         }
 
@@ -811,6 +823,7 @@ export default function ClientBookingView({
                     key={service.id}
                     service={service}
                     isSelected={isSelected}
+                    onToggleSelect={() => handleToggleService(service)}
                     onToggle={() => handleToggleService(service)}
                   />
                 );

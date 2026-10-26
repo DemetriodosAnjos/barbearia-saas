@@ -6,6 +6,7 @@ export default function ServiceCard({
   service = {},
   isSelected = false,
   onToggleSelect,
+  onToggle,
   onEdit,
   onDelete,
   onRestore,
@@ -14,6 +15,8 @@ export default function ServiceCard({
 }) {
   // [Defesa: se o serviço for nulo ou sem nome, não quebra a interface]
   if (!service || !service.name) return null;
+
+  const handleToggle = onToggleSelect || onToggle;
 
   // [Normalização defensiva suportando snake_case do Supabase e camelCase do React]
   const isInactive = service.active === false;
@@ -35,7 +38,7 @@ export default function ServiceCard({
   const handleKeyDown = (e) => {
     if (!isManagementMode && !disabled && !isInactive && (e.key === " " || e.key === "Enter")) {
       e.preventDefault();
-      onToggleSelect && onToggleSelect(service);
+      handleToggle && handleToggle(service);
     }
   };
 
@@ -47,7 +50,7 @@ export default function ServiceCard({
       tabIndex={isManagementMode || disabled || isInactive ? -1 : 0}
       onKeyDown={handleKeyDown}
       onClick={() =>
-        !isManagementMode && !disabled && !isInactive && onToggleSelect && onToggleSelect(service)
+        !isManagementMode && !disabled && !isInactive && handleToggle && handleToggle(service)
       }
       className={`
         ${serviceCardStyles.container}
@@ -142,7 +145,7 @@ export default function ServiceCard({
           /* [Botão: inclusão de onClick no próprio botão para garantir resposta imediata ao toque do cliente] */
           <button
             type="button"
-            onClick={() => onToggleSelect && onToggleSelect(service)}
+            onClick={() => handleToggle && handleToggle(service)}
             className={`
               ${serviceCardStyles.selectButton}
               ${isSelected ? serviceCardStyles.btnSelected : serviceCardStyles.btnDefault}
