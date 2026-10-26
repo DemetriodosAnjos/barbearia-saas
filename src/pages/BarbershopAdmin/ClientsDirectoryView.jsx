@@ -466,8 +466,10 @@ export default function ClientsDirectoryView({
       client.frequencyDays - (client.daysSinceLastVisit || 0),
     );
 
-    // [Link dinâmico e seguro: aponta para a URL pública real preservando subpastas do GitHub Pages (/barbearia-saas/)]
+    // [Link dinâmico e seguro: aponta para a URL pública real vinculada à barbearia/tenant]
     const customLink = buildClientBookingUrl({
+      slug: tenant?.slug,
+      tenantId: tenant?.id,
       barber: client.preferredBarber || "geral",
       clientName: client.name,
       clientPhone: client.phone,

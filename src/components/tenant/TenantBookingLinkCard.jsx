@@ -1,0 +1,229 @@
+import { useState, useEffect } from "react";
+import QRCode from "qrcode";
+import ProjectIcon from "../ui/ProjectIcon";
+import Button from "../ui/Button";
+import Modal from "../ui/Modal";
+import {
+  buildClientBookingUrl,
+  buildWhatsAppInviteMessage,
+  buildWhatsAppUrl,
+} from "../../utils/publicBookingUrl";
+
+export default function TenantBookingLinkCard({
+  tenant,
+  onOpenSettings,
+  className = "",
+}) {
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
+
+  const tenantSlug = tenant?.slug || "";
+  const tenantId = tenant?.id || "";
+  const barbershopName = tenant?.name || "Minha Barbearia";
+
+  // Constrói a URL pública oficial associada à barbearia
+  const clientBookingUrl = buildClientBookingUrl({
+    slug: tenantSlug,
+    tenantId: tenantId,
+  });
+
+  // Mensagem de convite pronta para divulgação
+  const inviteMessage = buildWhatsAppInviteMessage({
+    barbershopName,
+    bookingUrl: clientBookingUrl,
+  });
+
+  const whatsAppShareUrl = buildWhatsAppUrl("", inviteMessage);
+
+  // Gera o QR Code quando abrir o modal
+  useEffect(() => {
+    if (isQrModalOpen && clientBookingUrl) {
+      QRCode.toDataURL(clientBookingUrl, {
+        width: 320,
+        margin: 2,
+        color: {
+          dark: "#000000",
+          light: "#FFFFFF",
+        },
+      })
+        .then((url) => setQrCodeDataUrl(url))
+        .catch((err) => console.warn("Erro ao gerar QR Code do balcão:", err));
+    }
+  }, [isQrModalOpen, clientBookingUrl]);
+
+  const handleCopyLink = () => {
+    navigator.clipboard?.writeText(clientBookingUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  const handleDownloadQr = () => {
+    if (!qrCodeDataUrl) return;
+    const a = document.createElement("a");
+    a.href = qrCodeDataUrl;
+    a.download = `qrcode-agendamento-${tenantSlug || "barbearia"}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  return (
+    <div
+      className={`p-4 sm:p-5 bg-gradient-to-br from-neutral-900 via-neutral-900 to-amber-950/20 border border-amber-500/30 rounded-3xl shadow-xl space-y-3.5 text-left ${className}`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-neutral-800">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <ProjectIcon name="Scissors" size={18} colorVariant="amber" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                Link do Cliente (Tenant)
+              </span>
+              {tenantSlug && (
+                <span className="text-[11px] font-mono text-neutral-400 truncate hidden md:inline">
+                  @{tenantSlug}
+                </span>
+              )}
+            </div>
+            <h3 className="text-sm font-black text-white mt-0.5">
+              Link de Agendamento da Barbearia
+            </h3>
+          </div>
+        </div>
+
+        {onOpenSettings && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="text-[11px] font-semibold text-neutral-400 hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <ProjectIcon name="Settings" size={12} colorVariant="inherit" />
+            <span>Personalizar Slug</span>
+          </button>
+        )}
+      </div>
+
+      <p className="text-xs text-neutral-300 leading-relaxed">
+        Envie este link para seus clientes pelo WhatsApp ou Instagram. Eles escolhem o serviço, o barbeiro e o horário com confirmação direta.
+      </p>
+
+      {/* Caixa de exibição do link com cópia rápida */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 flex items-center gap-2 text-xs font-mono text-neutral-200 overflow-hidden shadow-inner">
+          <ProjectIcon name="Link" size={14} className="text-amber-400 shrink-0" />
+          <span className="truncate select-all">{clientBookingUrl}</span>
+        </div>
+
+        <Button
+          variant={copiedLink ? "success" : "primary"}
+          onClick={handleCopyLink}
+          className="text-xs py-2 px-3 font-bold cursor-pointer shrink-0"
+        >
+          <span className="flex items-center justify-center gap-1.5">
+            <ProjectIcon name={copiedLink ? "Check" : "Copy"} size={13} colorVariant="inherit" />
+            <span>{copiedLink ? "Link Copiado!" : "Copiar Link"}</span>
+          </span>
+        </Button>
+      </div>
+
+      {/* Ações Rápidas de Divulgação */}
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        <a
+          href={whatsAppShareUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="py-1.5 px-3 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-950/30 cursor-pointer"
+        >
+          <ProjectIcon name="MessageSquare" size={13} colorVariant="inherit" />
+          <span>Divulgar no WhatsApp</span>
+          <ProjectIcon name="ExternalLink" size={10} colorVariant="inherit" />
+        </a>
+
+        <Button
+          variant="secondary"
+          onClick={() => setIsQrModalOpen(true)}
+          className="text-xs py-1.5 px-3 font-semibold cursor-pointer"
+        >
+          <span className="flex items-center gap-1.5">
+            <ProjectIcon name="QrCode" size={13} colorVariant="inherit" />
+            <span>QR Code do Balcão</span>
+          </span>
+        </Button>
+
+        <a
+          href={clientBookingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="py-1.5 px-3 rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ml-auto"
+        >
+          <ProjectIcon name="Eye" size={13} colorVariant="inherit" />
+          <span>Testar como Cliente</span>
+        </a>
+      </div>
+
+      {/* Modal de QR Code do Balcão */}
+      {isQrModalOpen && (
+        <Modal
+          isOpen={isQrModalOpen}
+          onClose={() => setIsQrModalOpen(false)}
+          title="QR Code de Agendamento no Balcão"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4 text-center p-2">
+            <p className="text-xs text-neutral-300">
+              Imprima este QR Code ou exiba-o no balcão e mesas da barbearia. O cliente aponta a câmera do celular e abre o agendamento imediatamente.
+            </p>
+
+            <div className="flex justify-center py-3">
+              <div className="p-4 bg-white rounded-3xl shadow-2xl inline-block border-4 border-amber-500/30">
+                {qrCodeDataUrl ? (
+                  <img
+                    src={qrCodeDataUrl}
+                    alt="QR Code da Barbearia"
+                    className="w-56 h-56 object-contain"
+                  />
+                ) : (
+                  <div className="w-56 h-56 flex items-center justify-center text-neutral-400 text-xs">
+                    Gerando QR Code...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-neutral-950 p-3 rounded-2xl border border-neutral-800 text-xs text-left font-mono">
+              <span className="text-[10px] text-neutral-500 block mb-0.5 font-sans font-bold uppercase">
+                Destino do QR Code:
+              </span>
+              <span className="text-amber-400 break-all select-all">
+                {clientBookingUrl}
+              </span>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="primary"
+                onClick={handleDownloadQr}
+                className="flex-1 text-xs py-2.5 font-bold cursor-pointer"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <ProjectIcon name="Download" size={14} colorVariant="inherit" />
+                  <span>Baixar Imagem PNG</span>
+                </span>
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setIsQrModalOpen(false)}
+                className="text-xs py-2.5 px-4 font-semibold cursor-pointer"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}

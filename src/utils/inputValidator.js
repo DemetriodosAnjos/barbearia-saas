@@ -172,6 +172,13 @@ export const SCHEMAS = {
     price: { type: "number", required: true, min: 0, max: 10000 },
     start_time: { type: "string", required: true, minLength: 4, maxLength: 10 },
     end_time: { type: "string", required: true, minLength: 4, maxLength: 10 },
+    payment_method: {
+      type: "string",
+      required: false,
+      maxLength: 30,
+      allowedValues: ["no_local", "pix", "credit_card", "dinheiro"],
+      default: "no_local",
+    },
   },
 
   // Schema de Cadastro de Cliente (Body)
@@ -214,7 +221,11 @@ export const SCHEMAS = {
       ],
     },
     tenant_id: { type: "string", required: false, maxLength: 50 },
+    barbearia: { type: "string", required: false, maxLength: 80 },
+    slug: { type: "string", required: false, maxLength: 80 },
     barbeiro: { type: "string", required: false, maxLength: 60 },
+    cliente: { type: "string", required: false, maxLength: 80 },
+    telefone: { type: "string", required: false, maxLength: 30 },
   },
 
   // Schema de Path Parameters

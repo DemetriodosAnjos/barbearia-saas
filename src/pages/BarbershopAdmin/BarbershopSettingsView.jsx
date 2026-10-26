@@ -417,6 +417,37 @@ export default function BarbershopSettingsView({
                   })
                 }
               />
+              <div className="space-y-1">
+                <Input
+                  label="Identificador do Link (Slug da Barbearia)"
+                  value={businessData.slug}
+                  placeholder="ex: barbearia-alfa"
+                  onChange={(e) =>
+                    setBusinessData({
+                      ...businessData,
+                      slug: e.target.value
+                        .toLowerCase()
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "")
+                        .replace(/[^a-z0-9-]/g, "-"),
+                    })
+                  }
+                />
+                <span className="text-[11px] font-mono text-neutral-400 block truncate">
+                  Link: ?barbearia={businessData.slug || "minha-barbearia"}
+                </span>
+              </div>
+              <Input
+                label="Telefone / WhatsApp da Barbearia"
+                value={businessData.phone}
+                placeholder="(11) 99999-9999"
+                onChange={(e) =>
+                  setBusinessData({
+                    ...businessData,
+                    phone: e.target.value,
+                  })
+                }
+              />
             </div>
             <div className={settingsStyles.footerActions}>
               <Button

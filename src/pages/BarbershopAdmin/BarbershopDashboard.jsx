@@ -20,6 +20,7 @@ import FinancialDashboardView from "./FinancialDashboardView";
 import SkeletonDashboard from "../../components/resilience/SkeletonDashboard";
 import ProjectIcon from "../../components/ui/ProjectIcon";
 import BottomNavigation from "../../components/ui/BottomNavigation";
+import TenantBookingLinkCard from "../../components/tenant/TenantBookingLinkCard";
 import {
   Calendar,
   Users,
@@ -567,6 +568,16 @@ export default function BarbershopDashboard({
               <SkeletonDashboard latencyNotice={true} />
             ) : (
               <>
+                {/* Cartão Oficial de Compartilhamento do Link de Agendamento da Barbearia */}
+                {activeMenuTab === "agenda" && (
+                  <div className="mb-4">
+                    <TenantBookingLinkCard
+                      tenant={tenant}
+                      onOpenSettings={() => setActiveMenuTab("configuracoes")}
+                    />
+                  </div>
+                )}
+
                 {/* 1. AGENDA: Consome 'appointments' e 'onUpdateAppointments' */}
                 {activeMenuTab === "agenda" && (
                   <ErrorBoundary componentName="Agenda de Atendimentos">

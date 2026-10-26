@@ -43,6 +43,12 @@ export default function App() {
   const urlBarber = urlParams.get("barbeiro");
   const urlClientName = urlParams.get("cliente");
   const urlClientPhone = urlParams.get("telefone");
+  const urlSlug =
+    urlParams.get("barbearia") ||
+    urlParams.get("slug") ||
+    urlParams.get("b") ||
+    urlParams.get("tenant") ||
+    urlParams.get("tenant_id");
   const pathname = typeof window !== "undefined" ? window.location.pathname : "";
 
   // 1. Auditoria Imediata Anti-Bypass no Inicializador de Rota
@@ -86,8 +92,8 @@ export default function App() {
   const initialScreen = (() => {
     if (storageAudit.tamperingDetected) return "login";
     if (urlScreen) return urlScreen;
-    // Se a URL contiver parâmetros de agendamento público (barbeiro, cliente, telefone), abre direto a tela do cliente
-    if (urlBarber || urlClientName || urlClientPhone) return "client-app";
+    // Se a URL contiver parâmetros de agendamento público (barbearia, slug, barbeiro, cliente, telefone), abre direto a tela do cliente
+    if (urlSlug || urlBarber || urlClientName || urlClientPhone) return "client-app";
 
     try {
       const savedUserStr = safeStorage.getItem("saas_auth_user");
@@ -1342,6 +1348,70 @@ export default function App() {
   useEffect(() => {
     loadDataFromSupabase();
   }, [loadDataFromSupabase]);
+
+  // Resolução e sincronização dinâmica da barbearia pública via link/slug compartilhado
+  useEffect(() => {
+    if (!urlSlug) return;
+    let isMounted = true;
+
+    async function resolvePublicTenantBySlug() {
+      try {
+        const cleanSlug = urlSlug.trim().toLowerCase();
+        const isUuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cleanSlug);
+
+        let resolvedShop = null;
+
+        // 1. Busca na tabela oficial 'barbershops'
+        if (isUuidPattern) {
+          const { data } = await supabase
+            .from("barbershops")
+            .select("*")
+            .eq("id", cleanSlug)
+            .maybeSingle();
+          if (data) resolvedShop = data;
+        } else {
+          const { data } = await supabase
+            .from("barbershops")
+            .select("*")
+            .ilike("slug", cleanSlug)
+            .maybeSingle();
+          if (data) resolvedShop = data;
+        }
+
+        // 2. Se não encontrar em barbershops, busca em 'tenants'
+        if (!resolvedShop) {
+          if (isUuidPattern) {
+            const { data } = await supabase
+              .from("tenants")
+              .select("*")
+              .eq("id", cleanSlug)
+              .maybeSingle();
+            if (data) resolvedShop = data;
+          } else {
+            const { data } = await supabase
+              .from("tenants")
+              .select("*")
+              .ilike("slug", cleanSlug)
+              .maybeSingle();
+            if (data) resolvedShop = data;
+          }
+        }
+
+        if (resolvedShop && isMounted) {
+          const normalized = normalizeTenantRecord(resolvedShop);
+          setTenant(normalized);
+          await loadDataFromSupabase(resolvedShop.id);
+        }
+      } catch (err) {
+        console.warn("Aviso ao sincronizar barbearia pública:", err);
+      }
+    }
+
+    resolvePublicTenantBySlug();
+    return () => {
+      isMounted = false;
+    };
+  }, [urlSlug, loadDataFromSupabase]);
 
   // Sincronização de novo agendamento do cliente
   const handleClientBookingFinished = (bookingData) => {
