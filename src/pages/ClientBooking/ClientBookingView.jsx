@@ -86,6 +86,8 @@ export default function ClientBookingView({
   onFinishBooking,
   onGoToLogin,
 }) {
+  const targetTenantId = tenant?.id || "";
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingErrorMessage, setBookingErrorMessage] = useState("");
@@ -161,8 +163,6 @@ export default function ClientBookingView({
   };
 
   const availableBarbersForClient = [...activeBarbersList, anyBarberOption];
-
-  const targetTenantId = tenant?.id || "";
 
   // Recupera perfil e histórico salvo localmente no dispositivo do cliente
   const [activeTab, setActiveTab] = useState("booking"); // "booking" | "history"
