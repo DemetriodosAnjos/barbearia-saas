@@ -23,6 +23,7 @@ import {
   generatePixQrCodeDataUrl,
   getRegisteredUserPixKey,
 } from "../../utils/pixQrCode";
+import { masks } from "../../utils/masks";
 
 // Horários base do dia
 const baseTimeSlots = [
@@ -184,7 +185,9 @@ export default function ClientBookingView({
 
   // Busca o histórico de agendamentos no Supabase com base no telefone do cliente
   const fetchClientHistory = async (phoneToSearch) => {
-    const rawDigits = (phoneToSearch || clientPhone || "").replace(/\D/g, "");
+    // Sanitização e isolamento estrito: extrai apenas dígitos com limite de 11 números (padrão Brasil)
+    const sanitizedRaw = DOMPurify.sanitize(String(phoneToSearch || clientPhone || ""), { ALLOWED_TAGS: [] });
+    const rawDigits = sanitizedRaw.replace(/\D/g, "").slice(0, 11);
     if (!rawDigits || rawDigits.length < 8 || !supabase) return;
 
     setIsLoadingHistory(true);
@@ -196,11 +199,10 @@ export default function ClientBookingView({
         .order("start_time", { ascending: false })
         .limit(20);
 
-      // Filtra por telefone (compatível com formato com ou sem máscara)
+      // Filtra por telefone com variações sanitizadas e limitadas
       const phoneVariations = [
         rawDigits,
-        phoneToSearch || clientPhone,
-        rawDigits.length === 11 ? `(${rawDigits.slice(0, 2)}) ${rawDigits.slice(2, 7)}-${rawDigits.slice(7)}` : null,
+        masks.phone ? masks.phone(rawDigits) : null,
       ].filter(Boolean);
 
       query = query.in("client_phone", phoneVariations);
@@ -951,14 +953,26 @@ export default function ClientBookingView({
               <div className="flex gap-2">
                 <input
                   id="history-phone-search"
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={15}
                   placeholder="(11) 99999-9999"
                   value={clientPhone}
                   onChange={(e) => {
-                    const val = DOMPurify.sanitize(e.target.value.trim(), { ALLOWED_TAGS: [] });
-                    setClientPhone(val);
+                    // Sanitização rigorosa: remove qualquer injeção/caractere malicioso e limita estritamente a 11 dígitos
+                    const sanitizedInput = DOMPurify.sanitize(e.target.value || "", { ALLOWED_TAGS: [] });
+                    const digits = sanitizedInput.replace(/\D/g, "").slice(0, 11);
+                    const formatted = masks.phone ? masks.phone(digits) : digits;
+                    setClientPhone(formatted);
                   }}
-                  className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      fetchClientHistory(clientPhone);
+                    }
+                  }}
+                  className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500 font-mono"
                 />
                 <Button
                   variant="primary"
