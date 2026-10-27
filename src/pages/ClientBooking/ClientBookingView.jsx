@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import DOMPurify from "dompurify";
 import { supabase } from "../../lib/supabase";
+import { safeStorage } from "../../utils/safeStorage";
 import { clientBookingStyles } from "./ClientBookingView.styles";
 import Navbar from "../../components/ui/Navbar";
 import ServiceCard from "../../components/services/ServiceCard";
@@ -130,11 +131,33 @@ export default function ClientBookingView({
 
   const availableBarbersForClient = [...activeBarbersList, anyBarberOption];
 
+  const targetTenantId = tenant?.id || "";
+
+  // Recupera perfil e histórico salvo localmente no dispositivo do cliente
+  const [activeTab, setActiveTab] = useState("booking"); // "booking" | "history"
+  const [clientAppointmentsHistory, setClientAppointmentsHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isReturningClient, setIsReturningClient] = useState(false);
+
   const [selectedBarberId, setSelectedBarberId] = useState(initialBarberId);
   const [bookingDate, setBookingDate] = useState(new Date());
   const [bookingTime, setBookingTime] = useState("");
-  const [clientName, setClientName] = useState(initialClientName);
-  const [clientPhone, setClientPhone] = useState(initialClientPhone);
+  const [clientName, setClientName] = useState(() => {
+    if (initialClientName) return initialClientName;
+    try {
+      return safeStorage.getItem("barbearia_client_profile_name") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [clientPhone, setClientPhone] = useState(() => {
+    if (initialClientPhone) return initialClientPhone;
+    try {
+      return safeStorage.getItem("barbearia_client_profile_phone") || "";
+    } catch {
+      return "";
+    }
+  });
 
   // Forma de pagamento flexível: "no_local" | "pix"
   const [paymentMethod, setPaymentMethod] = useState("no_local");
@@ -151,6 +174,69 @@ export default function ClientBookingView({
   useEffect(() => {
     if (initialClientPhone) setClientPhone(initialClientPhone);
   }, [initialClientPhone]);
+
+  // Se já houver nome e telefone salvos previamente no dispositivo, ativa o badge de boas-vindas
+  useEffect(() => {
+    if (clientPhone && clientPhone.replace(/\D/g, "").length >= 10 && clientName.trim()) {
+      setIsReturningClient(true);
+    }
+  }, []);
+
+  // Busca o histórico de agendamentos no Supabase com base no telefone do cliente
+  const fetchClientHistory = async (phoneToSearch) => {
+    const rawDigits = (phoneToSearch || clientPhone || "").replace(/\D/g, "");
+    if (!rawDigits || rawDigits.length < 8 || !supabase) return;
+
+    setIsLoadingHistory(true);
+    try {
+      let query = supabase
+        .from("appointments")
+        .select("id, client_name, client_phone, service_name, barber_name, date, start_time, end_time, price, status, notes, created_at, barbershop_id, tenant_id")
+        .order("date", { ascending: false })
+        .order("start_time", { ascending: false })
+        .limit(20);
+
+      // Filtra por telefone (compatível com formato com ou sem máscara)
+      const phoneVariations = [
+        rawDigits,
+        phoneToSearch || clientPhone,
+        rawDigits.length === 11 ? `(${rawDigits.slice(0, 2)}) ${rawDigits.slice(2, 7)}-${rawDigits.slice(7)}` : null,
+      ].filter(Boolean);
+
+      query = query.in("client_phone", phoneVariations);
+
+      if (targetTenantId) {
+        query = query.or(`barbershop_id.eq.${targetTenantId},tenant_id.eq.${targetTenantId}`);
+      }
+
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        setClientAppointmentsHistory(data);
+      } else if (error) {
+        // Fallback defensivo: busca sem o filtro de tenant se este falhar
+        const fallbackRes = await supabase
+          .from("appointments")
+          .select("id, client_name, client_phone, service_name, barber_name, date, start_time, end_time, price, status, notes, created_at")
+          .in("client_phone", phoneVariations)
+          .order("date", { ascending: false })
+          .limit(20);
+        if (!fallbackRes.error && Array.isArray(fallbackRes.data)) {
+          setClientAppointmentsHistory(fallbackRes.data);
+        }
+      }
+    } catch (err) {
+      console.warn("Aviso ao carregar histórico do cliente:", err);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Carrega o histórico na montagem caso já tenhamos o telefone gravado
+  useEffect(() => {
+    if (clientPhone && clientPhone.replace(/\D/g, "").length >= 10) {
+      fetchClientHistory(clientPhone);
+    }
+  }, [targetTenantId]);
 
   useEffect(() => {
     if (initialBarberId && (!selectedBarberId || selectedBarberId === "any")) {
@@ -170,8 +256,6 @@ export default function ClientBookingView({
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   })();
-
-  const targetTenantId = tenant?.id || "";
 
   // 1. Consulta em tempo real os agendamentos já cadastrados no Supabase para o dia selecionado
   const fetchOccupiedAppointments = async () => {
@@ -638,6 +722,14 @@ export default function ClientBookingView({
         barbershopPhone: tenant?.phone || "",
       };
 
+      // Persiste os dados do cliente no dispositivo para reconhecimento futuro e atualização do histórico
+      try {
+        safeStorage.setItem("barbearia_client_profile_name", effectiveName.trim());
+        safeStorage.setItem("barbearia_client_profile_phone", effectivePhone.trim());
+        setIsReturningClient(true);
+        fetchClientHistory(effectivePhone.trim());
+      } catch {}
+
       setConfirmedBooking(bookingPayload);
       setCurrentStep(5);
       if (onFinishBooking) onFinishBooking(bookingPayload);
@@ -777,13 +869,218 @@ export default function ClientBookingView({
           </div>
         </div>
 
-        {/* Banner de Barbeiro Pré-selecionado por Link */}
-        {initialBarberId &&
-          currentStep < 5 &&
-          selectedBarberObj &&
-          !selectedBarberObj.isAnyProfessional && (
-            <div className={clientBookingStyles.deepLinkBanner}>
-              <div className="flex items-center gap-2">
+        {/* Reconhecimento do Cliente e Alternância de Abas (Novo Agendamento vs Meus Agendamentos) */}
+        <div className="flex flex-col gap-2">
+          {isReturningClient && clientName && (
+            <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-neutral-900 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300 animate-in fade-in">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-xs font-black shrink-0">
+                  ✓
+                </span>
+                <span className="truncate">
+                  Olá, <strong className="text-white font-extrabold">{clientName.split(" ")[0]}</strong>! Bom ter você de volta.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("history");
+                  if (clientPhone) fetchClientHistory(clientPhone);
+                }}
+                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline shrink-0 cursor-pointer"
+              >
+                Ver Histórico
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 p-1 bg-neutral-900/90 border border-neutral-800 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => setActiveTab("booking")}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                activeTab === "booking"
+                  ? "bg-amber-500 text-neutral-950 shadow-md font-black"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <ProjectIcon name="Calendar" size={14} colorVariant="inherit" />
+              <span>Novo Agendamento</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("history");
+                if (clientPhone) fetchClientHistory(clientPhone);
+              }}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                activeTab === "history"
+                  ? "bg-amber-500 text-neutral-950 shadow-md font-black"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <ProjectIcon name="Clock" size={14} colorVariant="inherit" />
+              <span>Meus Agendamentos</span>
+              {clientAppointmentsHistory.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-800 text-amber-300 font-mono">
+                  {clientAppointmentsHistory.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* ABA 2: HISTÓRICO DE AGENDAMENTOS DO CLIENTE */}
+        {activeTab === "history" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className={clientBookingStyles.stepHeader}>
+              <h2 className={clientBookingStyles.stepHeading}>
+                <ProjectIcon name="Clock" size={20} colorVariant="amber" />
+                <span>Seu Histórico na Barbearia</span>
+              </h2>
+              <p className={clientBookingStyles.stepDescription}>
+                Acompanhe seus horários confirmados, cancelados e atendimentos passados vinculados ao seu WhatsApp.
+              </p>
+            </div>
+
+            {/* Busca/Filtro por WhatsApp se ainda não tiver telefone salvo */}
+            <div className="p-3.5 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-2">
+              <label htmlFor="history-phone-search" className="text-xs font-bold text-neutral-300 block">
+                Consultar pelo número de WhatsApp:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="history-phone-search"
+                  type="text"
+                  placeholder="(11) 99999-9999"
+                  value={clientPhone}
+                  onChange={(e) => {
+                    const val = DOMPurify.sanitize(e.target.value.trim(), { ALLOWED_TAGS: [] });
+                    setClientPhone(val);
+                  }}
+                  className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+                <Button
+                  variant="primary"
+                  isLoading={isLoadingHistory}
+                  onClick={() => fetchClientHistory(clientPhone)}
+                  className="text-xs px-4 py-2 font-bold cursor-pointer"
+                >
+                  Buscar
+                </Button>
+              </div>
+            </div>
+
+            {/* Listagem dos agendamentos */}
+            {isLoadingHistory ? (
+              <div className="p-8 text-center text-neutral-400 text-xs space-y-2">
+                <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p>Buscando seu histórico no sistema...</p>
+              </div>
+            ) : clientAppointmentsHistory.length === 0 ? (
+              <div className="p-8 bg-neutral-900/50 border border-neutral-800/80 rounded-3xl text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-neutral-800 text-neutral-400 flex items-center justify-center mx-auto text-xl">
+                  <ProjectIcon name="Calendar" size={22} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Nenhum agendamento encontrado</h3>
+                  <p className="text-xs text-neutral-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                    Não encontramos atendimentos registrados para esse número nesta barbearia.
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  onClick={() => setActiveTab("booking")}
+                  className="text-xs py-2 px-5 font-bold cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <ProjectIcon name="Scissors" size={14} colorVariant="inherit" />
+                  <span>Fazer Novo Agendamento</span>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {clientAppointmentsHistory.map((appt) => {
+                  const isFuture = (() => {
+                    if (!appt.date) return false;
+                    const todayStr = new Date().toISOString().split("T")[0];
+                    return appt.date >= todayStr;
+                  })();
+
+                  const isCancelled = appt.status === "cancelled" || appt.status === "rejected";
+                  const isCompleted = appt.status === "completed";
+
+                  return (
+                    <div
+                      key={appt.id || `${appt.date}-${appt.start_time}`}
+                      className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-2.5 transition-all hover:border-neutral-700"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-mono text-neutral-400">
+                            {appt.date ? new Date(appt.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short", year: "numeric" }) : "Data não informada"}
+                          </span>
+                          <h4 className="text-sm font-black text-white mt-0.5">
+                            {appt.service_name || "Serviço da Barbearia"}
+                          </h4>
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            isCancelled
+                              ? "bg-rose-950/40 text-rose-400 border-rose-900/40"
+                              : isCompleted
+                                ? "bg-blue-950/40 text-blue-400 border-blue-900/40"
+                                : isFuture
+                                  ? "bg-emerald-950/40 text-emerald-400 border-emerald-900/40"
+                                  : "bg-neutral-800 text-neutral-300 border-neutral-700"
+                          }`}
+                        >
+                          {isCancelled
+                            ? "Cancelado"
+                            : isCompleted
+                              ? "Concluído"
+                              : isFuture
+                                ? "Agendado"
+                                : "Realizado"}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-neutral-300 pt-1 border-t border-neutral-800/60 font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <ProjectIcon name="Clock" size={13} className="text-amber-400" />
+                          <span>{appt.start_time || appt.appointment_time || "--:--"}h</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <ProjectIcon name="Scissors" size={13} className="text-amber-400" />
+                          <span className="truncate">{appt.barber_name || "Barbeiro da Casa"}</span>
+                        </div>
+                      </div>
+
+                      {appt.price > 0 && (
+                        <div className="flex justify-between items-center text-[11px] pt-1 text-neutral-400">
+                          <span>Valor do atendimento:</span>
+                          <span className="font-bold text-amber-400 font-mono">
+                            R$ {Number(appt.price).toFixed(2).replace(".", ",")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* FLUXO NORMAL DE NOVO AGENDAMENTO */}
+        {activeTab === "booking" && (
+          <>
+            {/* Banner de Barbeiro Pré-selecionado por Link */}
+            {initialBarberId &&
+              currentStep < 5 &&
+              selectedBarberObj &&
+              !selectedBarberObj.isAnyProfessional && (
+                <div className={clientBookingStyles.deepLinkBanner}>
+                  <div className="flex items-center gap-2">
                 <ProjectIcon name="Scissors" size={16} className="text-amber-500" />
                 <span>
                   Agendando com:{" "}
@@ -1231,6 +1528,7 @@ export default function ClientBookingView({
                 onClick={() => {
                   setConfirmedBooking(null);
                   setCurrentStep(1);
+                  setActiveTab("booking");
                 }}
                 className="flex-1 text-xs py-2.5 font-bold cursor-pointer border-neutral-700 hover:bg-neutral-800"
               >
@@ -1242,13 +1540,15 @@ export default function ClientBookingView({
             </div>
           </div>
         )}
+          </>
+        )}
 
         {/* Espaçador de rolagem */}
         <div className="h-44 sm:h-52 w-full shrink-0 select-none pointer-events-none" aria-hidden="true" />
       </main>
 
       {/* BARRA FIXA INFERIOR COM TOTAL E BOTÃO DE AVANÇAR */}
-      {currentStep < 5 && (
+      {activeTab === "booking" && currentStep < 5 && (
         <div className={clientBookingStyles.bottomDock}>
           <div className={clientBookingStyles.dockContent}>
             <div className={clientBookingStyles.dockTotalBox}>
