@@ -2,38 +2,41 @@ import { Dices, Star, Check, Scissors } from "lucide-react";
 import { professionalCardStyles } from "./ProfessionalCard.styles";
 
 export default function ProfessionalCard({
-  // [Remoção do mock fixo de Carlos Silva e inicialização defensiva como objeto vazio]
-  professional = {},
+  // Suporta tanto a prop professional quanto barber de forma intercambiável
+  professional,
+  barber,
   isSelected = false,
   onSelect,
   disabled = false,
   className = "",
 }) {
+  const activeProfessional = professional || barber || {};
+
   // [Defesa: se o objeto for nulo, não quebra a interface da listagem]
-  if (!professional) return null;
+  if (!activeProfessional || Object.keys(activeProfessional).length === 0) return null;
 
   // [Normalização defensiva de chaves suportando Supabase (snake_case) e React (camelCase)]
-  const name = professional.name || professional.display_name || "Profissional";
-  const role = professional.role || "Barbeiro";
+  const name = activeProfessional.name || activeProfessional.display_name || "Profissional";
+  const role = activeProfessional.role || "Barbeiro";
   const isAny = Boolean(
-    professional.isAnyProfessional || professional.is_any_professional,
+    activeProfessional.isAnyProfessional || activeProfessional.is_any_professional,
   );
   const avatar =
-    professional.avatar || (name ? name.slice(0, 2).toUpperCase() : null);
+    activeProfessional.avatar || (name ? name.slice(0, 2).toUpperCase() : null);
   const rating =
-    professional.rating !== undefined && professional.rating !== null
-      ? Number(professional.rating)
+    activeProfessional.rating !== undefined && activeProfessional.rating !== null
+      ? Number(activeProfessional.rating)
       : null;
-  const reviewCount = professional.reviewCount ?? professional.review_count;
-  const specialties = Array.isArray(professional.specialties)
-    ? professional.specialties
+  const reviewCount = activeProfessional.reviewCount ?? activeProfessional.review_count;
+  const specialties = Array.isArray(activeProfessional.specialties)
+    ? activeProfessional.specialties
     : [];
   const isAvailable =
-    professional.isAvailable ??
-    (professional.status !== "unavailable" && professional.status !== "off");
+    activeProfessional.isAvailable ??
+    (activeProfessional.status !== "unavailable" && activeProfessional.status !== "off");
   const nextSlot =
-    professional.nextAvailableSlot ||
-    professional.next_available_slot ||
+    activeProfessional.nextAvailableSlot ||
+    activeProfessional.next_available_slot ||
     "Disponível Hoje";
 
   // [Variáveis: cálculo do estado visual de seleção e bloqueio do card]
@@ -45,7 +48,7 @@ export default function ProfessionalCard({
 
   const handleClick = () => {
     if (!disabled && onSelect) {
-      onSelect(professional);
+      onSelect(activeProfessional);
     }
   };
 

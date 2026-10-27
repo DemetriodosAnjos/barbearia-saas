@@ -118,8 +118,38 @@ export default function ClientBookingView({
     }
   }, [services]);
 
-  // Barbeiros ativos
-  const activeBarbersList = barbers.filter((b) => b.status === "active");
+  // Barbeiros ativos da barbearia (com fallback direto caso venham do Supabase sem barbershop_id explícito)
+  const [liveBarbers, setLiveBarbers] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDirectBarbers() {
+      if (Array.isArray(barbers) && barbers.length > 0) {
+        setLiveBarbers(barbers);
+        return;
+      }
+      if (!supabase) return;
+      try {
+        let query = supabase.from("barbers").select("*").neq("status", "off");
+        if (targetTenantId) {
+          query = query.or(`barbershop_id.eq.${targetTenantId},tenant_id.eq.${targetTenantId},barbershop_id.is.null`);
+        }
+        const { data, error } = await query;
+        if (!error && Array.isArray(data) && data.length > 0 && isMounted) {
+          setLiveBarbers(data);
+        }
+      } catch (err) {
+        console.warn("Aviso ao carregar barbeiros diretamente do Supabase:", err);
+      }
+    }
+    loadDirectBarbers();
+    return () => {
+      isMounted = false;
+    };
+  }, [barbers, targetTenantId]);
+
+  const effectiveBarbers = liveBarbers.length > 0 ? liveBarbers : (Array.isArray(barbers) ? barbers : []);
+  const activeBarbersList = effectiveBarbers.filter((b) => b.status === "active" || !b.status);
 
   const anyBarberOption = {
     id: "any",
