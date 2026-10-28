@@ -1263,8 +1263,9 @@ export default function ScheduleView({
                     <Button
                       variant="secondary"
                       onClick={() => {
+                        const apptId = selectedAppointment?.id;
                         setSelectedAppointment(null);
-                        onNavigateToCashier();
+                        onNavigateToCashier(apptId);
                       }}
                       className="text-xs font-bold"
                     >

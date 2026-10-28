@@ -64,6 +64,7 @@ export default function BarbershopDashboard({
   isLoading = false,
 }) {
   const [activeMenuTab, setActiveMenuTab] = useState("agenda");
+  const [targetCashierComandaId, setTargetCashierComandaId] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [barberPresenceStatus, setBarberPresenceStatus] = useState("available");
@@ -594,7 +595,10 @@ export default function BarbershopDashboard({
                       onUpdateClient={onUpdateClient}
                       comandas={comandas}
                       onNavigateToClients={() => setActiveMenuTab("clientes")}
-                      onNavigateToCashier={() => setActiveMenuTab("caixa")}
+                      onNavigateToCashier={(comandaId) => {
+                        setTargetCashierComandaId(comandaId || null);
+                        setActiveMenuTab("caixa");
+                      }}
                       openNewAppointmentTrigger={openNewAppointmentTrigger}
                     />
                   </ErrorBoundary>
@@ -654,6 +658,8 @@ export default function BarbershopDashboard({
             {activeMenuTab === "caixa" && (
               <ErrorBoundary componentName="Frente de Caixa (PDV)">
                 <CashierPosView
+                  targetComandaId={targetCashierComandaId}
+                  onClearTargetComanda={() => setTargetCashierComandaId(null)}
                   sharedComandas={comandas}
                   onUpdateComandas={onUpdateComandas}
                   appointments={appointments}
