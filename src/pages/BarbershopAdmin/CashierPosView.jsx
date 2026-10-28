@@ -107,51 +107,6 @@ export default function CashierPosView({
   // Destaque visual temporário da comanda selecionada na Agenda
   const [highlightedComandaId, setHighlightedComandaId] = useState(null);
 
-  // Sincronização automática quando o usuário clica em "Ver comanda no caixa" ou "Abrir no Caixa" na Agenda
-  useEffect(() => {
-    if (!targetComandaId || !Array.isArray(comandas) || comandas.length === 0) return;
-
-    const target = comandas.find(
-      (c) => c.id === targetComandaId || c.appointmentId === targetComandaId
-    );
-
-    if (target) {
-      // Ajusta para a data do agendamento alvo caso esteja em outro dia
-      if (target.date && target.date !== selectedDate) {
-        setSelectedDate(target.date);
-        setViewAllDates(false);
-      }
-
-      // Se a comanda estiver cancelada e o filtro atual ocultar, ajusta filtro
-      if (target.status === "cancelled") {
-        setActiveFilter("cancelled");
-      } else if (
-        (activeFilter === "paid" && target.status !== "paid") ||
-        (activeFilter === "open" && target.status !== "open") ||
-        (activeFilter === "pending" && target.status !== "pending_payment")
-      ) {
-        setActiveFilter("all");
-      }
-
-      // Aplica destaque e rola suavemente até o card
-      setHighlightedComandaId(target.id);
-
-      setTimeout(() => {
-        const el = document.getElementById(`comanda-card-${target.id}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 150);
-
-      const timer = setTimeout(() => {
-        setHighlightedComandaId(null);
-        if (onClearTargetComanda) onClearTargetComanda();
-      }, 3500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [targetComandaId, comandas, selectedDate, activeFilter, onClearTargetComanda]);
-
   // Sincroniza produtos passados pelo dashboard
   useEffect(() => {
     if (initialProducts && initialProducts.length > 0) {
@@ -313,6 +268,51 @@ export default function CashierPosView({
     },
     [onUpdateComandas],
   );
+
+  // Sincronização automática quando o usuário clica em "Ver comanda no caixa" ou "Abrir no Caixa" na Agenda
+  useEffect(() => {
+    if (!targetComandaId || !Array.isArray(comandas) || comandas.length === 0) return;
+
+    const target = comandas.find(
+      (c) => c.id === targetComandaId || c.appointmentId === targetComandaId
+    );
+
+    if (target) {
+      // Ajusta para a data do agendamento alvo caso esteja em outro dia
+      if (target.date && target.date !== selectedDate) {
+        setSelectedDate(target.date);
+        setViewAllDates(false);
+      }
+
+      // Se a comanda estiver cancelada e o filtro atual ocultar, ajusta filtro
+      if (target.status === "cancelled") {
+        setActiveFilter("cancelled");
+      } else if (
+        (activeFilter === "paid" && target.status !== "paid") ||
+        (activeFilter === "open" && target.status !== "open") ||
+        (activeFilter === "pending" && target.status !== "pending_payment")
+      ) {
+        setActiveFilter("all");
+      }
+
+      // Aplica destaque e rola suavemente até o card
+      setHighlightedComandaId(target.id);
+
+      setTimeout(() => {
+        const el = document.getElementById(`comanda-card-${target.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 150);
+
+      const timer = setTimeout(() => {
+        setHighlightedComandaId(null);
+        if (onClearTargetComanda) onClearTargetComanda();
+      }, 3500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [targetComandaId, comandas, selectedDate, activeFilter, onClearTargetComanda]);
 
   // =========================================================================
   // 3. CÁLCULO DOS 3 INDICADORES FINANCEIROS NO TOPO (REGRAS DE NEGÓCIO)
