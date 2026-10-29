@@ -1,11 +1,15 @@
 export const loginStyles = {
-  // Fundo com degradê escuro imersivo
+  // Fundo com degradê escuro imersivo cobrindo toda a tela
   pageWrapper:
-    "min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center justify-center p-4 sm:p-6 select-none",
+    "relative min-h-screen w-full bg-neutral-950 text-neutral-100 flex flex-col justify-center select-none overflow-x-hidden",
 
-  // Container central
+  // Camada com layout flexível para posicionar o form à direita na versão web
+  layoutGrid:
+    "relative z-10 w-full min-h-screen flex flex-col lg:flex-row items-center justify-center lg:justify-between px-4 py-8 sm:px-6 lg:px-12 xl:px-20 max-w-7xl mx-auto",
+
+  // Container do formulário posicionado à direita no desktop
   container:
-    "w-full max-w-md flex flex-col gap-6 text-left animate-in fade-in zoom-in-95 duration-200",
+    "w-full max-w-md flex flex-col gap-6 text-left animate-in fade-in zoom-in-95 duration-200 lg:ml-auto shrink-0",
 
   // Cabeçalho da Marca
   brandHeader: "flex items-center justify-center gap-2.5 text-center",

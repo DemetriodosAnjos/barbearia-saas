@@ -34,6 +34,8 @@ import {
   User,
   Check,
   ExternalLink,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 
 import {
@@ -705,19 +707,61 @@ export default function Login({
 
   return (
     <div className={loginStyles.pageWrapper}>
-      <div className={loginStyles.container}>
-        {/* CARD PRINCIPAL DE LOGIN COM LOGO CENTRALIZADO */}
-        <div className={loginStyles.cardForm}>
-          {/* Cabeçalho Interno Centralizado */}
-          <div className={loginStyles.cardHeaderCentered}>
-            <Logo size="sm" symbolOnly={true} />
-            <h2 className={loginStyles.formTitle}>
-              Barbearia SaaS
-            </h2>
-            <p className={loginStyles.formSubtitle}>
-              Entre com suas credenciais para acessar sua conta.
-            </p>
+      {/* Background de Barbearia gerado por IA cobrindo toda a tela */}
+      <div className="fixed inset-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+        <img
+          src="/src/assets/images/barbershop_login_backdrop_1793291129617.jpg"
+          alt="Interior sofisticado de barbearia moderna"
+          className="w-full h-full object-cover select-none"
+          referrerPolicy="no-referrer"
+        />
+        {/* Overlay escuro com degradê direcional para contraste cinematográfico */}
+        <div className="absolute inset-0 bg-neutral-950/65 backdrop-blur-[2px] bg-gradient-to-t from-neutral-950/95 via-neutral-950/70 to-neutral-950/80 lg:bg-gradient-to-r lg:from-neutral-950/60 lg:via-neutral-950/75 lg:to-neutral-950/95" />
+      </div>
+
+      <div className={loginStyles.layoutGrid}>
+        {/* Painel de Apresentação da Barbearia (Visível na versão web/desktop) */}
+        <div className="hidden lg:flex flex-col justify-center max-w-xl text-left space-y-6 pr-8 text-white z-10">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold tracking-wide w-fit backdrop-blur-md shadow-sm">
+            <Shield className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span>Gestão Inteligente para Barbearias</span>
           </div>
+          <h1 className="text-4xl xl:text-5xl font-black tracking-tight text-white leading-tight">
+            Estilo, precisão e controle total do seu negócio.
+          </h1>
+          <p className="text-neutral-300 text-sm xl:text-base leading-relaxed">
+            Agendamentos em tempo real, comissões automáticas por barbeiro, frente de caixa (PDV) e pagamentos integrados via Mercado Pago.
+          </p>
+          <div className="flex flex-wrap items-center gap-6 pt-2 text-xs text-neutral-300 font-semibold">
+            <span className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Agendamento 24h</span>
+            </span>
+            <span className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Comissões Automáticas</span>
+            </span>
+            <span className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Frente de Caixa (PDV)</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Container Tela de Login (Posicionado à direita na versão web) */}
+        <div className={loginStyles.container}>
+          {/* CARD PRINCIPAL DE LOGIN COM LOGO CENTRALIZADO */}
+          <div className={loginStyles.cardForm}>
+            {/* Cabeçalho Interno Centralizado */}
+            <div className={loginStyles.cardHeaderCentered}>
+              <Logo size="sm" symbolOnly={true} />
+              <h2 className={loginStyles.formTitle}>
+                Barbearia SaaS
+              </h2>
+              <p className={loginStyles.formSubtitle}>
+                Entre com suas credenciais para acessar sua conta.
+              </p>
+            </div>
 
           {/* Alerta de Erro de Autenticação */}
           {authError && (
@@ -780,8 +824,15 @@ export default function Login({
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                  className="sr-only"
                 />
+                <span className="text-amber-500 inline-flex items-center transition-transform active:scale-95">
+                  {rememberMe ? (
+                    <CheckSquare className="w-4 h-4 text-amber-500 shrink-0" />
+                  ) : (
+                    <Square className="w-4 h-4 text-neutral-400 hover:text-neutral-300 shrink-0" />
+                  )}
+                </span>
                 <span>Lembrar de mim</span>
               </label>
 
@@ -921,6 +972,7 @@ export default function Login({
             Criar conta grátis
           </span>
         </p>
+      </div>
       </div>
 
       {/* ======================================================== */}

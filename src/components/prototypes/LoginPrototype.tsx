@@ -14,7 +14,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   KeyRound,
-  Fingerprint
+  Fingerprint,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { SafeHtml } from '../SafeHtml';
 
@@ -130,8 +132,15 @@ export const LoginPrototype: React.FC<LoginPrototypeProps> = ({ onSuccess }) => 
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded bg-zinc-950 border-zinc-800 text-indigo-600 focus:ring-indigo-500/20"
+              className="sr-only"
             />
+            <span className="text-amber-500 inline-flex items-center transition-transform active:scale-95">
+              {rememberMe ? (
+                <CheckSquare className="w-4 h-4 text-amber-500 shrink-0" />
+              ) : (
+                <Square className="w-4 h-4 text-zinc-500 hover:text-zinc-400 shrink-0" />
+              )}
+            </span>
             <span className="text-xs text-zinc-400">Lembrar este dispositivo</span>
           </label>
           <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
