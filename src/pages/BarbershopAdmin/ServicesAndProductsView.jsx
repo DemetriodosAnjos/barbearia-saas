@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 // [Import: cliente Supabase para sincronização real de serviços e produtos no banco]
-import { supabase } from "../../lib/supabase";
+import { supabase, resolveUnifiedTenantId } from "../../lib/supabase";
+import { Plus } from "lucide-react";
 import { barbershopStyles } from "./BarbershopDashboard.styles";
 import ServiceCard from "../../components/services/ServiceCard";
 import PosProductItem from "../../components/pos/PosProductItem";
@@ -214,9 +215,14 @@ export default function ServicesAndProductsView({
       return;
     }
 
+    const resolvedShopId =
+      tenant?.id ||
+      resolveUnifiedTenantId(tenant, null) ||
+      "db3f8187-8771-4f7c-b2bf-b7486d4eb1b6";
+
     const created = {
       id: `s-${Date.now()}`,
-      barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001",
+      barbershop_id: resolvedShopId,
       name: sanitizedName,
       category: sanitizedCategory,
       durationMinutes: duration,
@@ -238,7 +244,8 @@ export default function ServicesAndProductsView({
         await supabase.from("services").insert([
           {
             id: created.id,
-            barbershop_id: created.barbershop_id,
+            barbershop_id: resolvedShopId,
+            tenant_id: resolvedShopId,
             name: created.name,
             category: created.category,
             duration_minutes: created.durationMinutes,
@@ -351,10 +358,15 @@ export default function ServicesAndProductsView({
       return;
     }
 
+    const resolvedShopId =
+      tenant?.id ||
+      resolveUnifiedTenantId(tenant, null) ||
+      "db3f8187-8771-4f7c-b2bf-b7486d4eb1b6";
+
     const tempId = `prod-${Date.now()}`;
     const productPayload = {
-      id: tempId,
-      barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001",
+      barbershop_id: resolvedShopId,
+      tenant_id: resolvedShopId,
       name: sanitizedName,
       category: sanitizedCategory,
       cost_price: costPrice,
@@ -366,7 +378,7 @@ export default function ServicesAndProductsView({
 
     const created = {
       id: tempId,
-      barbershop_id: productPayload.barbershop_id,
+      barbershop_id: resolvedShopId,
       name: sanitizedName,
       category: sanitizedCategory,
       icon: sanitizedCategory === "Bar" ? "beer" : "product",
@@ -394,15 +406,29 @@ export default function ServicesAndProductsView({
         .select()
         .single();
 
-      if (!error && data) {
+      if (error) {
+        console.error("[ServicesAndProductsView] Erro ao salvar produto no Supabase:", error);
+        setFeedbackAlert({
+          variant: "warning",
+          title: "Produto Ativo (Aviso de Sincronização)",
+          message: `O produto "${created.name}" está ativo no PDV local, mas o Supabase reportou: ${error.message || "Erro no banco"}.`,
+        });
+        return;
+      }
+
+      if (data) {
         const official = {
           ...created,
           id: data.id || tempId,
+          barbershop_id: data.barbershop_id || resolvedShopId,
         };
         setLocalProducts((prev) =>
           prev.map((p) => (p.id === tempId ? official : p))
         );
         if (onUpdateProduct) onUpdateProduct(official);
+        if (onUpdateProducts) {
+          onUpdateProducts([official, ...localProducts.filter((p) => p.id !== tempId)]);
+        }
       }
     } catch (err) {
       console.warn("Aviso ao salvar produto no Supabase (mantido em contingência):", err);
@@ -410,8 +436,8 @@ export default function ServicesAndProductsView({
 
     setFeedbackAlert({
       variant: "success",
-      title: "Produto Cadastrado com Segurança!",
-      message: `O produto "${created.name}" foi sanitizado e adicionado ao estoque do PDV.`,
+      title: "Produto Cadastrado com Sucesso!",
+      message: `O produto "${created.name}" foi salvo com segurança no banco de dados e adicionado ao estoque do PDV.`,
     });
   };
 
@@ -587,17 +613,19 @@ export default function ServicesAndProductsView({
           <Button
             variant="primary"
             onClick={() => setIsServiceModalOpen(true)}
-            className="text-xs py-2.5 px-4 font-bold shadow-md self-start sm:self-auto"
+            className="text-xs py-2.5 px-4 font-bold shadow-md self-start sm:self-auto flex items-center gap-1.5"
           >
-            <span>+</span> Novo Serviço
+            <Plus className="w-4 h-4 shrink-0" />
+            <span>Novo Serviço</span>
           </Button>
         ) : (
           <Button
             variant="primary"
             onClick={() => setIsProductModalOpen(true)}
-            className="text-xs py-2.5 px-4 font-bold shadow-md self-start sm:self-auto bg-emerald-600 hover:bg-emerald-500"
+            className="text-xs py-2.5 px-4 font-bold shadow-md self-start sm:self-auto bg-emerald-600 hover:bg-emerald-500 flex items-center gap-1.5"
           >
-            <span>+</span> Novo Produto
+            <Plus className="w-4 h-4 shrink-0" />
+            <span>Novo Produto</span>
           </Button>
         )}
       </div>

@@ -224,6 +224,8 @@ async function supabaseResilientFetch(input, init = {}) {
       targetPath.startsWith("/rest/v1/appointments") ||
       targetPath.startsWith("/rest/v1/profiles") ||
       targetPath.startsWith("/rest/v1/plans") ||
+      targetPath.startsWith("/rest/v1/products") ||
+      targetPath.startsWith("/rest/v1/services") ||
       targetPath.startsWith("/rest/v1/saas_config"))
   ) {
     try {
