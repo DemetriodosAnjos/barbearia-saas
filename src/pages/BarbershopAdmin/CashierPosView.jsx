@@ -3,6 +3,7 @@ import DOMPurify from "dompurify";
 import { supabase } from "../../lib/supabase";
 import { posStyles } from "./CashierPosView.styles";
 import ComandaCard from "../../components/pos/ComandaCard";
+import AddItemToComandaModal from "../../components/pos/AddItemToComandaModal";
 import PosProductItem from "../../components/pos/PosProductItem";
 import QueueTicket from "../../components/pos/QueueTicket";
 import PaymentMethodSelector from "../../components/pos/PaymentMethodSelector";
@@ -99,10 +100,12 @@ export default function CashierPosView({
   const [selectedServiceToAdd, setSelectedServiceToAdd] = useState("");
   const [selectedProductToAdd, setSelectedProductToAdd] = useState("");
 
-  // Adicionar item em comanda
+  // Adicionar item em comanda (Modal com abas Serviços e Produtos)
   const [selectedComandaIdForAdd, setSelectedComandaIdForAdd] = useState("");
+  const [targetComandaForAddItem, setTargetComandaForAddItem] = useState(null);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [productToAdd, setProductToAdd] = useState(null);
+  const [posServices, setPosServices] = useState(services);
 
   // Nova comanda balcão
   const [isNewComandaModalOpen, setIsNewComandaModalOpen] = useState(false);
@@ -161,6 +164,52 @@ export default function CashierPosView({
       isMounted = false;
     };
   }, [initialProducts, onUpdateProducts]);
+
+  // Sincroniza e carrega catálogo real de serviços do Supabase
+  useEffect(() => {
+    if (services && services.length > 0) {
+      setPosServices(services);
+    }
+  }, [services]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadPosServices() {
+      try {
+        const { data, error } = await supabase
+          .from("services")
+          .select("*")
+          .order("name");
+
+        if (!error && data && data.length > 0 && isMounted) {
+          const mapped = data.map((s) => ({
+            id: s.id,
+            barbershop_id: s.barbershop_id,
+            name: s.name,
+            category: s.category || "Cabelo",
+            durationMinutes: Number(s.duration_minutes || s.durationMinutes || 30),
+            duration_minutes: Number(s.duration_minutes || s.durationMinutes || 30),
+            price: Number(s.price || 0),
+            commissionPercent: Number(
+              s.commission_percent || s.commissionPercent || 50,
+            ),
+            active: s.active !== false,
+            description: s.description || "",
+            tag: s.tag || undefined,
+          }));
+          setPosServices(mapped);
+        }
+      } catch (err) {
+        console.warn("Aviso ao carregar serviços no PDV:", err);
+      }
+    }
+    if (!services || services.length === 0) {
+      loadPosServices();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [services]);
 
   // =========================================================================
   // 2. SINCRONIZAÇÃO UNIFICADA: MERGE ENTRE AGENDA E COMANDAS DE BALCÃO
@@ -462,61 +511,277 @@ export default function CashierPosView({
     setTimeout(() => setAlertSuccess(""), 5000);
   };
 
-  // Lançar Produto na Comanda
+  // Catálogo de Produtos para o PDV / Comandas
+  const availableProducts = useMemo(() => {
+    if (Array.isArray(products) && products.length > 0) {
+      return products;
+    }
+    return [
+      { id: "prod-1", name: "Cerveja Heineken Long Neck 330ml", category: "Bar", price: 14, stock: 48, commissionPercent: 10 },
+      { id: "prod-2", name: "Refrigerante Coca-Cola Lata 350ml", category: "Bar", price: 7, stock: 36, commissionPercent: 10 },
+      { id: "prod-3", name: "Pomada Modeladora Efeito Matte", category: "Vitrine", price: 45, stock: 20, commissionPercent: 15 },
+      { id: "prod-4", name: "Óleo Hidratante de Barba Premium", category: "Vitrine", price: 38, stock: 15, commissionPercent: 15 },
+      { id: "prod-5", name: "Água Mineral com Gás 500ml", category: "Bar", price: 5, stock: 40, commissionPercent: 10 },
+    ];
+  }, [products]);
+
+  // Abertura do Modal de Adicionar Item (Serviços & Produtos com abas)
+  const handleOpenAddItemModal = (cmd) => {
+    const target =
+      cmd ||
+      comandas.find((c) => c.id === selectedComandaIdForAdd) ||
+      comandas.find((c) => c.status !== "paid" && c.status !== "cancelled") ||
+      comandas[0];
+    if (target) {
+      setTargetComandaForAddItem(target);
+      setSelectedComandaIdForAdd(target.id);
+    }
+    setIsAddItemModalOpen(true);
+  };
+
+  // Lançar Produto na Comanda a partir do Quick Bar
   const handleQuickAddProduct = (product) => {
+    const openCmd =
+      targetComandaForAddItem ||
+      comandas.find((c) => c.status !== "paid" && c.status !== "cancelled") ||
+      comandas[0];
+    if (openCmd) {
+      setTargetComandaForAddItem(openCmd);
+      setSelectedComandaIdForAdd(openCmd.id);
+    }
     setProductToAdd(product);
     setIsAddItemModalOpen(true);
   };
 
-  const handleConfirmAddProductToComanda = () => {
-    if (!productToAdd || !selectedComandaIdForAdd) return;
+  // Inclusão de Serviço na Comanda
+  const handleAddServiceToComanda = async (service, targetComandaId) => {
+    const cmdId =
+      targetComandaId || targetComandaForAddItem?.id || selectedComandaIdForAdd;
+    if (!service || !cmdId) return;
 
-    const updated = comandas.map((cmd) => {
-      if (cmd.id !== selectedComandaIdForAdd) return cmd;
+    let updatedCmd = null;
+    const nextComandas = comandas.map((c) => {
+      if (c.id !== cmdId) return c;
 
-      const existingProdIndex = (cmd.products || []).findIndex(
-        (p) => p.id === productToAdd.id,
+      const newService = {
+        id: `s-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        serviceId: service.id,
+        name: service.name,
+        category: service.category || "Cabelo",
+        price: Number(service.price || 0),
+        barberCommission:
+          Number(service.price || 0) *
+          ((service.commissionPercent || 50) / 100),
+      };
+
+      const updatedServices = [...(c.services || []), newService];
+      const servicesTotal = updatedServices.reduce(
+        (acc, s) => acc + Number(s.price || 0),
+        0,
       );
-      let updatedProducts;
+      const productsTotal = (c.products || []).reduce(
+        (acc, p) =>
+          acc +
+          Number(
+            p.total ||
+              Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+          ),
+        0,
+      );
+      const newPrice = servicesTotal + productsTotal;
 
-      if (existingProdIndex >= 0) {
-        updatedProducts = cmd.products.map((p, idx) =>
-          idx === existingProdIndex
-            ? {
-                ...p,
-                quantity: p.quantity + 1,
-                total: (p.quantity + 1) * p.unitPrice,
-                sellerCommission:
-                  (p.quantity + 1) *
-                  (p.unitPrice * ((productToAdd.commissionPercent || 0) / 100)),
-              }
-            : p,
-        );
-      } else {
-        updatedProducts = [
-          ...(cmd.products || []),
-          {
-            id: productToAdd.id,
-            name: productToAdd.name,
-            quantity: 1,
-            unitPrice: productToAdd.price,
-            total: productToAdd.price,
+      updatedCmd = {
+        ...c,
+        services: updatedServices,
+        price: newPrice,
+      };
+      return updatedCmd;
+    });
+
+    updateComandasState(nextComandas);
+
+    if (updatedCmd) {
+      setTargetComandaForAddItem(updatedCmd);
+
+      // Sincroniza com a Agenda e Supabase se for vinculado a agendamento
+      if (updatedCmd.appointmentId || updatedCmd.source === "agenda") {
+        const apptId = updatedCmd.appointmentId || updatedCmd.id;
+        const consolidatedNames = updatedCmd.services
+          .map((s) => s.name)
+          .join(" + ");
+
+        if (onUpdateAppointments) {
+          onUpdateAppointments((prevAppts) =>
+            prevAppts.map((a) =>
+              a.id === apptId
+                ? {
+                    ...a,
+                    serviceName: consolidatedNames,
+                    price: updatedCmd.price,
+                  }
+                : a,
+            ),
+          );
+        }
+
+        try {
+          await supabase
+            .from("appointments")
+            .update({
+              service_name: consolidatedNames,
+              price: updatedCmd.price,
+            })
+            .eq("id", apptId);
+        } catch (err) {
+          console.warn(
+            "Aviso ao sincronizar inclusão de serviço no Supabase:",
+            err,
+          );
+        }
+      }
+
+      setAlertSuccess(
+        `Serviço "${service.name}" incluído na comanda de ${updatedCmd.clientName}!`,
+      );
+      setTimeout(() => setAlertSuccess(""), 4000);
+    }
+  };
+
+  // Inclusão de Produto na Comanda
+  const handleAddProductToComanda = async (
+    product,
+    quantity = 1,
+    targetComandaId,
+  ) => {
+    const cmdId =
+      targetComandaId || targetComandaForAddItem?.id || selectedComandaIdForAdd;
+    if (!product || !cmdId) return;
+
+    const qty = Math.max(1, Number(quantity) || 1);
+    const prodPrice = Number(product.price || 0);
+
+    let updatedCmd = null;
+    const nextComandas = comandas.map((c) => {
+      if (c.id !== cmdId) return c;
+
+      const currentProducts = c.products || [];
+      const existingIdx = currentProducts.findIndex(
+        (p) => p.id === product.id || p.name === product.name,
+      );
+
+      let nextProducts;
+      if (existingIdx >= 0) {
+        nextProducts = currentProducts.map((p, idx) => {
+          if (idx !== existingIdx) return p;
+          const nextQty = (p.quantity || 1) + qty;
+          const uPrice = Number(p.unitPrice || prodPrice);
+          return {
+            ...p,
+            quantity: nextQty,
+            total: nextQty * uPrice,
             sellerCommission:
-              productToAdd.price *
-              ((productToAdd.commissionPercent || 0) / 100),
+              nextQty * (uPrice * ((product.commissionPercent || 10) / 100)),
+          };
+        });
+      } else {
+        nextProducts = [
+          ...currentProducts,
+          {
+            id: product.id,
+            productId: product.id,
+            name: product.name,
+            category: product.category || "Bar",
+            quantity: qty,
+            unitPrice: prodPrice,
+            total: qty * prodPrice,
+            sellerCommission:
+              qty * (prodPrice * ((product.commissionPercent || 10) / 100)),
           },
         ];
       }
 
-      return { ...cmd, products: updatedProducts };
+      const servicesTotal = (c.services || []).reduce(
+        (acc, s) => acc + Number(s.price || 0),
+        0,
+      );
+      const productsTotal = nextProducts.reduce(
+        (acc, p) =>
+          acc +
+          Number(
+            p.total ||
+              Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+          ),
+        0,
+      );
+      const newPrice = servicesTotal + productsTotal;
+
+      updatedCmd = {
+        ...c,
+        products: nextProducts,
+        price: newPrice,
+      };
+      return updatedCmd;
     });
 
-    updateComandasState(updated);
-    setIsAddItemModalOpen(false);
-    setAlertSuccess(
-      `Item "${productToAdd.name}" lançado na Comanda #${selectedComandaIdForAdd}!`,
+    updateComandasState(nextComandas);
+
+    // Abate estoque localmente
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === product.id
+          ? { ...p, stock: Math.max(0, (p.stock || 0) - qty) }
+          : p,
+      ),
     );
-    setTimeout(() => setAlertSuccess(""), 4000);
+
+    if (updatedCmd) {
+      setTargetComandaForAddItem(updatedCmd);
+
+      // Sincroniza com a Agenda e Supabase se for vinculado a agendamento
+      if (updatedCmd.appointmentId || updatedCmd.source === "agenda") {
+        const apptId = updatedCmd.appointmentId || updatedCmd.id;
+
+        if (onUpdateAppointments) {
+          onUpdateAppointments((prevAppts) =>
+            prevAppts.map((a) =>
+              a.id === apptId
+                ? {
+                    ...a,
+                    price: updatedCmd.price,
+                  }
+                : a,
+            ),
+          );
+        }
+
+        try {
+          await supabase
+            .from("appointments")
+            .update({
+              price: updatedCmd.price,
+            })
+            .eq("id", apptId);
+        } catch (err) {
+          console.warn("Aviso ao sincronizar produto no Supabase:", err);
+        }
+      }
+
+      // Atualiza estoque no Supabase
+      try {
+        const newStock = Math.max(0, (product.stock || 0) - qty);
+        await supabase
+          .from("products")
+          .update({ stock: newStock })
+          .eq("id", product.id);
+      } catch (err) {
+        console.warn("Aviso ao atualizar estoque no Supabase:", err);
+      }
+
+      setAlertSuccess(
+        `${qty}x "${product.name}" lançado na comanda de ${updatedCmd.clientName}!`,
+      );
+      setTimeout(() => setAlertSuccess(""), 4000);
+    }
   };
 
   // Criar Comanda Balcão Avulsa
@@ -596,19 +861,22 @@ export default function CashierPosView({
 
   // Catálogo de Serviços para edição da comanda
   const availableServices = useMemo(() => {
+    if (Array.isArray(posServices) && posServices.length > 0) {
+      return posServices;
+    }
     if (Array.isArray(services) && services.length > 0) {
       return services;
     }
     return [
-      { id: "cat-s1", name: "Corte Degradê / Fade", price: 50 },
-      { id: "cat-s2", name: "Barba Terapia com Toalha Quente", price: 40 },
-      { id: "cat-s3", name: "Combo Cabelo + Barba VIP", price: 85 },
-      { id: "cat-s4", name: "Pigmentação de Barba", price: 35 },
-      { id: "cat-s5", name: "Sobrancelha na Navalha", price: 20 },
-      { id: "cat-s6", name: "Acabamento / Pezinho", price: 25 },
-      { id: "cat-s7", name: "Hidratação Capilar", price: 35 },
+      { id: "cat-s1", name: "Corte Degradê / Fade", category: "Cabelo", durationMinutes: 30, price: 50 },
+      { id: "cat-s2", name: "Barba Terapia com Toalha Quente", category: "Barba", durationMinutes: 30, price: 40 },
+      { id: "cat-s3", name: "Combo Cabelo + Barba VIP", category: "Combo", durationMinutes: 50, price: 85 },
+      { id: "cat-s4", name: "Pigmentação de Barba", category: "Barba", durationMinutes: 20, price: 35 },
+      { id: "cat-s5", name: "Sobrancelha na Navalha", category: "Tratamento", durationMinutes: 15, price: 20 },
+      { id: "cat-s6", name: "Acabamento / Pezinho", category: "Cabelo", durationMinutes: 15, price: 25 },
+      { id: "cat-s7", name: "Hidratação Capilar", category: "Tratamento", durationMinutes: 30, price: 35 },
     ];
-  }, [services]);
+  }, [posServices, services]);
 
   // Salvar Alterações de Dados, Serviços e Produtos na Comanda
   const handleSaveEditedComanda = async (updatedComanda) => {
@@ -1023,10 +1291,8 @@ export default function CashierPosView({
                   >
                     <ComandaCard
                       comanda={cmd}
-                      onAddItem={() => {
-                        setSelectedComandaIdForAdd(cmd.id);
-                        setProductToAdd(products[0]);
-                        setIsAddItemModalOpen(true);
+                      onAddItem={(targetCmd) => {
+                        handleOpenAddItemModal(targetCmd || cmd);
                       }}
                       onEditComanda={(targetCmd) => {
                         setEditingComanda(JSON.parse(JSON.stringify(targetCmd)));
@@ -1255,50 +1521,34 @@ export default function CashierPosView({
       )}
 
       {/* ======================================================== */}
-      {/* MODAL 3: ESCOLHER EM QUAL COMANDA LANÇAR O PRODUTO       */}
+      {/* MODAL 3: ADICIONAR ITEM NA COMANDA (SERVIÇOS & PRODUTOS) */}
       {/* ======================================================== */}
-      <Modal
+      <AddItemToComandaModal
         isOpen={isAddItemModalOpen}
-        size="sm"
-        onClose={() => setIsAddItemModalOpen(false)}
-        title={`Lançar Item: ${productToAdd?.name}`}
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => setIsAddItemModalOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleConfirmAddProductToComanda}
-            >
-              Confirmar Lançamento (R${" "}
-              {Number(productToAdd?.price || 0).toFixed(2)})
-            </Button>
-          </>
+        onClose={() => {
+          setIsAddItemModalOpen(false);
+          setTargetComandaForAddItem(null);
+          setProductToAdd(null);
+        }}
+        targetComanda={
+          targetComandaForAddItem ||
+          comandas.find((c) => c.id === selectedComandaIdForAdd) ||
+          comandas.find((c) => c.status !== "paid" && c.status !== "cancelled") ||
+          comandas[0]
         }
-      >
-        <div className="space-y-4 text-left">
-          <p className="text-xs text-neutral-400">
-            Selecione em qual comanda aberta o item{" "}
-            <strong>{productToAdd?.name}</strong> será incluído:
-          </p>
-
-          <Select
-            label="Comanda de Destino"
-            value={selectedComandaIdForAdd}
-            onChange={(e) => setSelectedComandaIdForAdd(e.target.value)}
-            options={comandas
-              .filter((c) => c.status !== "paid" && c.status !== "cancelled")
-              .map((c) => ({
-                value: c.id,
-                label: `#${c.id} - ${c.clientName} (${c.barberName})`,
-              }))}
-          />
-        </div>
-      </Modal>
+        allComandas={comandas.filter(
+          (c) => c.status !== "paid" && c.status !== "cancelled",
+        )}
+        onChangeTargetComanda={(cmdId) => {
+          setSelectedComandaIdForAdd(cmdId);
+          const found = comandas.find((c) => c.id === cmdId);
+          if (found) setTargetComandaForAddItem(found);
+        }}
+        services={availableServices}
+        products={availableProducts}
+        onAddService={handleAddServiceToComanda}
+        onAddProduct={handleAddProductToComanda}
+      />
 
       {/* ======================================================== */}
       {/* MODAL 4: ABRIR NOVA COMANDA BALCÃO AVULSA               */}
