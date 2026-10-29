@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Share2,
 } from "lucide-react";
 import { calendarViewStyles } from "./CalendarView.styles";
 import BarberTimelineColumn from "./BarberTimelineColumn";
@@ -123,6 +124,7 @@ export default function CalendarView({
   onViewModeChange,
   currentDate: controlledDate,
   onDateChange,
+  onNavigateToShareAgenda,
 }) {
   const [internalViewMode, setInternalViewMode] = useState("day"); // 'day' | 'week' | 'month'
   const [internalCurrentDate, setInternalCurrentDate] = useState(() => new Date());
@@ -459,6 +461,21 @@ export default function CalendarView({
             Agenda de Atendimentos
           </h2>
         </div>
+
+        <a
+          href="#compartilhar-agenda"
+          onClick={(e) => {
+            e.preventDefault();
+            if (onNavigateToShareAgenda) {
+              onNavigateToShareAgenda();
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-amber-500 hover:text-amber-400 dark:text-amber-400 dark:hover:text-amber-300 no-underline hover:no-underline transition-colors cursor-pointer select-none"
+          title="Ir para Compartilhar agenda"
+        >
+          <Share2 className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+          <span>Compartilhar agenda</span>
+        </a>
       </div>
 
       {/* LINHA DIVISÓRIA (DIVIDER): Separa visualmente o título dos controles de navegação e filtros */}

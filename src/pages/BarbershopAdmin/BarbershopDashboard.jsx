@@ -29,6 +29,7 @@ import {
   DollarSign,
   Settings,
   Menu,
+  Share2,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { safeStorage } from "../../utils/safeStorage";
@@ -116,6 +117,7 @@ export default function BarbershopDashboard({
         icon: <Menu className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
         isActive:
           activeMenuTab === "perfil" ||
+          activeMenuTab === "compartilhar_agenda" ||
           activeMenuTab === "configuracoes" ||
           activeMenuTab === "suporte" ||
           activeMenuTab === "servicos" ||
@@ -349,6 +351,11 @@ export default function BarbershopDashboard({
       icon: "calendar",
       badge: `${todayActiveAppointments.length} hoje`,
     },
+    {
+      id: "compartilhar_agenda",
+      label: "Compartilhar Agenda",
+      icon: "Share2",
+    },
     { id: "servicos", label: "Serviços & Produtos", icon: "scissors" },
     { id: "profissionais", label: "Equipe de Barbeiros", icon: "barber" },
     {
@@ -540,6 +547,7 @@ export default function BarbershopDashboard({
               "Painel da Barbearia",
               {
                 agenda: "Agenda",
+                compartilhar_agenda: "Compartilhar Agenda",
                 servicos: "Serviços",
                 profissionais: "Equipe",
                 clientes: "Clientes",
@@ -569,16 +577,6 @@ export default function BarbershopDashboard({
               <SkeletonDashboard latencyNotice={true} />
             ) : (
               <>
-                {/* Cartão Oficial de Compartilhamento do Link de Agendamento da Barbearia */}
-                {activeMenuTab === "agenda" && (
-                  <div className="mb-4">
-                    <TenantBookingLinkCard
-                      tenant={tenant}
-                      onOpenSettings={() => setActiveMenuTab("configuracoes")}
-                    />
-                  </div>
-                )}
-
                 {/* 1. AGENDA: Consome 'appointments' e 'onUpdateAppointments' */}
                 {activeMenuTab === "agenda" && (
                   <ErrorBoundary componentName="Agenda de Atendimentos">
@@ -599,10 +597,23 @@ export default function BarbershopDashboard({
                         setTargetCashierComandaId(comandaId || null);
                         setActiveMenuTab("caixa");
                       }}
+                      onNavigateToShareAgenda={() => setActiveMenuTab("compartilhar_agenda")}
                       openNewAppointmentTrigger={openNewAppointmentTrigger}
                     />
                   </ErrorBoundary>
                 )}
+
+            {/* 1b. COMPARTILHAR AGENDA: Página dedicada com link público e QR Code da barbearia */}
+            {activeMenuTab === "compartilhar_agenda" && (
+              <ErrorBoundary componentName="Compartilhar Agenda">
+                <div className="space-y-4 max-w-5xl">
+                  <TenantBookingLinkCard
+                    tenant={tenant}
+                    onOpenSettings={() => setActiveMenuTab("configuracoes")}
+                  />
+                </div>
+              </ErrorBoundary>
+            )}
 
             {/* 2. SERVIÇOS & PRODUTOS */}
             {activeMenuTab === "servicos" && (

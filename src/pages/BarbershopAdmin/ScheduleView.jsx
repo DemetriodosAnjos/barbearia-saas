@@ -76,6 +76,7 @@ export default function ScheduleView({
   comandas = [],
   onNavigateToClients,
   onNavigateToCashier,
+  onNavigateToShareAgenda,
   onBack,
   openNewAppointmentTrigger = 0,
 }) {
@@ -1222,6 +1223,7 @@ export default function ScheduleView({
         onSaveClient={handleSaveClientFromAppointment}
         onOpenClientRecord={handleOpenClientRecord}
         onDropAppointment={handleDropAppointment}
+        onNavigateToShareAgenda={onNavigateToShareAgenda}
       />
 
       {/* MODAL 1: DETALHES & EDIÇÃO */}
