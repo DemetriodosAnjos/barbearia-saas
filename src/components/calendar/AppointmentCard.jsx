@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Scissors, Receipt, FileText, Star, X, Sparkles, CreditCard, Check, MoreVertical, UserPlus } from "lucide-react";
+import { Scissors, Receipt, FileText, Star, X, Sparkles, QrCode, CreditCard, Check, MoreVertical, UserPlus } from "lucide-react";
 import Badge from "../ui/Badge";
 import { appointmentCardStyles } from "./AppointmentCard.styles";
 
@@ -242,37 +242,39 @@ export default function AppointmentCard({
               role="menu"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="px-3 py-1 border-b border-neutral-800 text-[10px] text-neutral-400 font-mono truncate">
+              <div className="px-3.5 py-2 border-b border-[#3f3f46] text-[10px] text-[#969696] font-mono truncate">
                 #{id} • {clientName}
               </div>
 
               {(status === "waiting" || status === "confirmed") && (
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (onStatusChange) onStatusChange("in_progress");
                     toggleMenu(false);
                   }}
-                  className={appointmentCardStyles.menuItem}
+                  className={`${appointmentCardStyles.menuItem} appointment-dropdown-item group`}
                 >
-                  <Scissors className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>Iniciar Atendimento</span>
+                  <Scissors className="w-3.5 h-3.5 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white group-hover:stroke-white group-focus:stroke-white transition-colors shrink-0" data-appointment-menu-icon="iniciar" />
+                  <span className="text-[#929292] group-hover:text-white group-focus:text-white transition-colors" data-appointment-menu-text="iniciar">Iniciar Atendimento</span>
                 </button>
               )}
 
               {status === "in_progress" && (
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (onStatusChange) onStatusChange("completed");
                     toggleMenu(false);
                   }}
-                  className={appointmentCardStyles.menuItem}
+                  className={`${appointmentCardStyles.menuItem} appointment-dropdown-item group`}
                 >
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Concluir Atendimento</span>
+                  <Check className="w-3.5 h-3.5 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white group-hover:stroke-white group-focus:stroke-white transition-colors shrink-0" data-appointment-menu-icon="concluir" />
+                  <span className="text-[#929292] group-hover:text-white group-focus:text-white transition-colors" data-appointment-menu-text="concluir">Concluir Atendimento</span>
                 </button>
               )}
 
@@ -280,6 +282,7 @@ export default function AppointmentCard({
               {isExistingClient ? (
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (onOpenClientRecord) {
@@ -287,15 +290,16 @@ export default function AppointmentCard({
                     }
                     toggleMenu(false);
                   }}
-                  className={appointmentCardStyles.menuItem}
+                  className={`${appointmentCardStyles.menuItem} appointment-dropdown-item group`}
                   title="Visualizar histórico e notas técnicas do cliente"
                 >
-                  <FileText className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                  <span>Ver Prontuário do Cliente</span>
+                  <FileText className="w-3.5 h-3.5 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white group-hover:stroke-white group-focus:stroke-white transition-colors shrink-0" data-appointment-menu-icon="prontuario" />
+                  <span className="text-[#929292] group-hover:text-white group-focus:text-white transition-colors" data-appointment-menu-text="prontuario">Ver Prontuário do Cliente</span>
                 </button>
               ) : (
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (onSaveClient) {
@@ -303,30 +307,32 @@ export default function AppointmentCard({
                     }
                     toggleMenu(false);
                   }}
-                  className={appointmentCardStyles.menuItem}
+                  className={`${appointmentCardStyles.menuItem} appointment-dropdown-item group`}
                   title="Cadastrar este cliente e abrir prontuário"
                 >
-                  <UserPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Salvar como Cliente (Novo)</span>
+                  <UserPlus className="w-3.5 h-3.5 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white group-hover:stroke-white group-focus:stroke-white transition-colors shrink-0" data-appointment-menu-icon="salvar_cliente" />
+                  <span className="text-[#929292] group-hover:text-white group-focus:text-white transition-colors" data-appointment-menu-text="salvar_cliente">Salvar como Cliente (Novo)</span>
                 </button>
               )}
 
               <button
                 type="button"
+                role="menuitem"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onOpenComanda) onOpenComanda(id);
                   toggleMenu(false);
                 }}
-                className={appointmentCardStyles.menuItem}
+                className={`${appointmentCardStyles.menuItem} appointment-dropdown-item group`}
               >
-                <Receipt className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>Ver Comanda no Caixa</span>
+                <Receipt className="w-3.5 h-3.5 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white group-hover:stroke-white group-focus:stroke-white transition-colors shrink-0" data-appointment-menu-icon="comanda" />
+                <span className="text-[#929292] group-hover:text-white group-focus:text-white transition-colors" data-appointment-menu-text="comanda">Ver Comanda no Caixa</span>
               </button>
 
               {!isPaid && (
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (onPayMercadoPago) {
@@ -336,26 +342,27 @@ export default function AppointmentCard({
                     }
                     toggleMenu(false);
                   }}
-                  className={`${appointmentCardStyles.menuItem} text-sky-400 hover:text-sky-300`}
+                  className={`${appointmentCardStyles.menuItem} appointment-dropdown-item group`}
                 >
-                  <CreditCard className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                  <span>Pagar via Mercado Pago</span>
+                  <QrCode className="w-3.5 h-3.5 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white group-hover:stroke-white group-focus:stroke-white transition-colors shrink-0" data-appointment-menu-icon="pix" />
+                  <span className="text-[#929292] group-hover:text-white group-focus:text-white transition-colors" data-appointment-menu-text="pix">Pagar com pix</span>
                 </button>
               )}
 
-              <div className="my-1 border-t border-neutral-800" />
+              <div className="my-1 border-t border-[#3f3f46]" data-appointment-dropdown-divider="true" />
 
               <button
                 type="button"
+                role="menuitem"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onCancel) onCancel(id);
                   toggleMenu(false);
                 }}
-                className={`${appointmentCardStyles.menuItem} text-rose-400 hover:text-rose-300`}
+                className={`${appointmentCardStyles.menuItem} appointment-dropdown-item group`}
               >
-                <X className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                <span>Cancelar Horário</span>
+                <X className="w-3.5 h-3.5 text-[#059669] dark:text-[#FFC21F] group-hover:text-white group-focus:text-white group-hover:stroke-white group-focus:stroke-white transition-colors shrink-0" data-appointment-menu-icon="cancelar" />
+                <span className="text-[#929292] group-hover:text-white group-focus:text-white transition-colors" data-appointment-menu-text="cancelar">Cancelar Horário</span>
               </button>
             </div>
           )}

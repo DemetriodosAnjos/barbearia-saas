@@ -532,6 +532,65 @@ html:not(.dark) [data-user-dropdown-header] {
   border-color: #E4E4E7 !important;
 }
 
+/* ======================================================== */
+/* MENU SUSPENSO DE AGENDAMENTOS (PADRÃO MEU PERFIL) - LIGHT */
+/* ======================================================== */
+/* Container Suspenso: Fundo #262626 */
+[data-appointment-dropdown-menu],
+.appointment-dropdown-menu,
+html:not(.dark) [data-appointment-dropdown-menu],
+html:not(.dark) .appointment-dropdown-menu {
+  background-color: #262626 !important;
+  border-color: #3f3f46 !important;
+}
+
+.appointment-dropdown-item:hover,
+.appointment-dropdown-item:focus,
+html:not(.dark) .appointment-dropdown-item:hover,
+html:not(.dark) .appointment-dropdown-item:focus {
+  background-color: #3f3f46 !important;
+}
+
+html:not(.dark) .appointment-dropdown-item:hover span,
+html:not(.dark) .appointment-dropdown-item:focus span,
+html:not(.dark) .appointment-dropdown-item:hover [data-appointment-menu-text],
+html:not(.dark) .appointment-dropdown-item:focus [data-appointment-menu-text] {
+  color: #ffffff !important;
+}
+
+.appointment-dropdown-item:hover [data-appointment-menu-icon],
+.appointment-dropdown-item:hover [data-appointment-menu-icon] svg,
+.appointment-dropdown-item:hover svg,
+.appointment-dropdown-item:focus [data-appointment-menu-icon],
+.appointment-dropdown-item:focus [data-appointment-menu-icon] svg,
+.appointment-dropdown-item:focus svg,
+html:not(.dark) .appointment-dropdown-item:hover [data-appointment-menu-icon],
+html:not(.dark) .appointment-dropdown-item:hover [data-appointment-menu-icon] svg,
+html:not(.dark) .appointment-dropdown-item:hover svg,
+html:not(.dark) .appointment-dropdown-item:focus [data-appointment-menu-icon],
+html:not(.dark) .appointment-dropdown-item:focus [data-appointment-menu-icon] svg,
+html:not(.dark) .appointment-dropdown-item:focus svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html:not(.dark) [data-appointment-menu-icon],
+html:not(.dark) [data-appointment-menu-icon] svg,
+html:not(.dark) .appointment-dropdown-item svg {
+  color: #059669 !important;
+  stroke: #059669 !important;
+}
+
+html:not(.dark) [data-appointment-menu-text],
+html:not(.dark) .appointment-dropdown-item,
+html:not(.dark) .appointment-dropdown-item span {
+  color: #929292 !important;
+}
+
+html:not(.dark) [data-appointment-dropdown-divider] {
+  border-color: #3f3f46 !important;
+}
+
 /* 19.5. ÍCONE HAMBÚRGUER (MENU) - LIGHT: #059669 (VERDE) */
 html:not(.dark) [data-menu-button],
 html:not(.dark) [data-menu-button] svg,
@@ -908,6 +967,59 @@ html.dark .avatar-dropdown-item:focus span,
 html.dark .avatar-dropdown-item:hover [data-user-dropdown-text],
 html.dark .avatar-dropdown-item:focus [data-user-dropdown-text] {
   color: #ffffff !important;
+}
+
+/* ======================================================== */
+/* MENU SUSPENSO DE AGENDAMENTOS (PADRÃO MEU PERFIL) - DARK */
+/* ======================================================== */
+html.dark [data-appointment-dropdown-menu],
+html.dark .appointment-dropdown-menu {
+  background-color: #262626 !important;
+  border-color: #3f3f46 !important;
+}
+
+/* ÍCONES Dark no repouso do menu de agendamentos: Âmbar (#FFC21F) */
+html.dark [data-appointment-menu-icon],
+html.dark [data-appointment-menu-icon] svg,
+html.dark .appointment-dropdown-item svg {
+  color: #FFC21F !important;
+  stroke: #FFC21F !important;
+}
+
+/* ÍCONES Dark no hover do menu de agendamentos: #ffffff (branca) */
+html.dark .appointment-dropdown-item:hover [data-appointment-menu-icon],
+html.dark .appointment-dropdown-item:hover [data-appointment-menu-icon] svg,
+html.dark .appointment-dropdown-item:hover svg,
+html.dark .appointment-dropdown-item:focus [data-appointment-menu-icon],
+html.dark .appointment-dropdown-item:focus [data-appointment-menu-icon] svg,
+html.dark .appointment-dropdown-item:focus svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html.dark .appointment-dropdown-item:hover,
+html.dark .appointment-dropdown-item:focus {
+  background-color: #3f3f46 !important;
+}
+
+/* Textos em repouso no Dark: #929292 conforme solicitado */
+html.dark .appointment-dropdown-item,
+html.dark .appointment-dropdown-item span,
+html.dark .appointment-dropdown-item [data-appointment-menu-text],
+html.dark [data-appointment-menu-text] {
+  color: #929292 !important;
+}
+
+/* Hover e Foco dos Textos no Dark: Branco puro (#ffffff) */
+html.dark .appointment-dropdown-item:hover span,
+html.dark .appointment-dropdown-item:focus span,
+html.dark .appointment-dropdown-item:hover [data-appointment-menu-text],
+html.dark .appointment-dropdown-item:focus [data-appointment-menu-text] {
+  color: #ffffff !important;
+}
+
+html.dark [data-appointment-dropdown-divider] {
+  border-color: #3f3f46 !important;
 }
 
 /* Ícone Hambúrguer Dark: Manter #a3a3a3 / hover #ffffff */

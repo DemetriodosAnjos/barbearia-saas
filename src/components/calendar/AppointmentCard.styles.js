@@ -45,12 +45,12 @@ export const appointmentCardStyles = {
   moreButton:
     "text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-white/15 transition-all cursor-pointer shrink-0 active:scale-95",
 
-  // Menu de Ações Rápidas Flutuante com z-index ultra elevado (z-[100]) e posicionamento inteligente
+  // Menu de Ações Rápidas Flutuante com z-index ultra elevado (z-[100]) e posicionamento inteligente (Fundo #262626)
   menuDropdown:
-    "absolute right-0 w-52 bg-neutral-900/98 backdrop-blur-xl border border-neutral-700/90 rounded-xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.95)] py-1.5 z-[100] text-xs text-left ring-1 ring-white/15 animate-in fade-in zoom-in-95 duration-100",
+    "absolute right-0 w-56 bg-[#262626] border border-[#3f3f46] rounded-xl shadow-2xl py-1.5 z-[100] text-xs text-left ring-1 ring-black/30 dark:ring-white/10 animate-in fade-in zoom-in-95 duration-100 appointment-dropdown-menu",
   menuDropdownTop: "bottom-full mb-1.5",
   menuDropdownBottom: "top-full mt-1.5",
 
   menuItem:
-    "w-full px-3 py-2 text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors flex items-center gap-2.5 cursor-pointer font-medium text-xs",
+    "w-full px-3.5 py-2 text-xs font-medium text-[#929292] hover:bg-[#3f3f46] hover:text-white dark:hover:bg-[#3f3f46] dark:hover:text-white transition-colors flex items-center gap-2.5 cursor-pointer group appointment-dropdown-item",
 };

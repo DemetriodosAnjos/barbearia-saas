@@ -9,5 +9,6 @@ coverage/
 .aistudio/
 .github_token
 .github_token*
+github_chave*
 bun.lock*
 
