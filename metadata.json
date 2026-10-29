@@ -1,5 +1,5 @@
 {
-  "name": "SaaS V1.5.6.1",
+  "name": "SaaS V1.5.6.2",
   "description": "Sistema SaaS para barbearias com agendamentos em tempo real, comissões automáticas, frente de caixa (PDV) e pagamentos Mercado Pago.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

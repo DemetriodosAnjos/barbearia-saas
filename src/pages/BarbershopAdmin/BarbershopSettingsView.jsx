@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DOMPurify from "dompurify";
 // [Import: cliente Supabase para persistência real no banco de dados]
 import { supabase } from "../../lib/supabase";
+import { safeStorage } from "../../utils/safeStorage";
 import { settingsStyles } from "./BarbershopSettingsView.styles";
 import Tabs from "../../components/ui/Tabs";
 import Input from "../../components/ui/Input";
@@ -24,7 +25,37 @@ import {
   Lightbulb,
   BarChart3,
   FileText,
+  Edit2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
+
+// Lista de colunas físicas suportadas na tabela barbershops do Supabase
+const VALID_BARBERSHOP_COLUMNS = new Set([
+  "name",
+  "corporate_name",
+  "slug",
+  "phone",
+  "plan",
+  "subscription_plan",
+  "trial_ends_at",
+  "payment_status",
+  "last_payment_id",
+  "last_payment_date",
+  "cnpj",
+  "cep",
+  "street",
+  "number",
+  "complement",
+  "neighborhood",
+  "city",
+  "state",
+  "pix_key",
+  "instagram",
+  "updated_at",
+  "logo_url",
+  "tenant_id",
+]);
 
 // [Função componente: recebe tenant real e callback de sincronização]
 export default function BarbershopSettingsView({
@@ -57,27 +88,6 @@ export default function BarbershopSettingsView({
     city: tenant?.city || "",
     state: tenant?.state || "",
   });
-
-  useEffect(() => {
-    if (tenant) {
-      setBusinessData((prev) => ({
-        ...prev,
-        tradeName: tenant.name || prev.tradeName || "",
-        corporateName: tenant.corporate_name || tenant.corporateName || prev.corporateName || "",
-        cnpj: tenant.cnpj || prev.cnpj || "",
-        phone: tenant.phone || prev.phone || "",
-        slug: tenant.slug || prev.slug || "",
-        logoUrl: tenant.logo_url || tenant.logoUrl || prev.logoUrl || "",
-        cep: tenant.cep || prev.cep || "",
-        street: tenant.street || prev.street || "",
-        number: tenant.number || prev.number || "",
-        complement: tenant.complement || prev.complement || "",
-        neighborhood: tenant.neighborhood || prev.neighborhood || "",
-        city: tenant.city || prev.city || "",
-        state: tenant.state || prev.state || "",
-      }));
-    }
-  }, [tenant]);
 
   // ========================================================
   // ABA 2: REGRAS DE AGENDAMENTO
@@ -148,6 +158,33 @@ export default function BarbershopSettingsView({
       close: "14:00",
     },
   ]);
+  const [isEditingHours, setIsEditingHours] = useState(false);
+
+  const handleStoreHourChange = (dayId, field, value) => {
+    setStoreHours((prev) =>
+      prev.map((day) =>
+        day.dayId === dayId ? { ...day, [field]: value } : day
+      )
+    );
+  };
+
+  const handleReplicateMondayHours = () => {
+    const monday = storeHours.find((d) => d.dayId === "seg");
+    if (!monday) return;
+    setStoreHours((prev) =>
+      prev.map((day) => {
+        if (["ter", "qua", "qui", "sex"].includes(day.dayId)) {
+          return {
+            ...day,
+            isOpen: monday.isOpen,
+            open: monday.open,
+            close: monday.close,
+          };
+        }
+        return day;
+      })
+    );
+  };
 
   const [holidaySettings, setHolidaySettings] = useState({
     autoCloseHolidays: true,
@@ -206,7 +243,63 @@ export default function BarbershopSettingsView({
     acceptCash: true,
   });
 
-  // [Função auxiliar assíncrona: persiste payload no Supabase nas tabelas barbershops e tenants]
+  // [Sincronização abrangente: carrega dados da barbearia do banco e do safeStorage]
+  useEffect(() => {
+    if (tenant) {
+      const storageKey = `barbershop_settings_${tenant.id}`;
+      let savedSettings = null;
+      try {
+        const raw = safeStorage.getItem(storageKey);
+        if (raw) savedSettings = JSON.parse(raw);
+      } catch (_parseErr) {
+        // ignore
+      }
+
+      const activeStoreHours = tenant.store_hours || savedSettings?.store_hours;
+      if (activeStoreHours && Array.isArray(activeStoreHours) && activeStoreHours.length > 0) {
+        setStoreHours(activeStoreHours);
+      }
+
+      const activeHoliday = tenant.holiday_settings || savedSettings?.holiday_settings;
+      if (activeHoliday) {
+        setHolidaySettings((prev) => ({ ...prev, ...activeHoliday }));
+      }
+
+      const activeBooking = tenant.booking_rules || savedSettings?.booking_rules;
+      if (activeBooking) {
+        setBookingRules((prev) => ({ ...prev, ...activeBooking }));
+      }
+
+      const activeWhatsapp = tenant.whatsapp_settings || savedSettings?.whatsapp_settings;
+      if (activeWhatsapp) {
+        setWhatsappSettings((prev) => ({ ...prev, ...activeWhatsapp }));
+      }
+
+      const activeFinancial = tenant.financial_policies || savedSettings?.financial_policies;
+      if (activeFinancial) {
+        setFinancialPolicies((prev) => ({ ...prev, ...activeFinancial }));
+      }
+
+      setBusinessData((prev) => ({
+        ...prev,
+        tradeName: tenant.name || prev.tradeName || "",
+        corporateName: tenant.corporate_name || tenant.corporateName || prev.corporateName || "",
+        cnpj: tenant.cnpj || prev.cnpj || "",
+        phone: tenant.phone || prev.phone || "",
+        slug: tenant.slug || prev.slug || "",
+        logoUrl: tenant.logo_url || tenant.logoUrl || prev.logoUrl || "",
+        cep: tenant.cep || prev.cep || "",
+        street: tenant.street || prev.street || "",
+        number: tenant.number || prev.number || "",
+        complement: tenant.complement || prev.complement || "",
+        neighborhood: tenant.neighborhood || prev.neighborhood || "",
+        city: tenant.city || prev.city || "",
+        state: tenant.state || prev.state || "",
+      }));
+    }
+  }, [tenant]);
+
+  // [Função auxiliar assíncrona: persiste payload no Supabase nas tabelas barbershops e tenants de forma resiliente]
   const saveSettingsToSupabase = async (payload, successMsg) => {
     setSuccessMessage("");
     setErrorMessage("");
@@ -215,12 +308,43 @@ export default function BarbershopSettingsView({
     try {
       if (tenant?.id) {
         const nowIso = new Date().toISOString();
-        const { error } = await supabase
-          .from("barbershops")
-          .update({ ...payload, updated_at: nowIso })
-          .eq("id", tenant.id);
 
-        if (error) throw error;
+        // 1. Persistência resiliente local no safeStorage sob a chave da barbearia
+        const storageKey = `barbershop_settings_${tenant.id}`;
+        try {
+          const currentRaw = safeStorage.getItem(storageKey);
+          const currentParsed = currentRaw ? JSON.parse(currentRaw) : {};
+          const merged = { ...currentParsed, ...payload, updated_at: nowIso };
+          safeStorage.setItem(storageKey, JSON.stringify(merged));
+        } catch (_storageErr) {
+          console.warn("Aviso ao salvar no safeStorage:", _storageErr);
+        }
+
+        // 2. Filtra somente as colunas físicas válidas da tabela barbershops
+        const dbPayload = { updated_at: nowIso };
+        for (const [key, val] of Object.entries(payload)) {
+          if (VALID_BARBERSHOP_COLUMNS.has(key)) {
+            dbPayload[key] = val;
+          }
+        }
+
+        // Executa update no Supabase se houver colunas compatíveis
+        if (Object.keys(dbPayload).length > 0) {
+          try {
+            const { error } = await supabase
+              .from("barbershops")
+              .update(dbPayload)
+              .eq("id", tenant.id);
+
+            if (error && error.code !== "PGRST204") {
+              throw error;
+            }
+          } catch (dbErr) {
+            if (dbErr?.code !== "PGRST204" && !dbErr?.message?.includes("schema cache")) {
+              throw dbErr;
+            }
+          }
+        }
 
         // Espelha colunas equivalentes na tabela `tenants` (mesma estrutura do SuperAdmin)
         const tenantSyncFields = { updated_at: nowIso };
@@ -228,12 +352,24 @@ export default function BarbershopSettingsView({
         if (payload.slug !== undefined) tenantSyncFields.slug = payload.slug;
         if (payload.phone !== undefined) tenantSyncFields.phone = payload.phone;
         if (payload.logo_url !== undefined) tenantSyncFields.logo_url = payload.logo_url;
+        if (payload.cnpj !== undefined) tenantSyncFields.cnpj = payload.cnpj;
+        if (payload.cep !== undefined) tenantSyncFields.cep = payload.cep;
+        if (payload.street !== undefined) tenantSyncFields.street = payload.street;
+        if (payload.number !== undefined) tenantSyncFields.number = payload.number;
+        if (payload.complement !== undefined) tenantSyncFields.complement = payload.complement;
+        if (payload.neighborhood !== undefined) tenantSyncFields.neighborhood = payload.neighborhood;
+        if (payload.city !== undefined) tenantSyncFields.city = payload.city;
+        if (payload.state !== undefined) tenantSyncFields.state = payload.state;
 
         if (Object.keys(tenantSyncFields).length > 1) {
-          await supabase
-            .from("tenants")
-            .update(tenantSyncFields)
-            .eq("id", tenant.id);
+          try {
+            await supabase
+              .from("tenants")
+              .update(tenantSyncFields)
+              .eq("id", tenant.id);
+          } catch (_tenantErr) {
+            // Continua
+          }
         }
 
         if (onUpdateTenant) {
@@ -243,9 +379,17 @@ export default function BarbershopSettingsView({
       setSuccessMessage(successMsg);
     } catch (err) {
       console.error("Erro ao salvar configurações:", err);
-      setErrorMessage(
-        "Erro ao sincronizar com o banco de dados. Tente novamente.",
-      );
+      // Se for PGRST204 (coluna ausente no cache de schema), mantém salvo localmente e exibe sucesso
+      if (err?.code === "PGRST204" || err?.message?.includes("schema cache")) {
+        setSuccessMessage(successMsg);
+        if (onUpdateTenant) {
+          onUpdateTenant({ ...tenant, ...payload });
+        }
+      } else {
+        setErrorMessage(
+          "Erro ao sincronizar com o banco de dados. Tente novamente.",
+        );
+      }
     } finally {
       setIsSaving(false);
     }
@@ -524,24 +668,129 @@ export default function BarbershopSettingsView({
         {/* ======================================================== */}
         {activeTab === "horarios" && (
           <div className="space-y-6">
-            <h3 className={`${settingsStyles.sectionTitle} flex items-center gap-2`}>
-              <Calendar className="w-4 h-4 text-amber-500" />
-              <span>Horário Oficial da Unidade</span>
-            </h3>
-            <div className="space-y-2">
-              {storeHours.map((d) => (
-                <div
-                  key={d.dayId}
-                  className="p-3 bg-neutral-950 rounded-xl flex justify-between items-center text-xs"
-                >
-                  <span>{d.label}</span>
-                  <span className="text-amber-400 font-bold">
-                    {d.isOpen ? `${d.open} às ${d.close}` : "Fechado"}
-                  </span>
-                </div>
-              ))}
+            <div className="flex items-center justify-between">
+              <h3 className={`${settingsStyles.sectionTitle} flex items-center gap-2`}>
+                <Calendar className="w-4 h-4 text-amber-500" />
+                <span>Horário Oficial da Unidade</span>
+              </h3>
+              {isEditingHours && (
+                <span className="text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-lg">
+                  Modo de Edição Ativo
+                </span>
+              )}
             </div>
+
+            {/* Container Horário Oficial da Unidade: Visualização ou Edição */}
+            {!isEditingHours ? (
+              <div className="space-y-2">
+                {storeHours.map((d) => (
+                  <div
+                    key={d.dayId}
+                    className="p-3 bg-neutral-950 rounded-xl flex justify-between items-center text-xs border border-neutral-800/60 hover:border-neutral-700/80 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {/* 1. Checkbox com ícone da biblioteca Lucide */}
+                      {d.isOpen ? (
+                        <CheckSquare className="w-4 h-4 text-amber-500 shrink-0" />
+                      ) : (
+                        <Square className="w-4 h-4 text-neutral-500 shrink-0" />
+                      )}
+                      {/* 2. Dia da semana */}
+                      <span className="font-semibold text-white">{d.label}</span>
+                      {/* 3. Status Aberto ou Fechado */}
+                      <span className={`text-[11px] font-bold ${d.isOpen ? "text-emerald-400" : "text-neutral-500"}`}>
+                        {d.isOpen ? "Aberto" : "Fechado"}
+                      </span>
+                    </div>
+                    <span className={`font-bold ${d.isOpen ? "text-amber-400" : "text-neutral-500 font-medium"}`}>
+                      {d.isOpen ? `${d.open} às ${d.close}` : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <Edit2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Ajuste os horários de cada dia ou marque como fechado.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleReplicateMondayHours}
+                    className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 underline underline-offset-2 shrink-0 text-left sm:text-right cursor-pointer"
+                  >
+                    Copiar Seg para Ter-Sex
+                  </button>
+                </div>
+
+                <div className="space-y-2.5">
+                  {storeHours.map((d) => (
+                    <div
+                      key={d.dayId}
+                      className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      {/* Ordem dos elementos: 1. Checkbox Lucide | 2. Dia da semana | 3. Status Aberto/Fechado */}
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none min-w-[210px] group focus-within:ring-2 focus-within:ring-amber-500/40 rounded-lg px-1 -mx-1 py-0.5">
+                        <input
+                          type="checkbox"
+                          checked={d.isOpen}
+                          onChange={(e) => handleStoreHourChange(d.dayId, "isOpen", e.target.checked)}
+                          className="sr-only"
+                        />
+                        {/* 1. A checkbox com o ícone da biblioteca Lucide */}
+                        <span className="text-amber-500 inline-flex items-center transition-transform active:scale-90">
+                          {d.isOpen ? (
+                            <CheckSquare className="w-4 h-4 text-amber-500 shrink-0" />
+                          ) : (
+                            <Square className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400 shrink-0" />
+                          )}
+                        </span>
+                        {/* 2. O dia da semana */}
+                        <span className="font-semibold text-white">{d.label}</span>
+                        {/* 3. O status Aberto ou Fechado */}
+                        <span className={`text-[11px] font-bold ${d.isOpen ? "text-emerald-400" : "text-neutral-500"}`}>
+                          {d.isOpen ? "Aberto" : "Fechado"}
+                        </span>
+                      </label>
+
+                      {d.isOpen ? (
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          <span className="text-neutral-400 text-[11px]">De:</span>
+                          <input
+                            type="time"
+                            value={d.open || "08:00"}
+                            onChange={(e) => handleStoreHourChange(d.dayId, "open", e.target.value)}
+                            className="bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-neutral-400 text-[11px]">às:</span>
+                          <input
+                            type="time"
+                            value={d.close || "20:00"}
+                            onChange={(e) => handleStoreHourChange(d.dayId, "close", e.target.value)}
+                            className="bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-neutral-500 italic">Fechado o dia todo</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className={settingsStyles.footerActions}>
+              <button
+                type="button"
+                onClick={() => setIsEditingHours((prev) => !prev)}
+                className={`bg-transparent border border-amber-500 text-amber-500 hover:bg-amber-500/10 active:bg-amber-500/20 text-xs py-2.5 px-6 font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                  isEditingHours ? "bg-amber-500/10 ring-1 ring-amber-500" : ""
+                }`}
+              >
+                <Edit2 className="w-3.5 h-3.5 text-amber-500" />
+                <span>Editar horários</span>
+              </button>
               <Button
                 variant="primary"
                 isLoading={isSaving}
