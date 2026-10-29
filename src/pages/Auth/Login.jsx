@@ -45,6 +45,7 @@ import {
   saveGoogleClientId,
   GOOGLE_SSO_MESSAGES,
 } from "../../services/googleAuthService";
+import loginBackdropImg from "../../assets/images/barbershop_login_backdrop_1793291129617.jpg";
 
 export { GOOGLE_SSO_MESSAGES };
 
@@ -710,7 +711,7 @@ export default function Login({
       {/* Background de Barbearia gerado por IA cobrindo toda a tela */}
       <div className="fixed inset-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <img
-          src="/src/assets/images/barbershop_login_backdrop_1793291129617.jpg"
+          src={loginBackdropImg}
           alt="Interior sofisticado de barbearia moderna"
           className="w-full h-full object-cover select-none"
           referrerPolicy="no-referrer"
