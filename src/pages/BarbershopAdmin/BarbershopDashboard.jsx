@@ -670,6 +670,7 @@ export default function BarbershopDashboard({
                   tenant={tenant}
                   user={user}
                   barbers={barbers}
+                  services={services}
                   products={products}
                   onUpdateProducts={onUpdateProducts}
                   onBack={() => setActiveMenuTab("agenda")}

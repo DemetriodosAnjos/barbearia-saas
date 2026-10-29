@@ -29,6 +29,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  Pencil,
+  Plus,
+  X,
+  Scissors,
 } from "lucide-react";
 
 // Helper defensivo para formatar data em YYYY-MM-DD
@@ -70,6 +74,7 @@ export default function CashierPosView({
   tenant,
   user,
   barbers = [],
+  services = [],
   products: initialProducts = [],
   onUpdateProducts,
   onBack,
@@ -88,6 +93,11 @@ export default function CashierPosView({
   // Modais de Pagamento
   const [mercadoPagoTarget, setMercadoPagoTarget] = useState(null);
   const [comandaToPay, setComandaToPay] = useState(null);
+
+  // Modal de Edição Completa de Dados da Comanda (Serviços e Produtos)
+  const [editingComanda, setEditingComanda] = useState(null);
+  const [selectedServiceToAdd, setSelectedServiceToAdd] = useState("");
+  const [selectedProductToAdd, setSelectedProductToAdd] = useState("");
 
   // Adicionar item em comanda
   const [selectedComandaIdForAdd, setSelectedComandaIdForAdd] = useState("");
@@ -584,6 +594,91 @@ export default function CashierPosView({
     setTimeout(() => setAlertSuccess(""), 4000);
   };
 
+  // Catálogo de Serviços para edição da comanda
+  const availableServices = useMemo(() => {
+    if (Array.isArray(services) && services.length > 0) {
+      return services;
+    }
+    return [
+      { id: "cat-s1", name: "Corte Degradê / Fade", price: 50 },
+      { id: "cat-s2", name: "Barba Terapia com Toalha Quente", price: 40 },
+      { id: "cat-s3", name: "Combo Cabelo + Barba VIP", price: 85 },
+      { id: "cat-s4", name: "Pigmentação de Barba", price: 35 },
+      { id: "cat-s5", name: "Sobrancelha na Navalha", price: 20 },
+      { id: "cat-s6", name: "Acabamento / Pezinho", price: 25 },
+      { id: "cat-s7", name: "Hidratação Capilar", price: 35 },
+    ];
+  }, [services]);
+
+  // Salvar Alterações de Dados, Serviços e Produtos na Comanda
+  const handleSaveEditedComanda = async (updatedComanda) => {
+    if (!updatedComanda) return;
+
+    const sList = Array.isArray(updatedComanda.services) ? updatedComanda.services : [];
+    const pList = Array.isArray(updatedComanda.products) ? updatedComanda.products : [];
+    const newPrice =
+      sList.reduce((acc, s) => acc + Number(s.price || 0), 0) +
+      pList.reduce(
+        (acc, p) =>
+          acc +
+          Number(
+            p.total ||
+              Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0)
+          ),
+        0
+      );
+
+    const nextComandas = comandas.map((c) =>
+      c.id === updatedComanda.id ? updatedComanda : c
+    );
+    updateComandasState(nextComandas);
+
+    // Se a comanda é oriunda de agendamento na agenda, atualiza o appointment correspondente
+    if (updatedComanda.appointmentId || updatedComanda.source === "agenda") {
+      const apptId = updatedComanda.appointmentId || updatedComanda.id;
+      const primaryServiceName =
+        sList.map((s) => s.name).join(" + ") || "Serviço de Barbearia";
+
+      if (onUpdateAppointments) {
+        onUpdateAppointments((prevAppts) =>
+          prevAppts.map((a) =>
+            a.id === apptId
+              ? {
+                  ...a,
+                  clientName: updatedComanda.clientName,
+                  clientPhone: updatedComanda.clientPhone,
+                  barberName: updatedComanda.barberName,
+                  serviceName: primaryServiceName,
+                  price: newPrice,
+                }
+              : a
+          )
+        );
+      }
+
+      try {
+        await supabase
+          .from("appointments")
+          .update({
+            client_name: updatedComanda.clientName,
+            client_phone: updatedComanda.clientPhone,
+            barber_name: updatedComanda.barberName,
+            service_name: primaryServiceName,
+            price: newPrice,
+          })
+          .eq("id", apptId);
+      } catch (err) {
+        console.warn("Aviso ao sincronizar edição da comanda no Supabase:", err);
+      }
+    }
+
+    setEditingComanda(null);
+    setAlertSuccess(
+      `Dados da Comanda #${updatedComanda.id} atualizados com sucesso! Serviços e produtos consolidados.`
+    );
+    setTimeout(() => setAlertSuccess(""), 4500);
+  };
+
   // Navegação de Datas (< Hoje >)
   const handlePrevDay = () => {
     const current = new Date(selectedDate + "T12:00:00");
@@ -902,88 +997,103 @@ export default function CashierPosView({
             </div>
           </div>
 
-          {/* Listagem das Comandas e Atendimentos */}
-          <div className="space-y-4">
-            {filteredComandas.map((cmd) => (
-              <div
-                key={cmd.id}
-                id={`comanda-card-${cmd.id}`}
-                className={
-                  highlightedComandaId === cmd.id
-                    ? "ring-2 ring-amber-500 rounded-2xl transition-all duration-500 shadow-[0_0_20px_rgba(245,158,11,0.35)] animate-pulse"
-                    : "transition-all duration-300"
-                }
-              >
-              <ComandaCard
-                comanda={cmd}
-                onAddItem={() => {
-                  setSelectedComandaIdForAdd(cmd.id);
-                  setProductToAdd(products[0]);
-                  setIsAddItemModalOpen(true);
-                }}
-                onRemoveService={(servId) => {
-                  const updated = comandas.map((c) =>
-                    c.id === cmd.id
-                      ? {
-                          ...c,
-                          services: (c.services || []).filter((s) => s.id !== servId),
-                        }
-                      : c,
-                  );
-                  updateComandasState(updated);
-                }}
-                onRemoveProduct={(prodId) => {
-                  const updated = comandas.map((c) =>
-                    c.id === cmd.id
-                      ? {
-                          ...c,
-                          products: (c.products || []).filter((p) => p.id !== prodId),
-                        }
-                      : c,
-                  );
-                  updateComandasState(updated);
-                }}
-                onStatusChange={(newStatus) => {
-                  handleComandaStatusChange(cmd.id, newStatus);
-                }}
-                onPayMercadoPago={(targetComanda) => {
-                  setMercadoPagoTarget(targetComanda);
-                }}
-                onProceedToPayment={(targetComanda) => {
-                  setComandaToPay(targetComanda);
-                }}
-              />
+          {/* Contêiner Geral Semelhante ao Painel da Barbearia (Envolve o Card de Títulos e os Cards dos Clientes) */}
+          {filteredComandas.length > 0 ? (
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded-3xl p-3 md:p-4 shadow-xl space-y-3">
+              {/* Card de Título Separado com Colunas Perfeitamente Alinhadas aos Dados */}
+              <div className="hidden xl:grid grid-cols-[1fr_210px_150px_180px_210px] gap-4 items-center px-4 md:px-5 py-3.5 bg-neutral-950 border border-neutral-800/80 rounded-2xl text-[11px] uppercase font-bold text-neutral-400 tracking-wider shadow-sm select-none">
+                <div className="text-left">Nome do Cliente</div>
+                <div className="text-left">Profissional Responsável</div>
+                <div className="text-center">Total dos Serviços</div>
+                <div className="text-center">Status</div>
+                <div className="text-center">Ações</div>
               </div>
-            ))}
 
-            {filteredComandas.length === 0 && (
-              <div className="p-12 text-center text-xs text-neutral-500 bg-neutral-900 border border-neutral-800 rounded-3xl space-y-2">
-                <Receipt className="w-8 h-8 text-neutral-600 mx-auto" />
-                <p className="text-base font-bold text-white">
-                  Nenhum agendamento ou comanda para esta data
-                </p>
-                <p className="text-neutral-400 max-w-sm mx-auto">
-                  Agendamentos criados na Agenda aparecem aqui automaticamente. Você também pode clicar em "+ Nova Comanda Balcão" ou navegar pelas datas acima.
-                </p>
-                <div className="pt-2 flex justify-center gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={handleSetToday}
-                    className="text-xs"
+              {/* Cards dos Clientes dentro do Card Principal */}
+              <div className="space-y-3">
+                {filteredComandas.map((cmd) => (
+                  <div
+                    key={cmd.id}
+                    id={`comanda-card-${cmd.id}`}
+                    className={
+                      highlightedComandaId === cmd.id
+                        ? "ring-2 ring-amber-500 rounded-2xl transition-all duration-500 shadow-[0_0_20px_rgba(245,158,11,0.35)] animate-pulse"
+                        : "transition-all duration-300"
+                    }
                   >
-                    Ver Hoje
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setViewAllDates(true)}
-                    className="text-xs"
-                  >
-                    Ver Todas as Datas
-                  </Button>
-                </div>
+                    <ComandaCard
+                      comanda={cmd}
+                      onAddItem={() => {
+                        setSelectedComandaIdForAdd(cmd.id);
+                        setProductToAdd(products[0]);
+                        setIsAddItemModalOpen(true);
+                      }}
+                      onEditComanda={(targetCmd) => {
+                        setEditingComanda(JSON.parse(JSON.stringify(targetCmd)));
+                      }}
+                      onRemoveService={(servId) => {
+                        const updated = comandas.map((c) =>
+                          c.id === cmd.id
+                            ? {
+                                ...c,
+                                services: (c.services || []).filter((s) => s.id !== servId),
+                              }
+                            : c,
+                        );
+                        updateComandasState(updated);
+                      }}
+                      onRemoveProduct={(prodId) => {
+                        const updated = comandas.map((c) =>
+                          c.id === cmd.id
+                            ? {
+                                ...c,
+                                products: (c.products || []).filter((p) => p.id !== prodId),
+                              }
+                            : c,
+                        );
+                        updateComandasState(updated);
+                      }}
+                      onStatusChange={(newStatus) => {
+                        handleComandaStatusChange(cmd.id, newStatus);
+                      }}
+                      onPayMercadoPago={(targetComanda) => {
+                        setMercadoPagoTarget(targetComanda);
+                      }}
+                      onProceedToPayment={(targetComanda) => {
+                        setComandaToPay(targetComanda);
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="p-12 text-center text-xs text-neutral-500 bg-neutral-900 border border-neutral-800 rounded-3xl space-y-2">
+              <Receipt className="w-8 h-8 text-neutral-600 mx-auto" />
+              <p className="text-base font-bold text-white">
+                Nenhum agendamento ou comanda para esta data
+              </p>
+              <p className="text-neutral-400 max-w-sm mx-auto">
+                Agendamentos criados na Agenda aparecem aqui automaticamente. Você também pode clicar em "+ Nova Comanda Balcão" ou navegar pelas datas acima.
+              </p>
+              <div className="pt-2 flex justify-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={handleSetToday}
+                  className="text-xs"
+                >
+                  Ver Hoje
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setViewAllDates(true)}
+                  className="text-xs"
+                >
+                  Ver Todas as Datas
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* COLUNA DIREITA: LANÇAMENTO RÁPIDO DE PRODUTOS + FILA */}
@@ -1232,6 +1342,435 @@ export default function CashierPosView({
           />
         </div>
       </Modal>
+
+      {/* ======================================================== */}
+      {/* MODAL 5: EDITAR DADOS DA COMANDA (SERVIÇOS E PRODUTOS)    */}
+      {/* ======================================================== */}
+      {editingComanda && (
+        <Modal
+          isOpen={!!editingComanda}
+          size="lg"
+          onClose={() => setEditingComanda(null)}
+          title={`Editar Dados: Comanda #${editingComanda.id}`}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setEditingComanda(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => handleSaveEditedComanda(editingComanda)}
+                className="bg-amber-600 hover:bg-amber-500 font-bold"
+              >
+                Salvar Alterações
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4 text-left">
+            {/* 1. DADOS DO CLIENTE E BARBEIRO */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-neutral-950/60 border border-neutral-800 rounded-2xl">
+              <Input
+                label="Nome do Cliente"
+                value={editingComanda.clientName || ""}
+                onChange={(e) =>
+                  setEditingComanda((prev) => ({
+                    ...prev,
+                    clientName: e.target.value,
+                  }))
+                }
+                placeholder="Nome do cliente"
+              />
+              <Input
+                label="Telefone / WhatsApp"
+                value={editingComanda.clientPhone || ""}
+                onChange={(e) =>
+                  setEditingComanda((prev) => ({
+                    ...prev,
+                    clientPhone: e.target.value,
+                  }))
+                }
+                placeholder="(11) 99999-9999"
+              />
+              <Select
+                label="Barbeiro Responsável"
+                value={editingComanda.barberName || (barbers[0]?.name || "Barbeiro")}
+                onChange={(e) =>
+                  setEditingComanda((prev) => ({
+                    ...prev,
+                    barberName: e.target.value,
+                  }))
+                }
+                options={
+                  barbers.length > 0
+                    ? barbers.map((b) => ({ value: b.name, label: b.name }))
+                    : [
+                        {
+                          value: editingComanda.barberName || "Barbeiro",
+                          label: editingComanda.barberName || "Barbeiro",
+                        },
+                      ]
+                }
+              />
+            </div>
+
+            {/* 2. SERVIÇOS EXECUTADOS */}
+            <div className="space-y-3 p-3.5 bg-neutral-950/60 border border-neutral-800 rounded-2xl">
+              <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <Scissors className="w-3.5 h-3.5" />
+                  <span>Serviços na Comanda ({(editingComanda.services || []).length})</span>
+                </span>
+                <span className="text-xs font-mono font-bold text-neutral-200">
+                  Subtotal: R${" "}
+                  {(editingComanda.services || [])
+                    .reduce((a, s) => a + Number(s.price || 0), 0)
+                    .toFixed(2)
+                    .replace(".", ",")}
+                </span>
+              </div>
+
+              {/* Lista de serviços atuais */}
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {(editingComanda.services || []).map((serv, idx) => (
+                  <div
+                    key={serv.id || idx}
+                    className="p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl flex items-center justify-between gap-3 text-xs"
+                  >
+                    <span className="font-semibold text-neutral-200 flex-1 truncate">
+                      {serv.name}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-neutral-400 text-[10px]">R$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={serv.price}
+                        onChange={(e) => {
+                          const newPrice = Number(e.target.value) || 0;
+                          setEditingComanda((prev) => ({
+                            ...prev,
+                            services: prev.services.map((s, i) =>
+                              i === idx
+                                ? {
+                                    ...s,
+                                    price: newPrice,
+                                    barberCommission: newPrice * 0.5,
+                                  }
+                                : s,
+                            ),
+                          }));
+                        }}
+                        className="w-20 px-2 py-1 bg-neutral-950 border border-neutral-700 rounded-lg text-xs font-mono text-emerald-400 text-right focus:outline-none focus:border-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingComanda((prev) => ({
+                            ...prev,
+                            services: prev.services.filter((_, i) => i !== idx),
+                          }));
+                        }}
+                        className="p-1 rounded-lg hover:bg-neutral-800 text-neutral-500 hover:text-red-400 transition-colors cursor-pointer"
+                        title="Remover serviço"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {(!editingComanda.services || editingComanda.services.length === 0) && (
+                  <p className="text-xs text-neutral-500 italic py-1 text-center">
+                    Nenhum serviço nesta comanda.
+                  </p>
+                )}
+              </div>
+
+              {/* Adicionar novo serviço à comanda */}
+              <div className="pt-2 border-t border-neutral-800/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <select
+                  value={selectedServiceToAdd}
+                  onChange={(e) => setSelectedServiceToAdd(e.target.value)}
+                  className="flex-1 bg-neutral-900 border border-neutral-700 text-xs rounded-xl px-2.5 py-2 text-neutral-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">Selecione um serviço do catálogo para adicionar...</option>
+                  {availableServices.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} - R$ {Number(s.price || 0).toFixed(2).replace(".", ",")}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    if (!selectedServiceToAdd) return;
+                    const found = availableServices.find(
+                      (s) => s.id === selectedServiceToAdd,
+                    );
+                    if (found) {
+                      const sPrice = Number(found.price || 0);
+                      setEditingComanda((prev) => ({
+                        ...prev,
+                        services: [
+                          ...(prev.services || []),
+                          {
+                            id: `s-${Date.now()}`,
+                            name: found.name,
+                            price: sPrice,
+                            barberCommission: sPrice * 0.5,
+                          },
+                        ],
+                      }));
+                      setSelectedServiceToAdd("");
+                    }
+                  }}
+                  className="text-xs py-2 px-3 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Adicionar Serviço
+                </Button>
+              </div>
+            </div>
+
+            {/* 3. PRODUTOS CONSUMIDOS (BAR & VITRINE) */}
+            <div className="space-y-3 p-3.5 bg-neutral-950/60 border border-neutral-800 rounded-2xl">
+              <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <Beer className="w-3.5 h-3.5" />
+                  <span>Produtos Consumidos ({(editingComanda.products || []).length})</span>
+                </span>
+                <span className="text-xs font-mono font-bold text-neutral-200">
+                  Subtotal: R${" "}
+                  {(editingComanda.products || [])
+                    .reduce(
+                      (a, p) =>
+                        a +
+                        Number(
+                          p.total ||
+                            Number(p.quantity || 1) *
+                              Number(p.unitPrice || p.price || 0),
+                        ),
+                      0,
+                    )
+                    .toFixed(2)
+                    .replace(".", ",")}
+                </span>
+              </div>
+
+              {/* Lista de produtos atuais */}
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {(editingComanda.products || []).map((prod, idx) => (
+                  <div
+                    key={prod.id || idx}
+                    className="p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-neutral-200 truncate">{prod.name}</p>
+                      <span className="text-[10px] text-neutral-400">
+                        R${" "}
+                        {Number(prod.unitPrice || prod.price || 0)
+                          .toFixed(2)
+                          .replace(".", ",")}{" "}
+                        un.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center border border-neutral-700 rounded-lg overflow-hidden bg-neutral-950">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const curQty = Number(prod.quantity || 1);
+                            if (curQty > 1) {
+                              const newQ = curQty - 1;
+                              const uPrice = Number(prod.unitPrice || prod.price || 0);
+                              setEditingComanda((prev) => ({
+                                ...prev,
+                                products: prev.products.map((p, i) =>
+                                  i === idx
+                                    ? {
+                                        ...p,
+                                        quantity: newQ,
+                                        total: newQ * uPrice,
+                                        sellerCommission: newQ * (uPrice * 0.1),
+                                      }
+                                    : p,
+                                ),
+                              }));
+                            } else {
+                              setEditingComanda((prev) => ({
+                                ...prev,
+                                products: prev.products.filter((_, i) => i !== idx),
+                              }));
+                            }
+                          }}
+                          className="px-2 py-0.5 text-neutral-400 hover:text-white hover:bg-neutral-800 cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <span className="px-2 text-xs font-mono font-bold text-neutral-200">
+                          {prod.quantity || 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newQ = Number(prod.quantity || 1) + 1;
+                            const uPrice = Number(prod.unitPrice || prod.price || 0);
+                            setEditingComanda((prev) => ({
+                              ...prev,
+                              products: prev.products.map((p, i) =>
+                                i === idx
+                                ? {
+                                    ...p,
+                                    quantity: newQ,
+                                    total: newQ * uPrice,
+                                    sellerCommission: newQ * (uPrice * 0.1),
+                                  }
+                                : p,
+                              ),
+                            }));
+                          }}
+                          className="px-2 py-0.5 text-neutral-400 hover:text-white hover:bg-neutral-800 cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <span className="font-mono font-bold text-neutral-200 w-16 text-right">
+                        R${" "}
+                        {Number(
+                          prod.total ||
+                            Number(prod.quantity || 1) *
+                              Number(prod.unitPrice || prod.price || 0),
+                        )
+                          .toFixed(2)
+                          .replace(".", ",")}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingComanda((prev) => ({
+                            ...prev,
+                            products: prev.products.filter((_, i) => i !== idx),
+                          }));
+                        }}
+                        className="p-1 rounded-lg hover:bg-neutral-800 text-neutral-500 hover:text-red-400 transition-colors cursor-pointer"
+                        title="Remover produto"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {(!editingComanda.products || editingComanda.products.length === 0) && (
+                  <p className="text-xs text-neutral-500 italic py-1 text-center">
+                    Nenhum produto consumido nesta comanda.
+                  </p>
+                )}
+              </div>
+
+              {/* Adicionar novo produto do estoque */}
+              <div className="pt-2 border-t border-neutral-800/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <select
+                  value={selectedProductToAdd}
+                  onChange={(e) => setSelectedProductToAdd(e.target.value)}
+                  className="flex-1 bg-neutral-900 border border-neutral-700 text-xs rounded-xl px-2.5 py-2 text-neutral-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">Selecione um produto do estoque para adicionar...</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} - R$ {Number(p.price || 0).toFixed(2).replace(".", ",")} (Estoque:{" "}
+                      {p.stock || 0})
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    if (!selectedProductToAdd) return;
+                    const found = products.find((p) => p.id === selectedProductToAdd);
+                    if (found) {
+                      const uPrice = Number(found.price || 0);
+                      setEditingComanda((prev) => {
+                        const currentProds = prev.products || [];
+                        const existIdx = currentProds.findIndex(
+                          (p) => p.id === found.id,
+                        );
+                        if (existIdx >= 0) {
+                          const updated = [...currentProds];
+                          const nextQ = Number(updated[existIdx].quantity || 1) + 1;
+                          updated[existIdx] = {
+                            ...updated[existIdx],
+                            quantity: nextQ,
+                            total: nextQ * uPrice,
+                            sellerCommission:
+                              nextQ *
+                              (uPrice * ((found.commissionPercent || 10) / 100)),
+                          };
+                          return { ...prev, products: updated };
+                        }
+                        return {
+                          ...prev,
+                          products: [
+                            ...currentProds,
+                            {
+                              id: found.id,
+                              name: found.name,
+                              quantity: 1,
+                              unitPrice: uPrice,
+                              total: uPrice,
+                              sellerCommission:
+                                uPrice * ((found.commissionPercent || 10) / 100),
+                            },
+                          ],
+                        };
+                      });
+                      setSelectedProductToAdd("");
+                    }
+                  }}
+                  className="text-xs py-2 px-3 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Adicionar Produto
+                </Button>
+              </div>
+            </div>
+
+            {/* 4. TOTAL GERAL RECALCULADO */}
+            <div className="p-3 bg-neutral-900 border border-neutral-800 rounded-xl flex items-center justify-between text-xs">
+              <span className="font-bold text-neutral-300 uppercase tracking-wider">
+                Total Geral da Comanda
+              </span>
+              <span className="text-lg font-black font-mono text-emerald-400">
+                R${" "}
+                {(
+                  (editingComanda.services || []).reduce(
+                    (a, s) => a + Number(s.price || 0),
+                    0,
+                  ) +
+                  (editingComanda.products || []).reduce(
+                    (a, p) =>
+                      a +
+                      Number(
+                        p.total ||
+                          Number(p.quantity || 1) *
+                            Number(p.unitPrice || p.price || 0),
+                      ),
+                    0,
+                  )
+                )
+                  .toFixed(2)
+                  .replace(".", ",")}
+              </span>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

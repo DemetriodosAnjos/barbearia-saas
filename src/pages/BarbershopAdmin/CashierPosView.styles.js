@@ -37,18 +37,18 @@ export const posStyles = {
   kpiCardValue: "text-2xl sm:text-3xl font-black font-mono tracking-tight",
   kpiCardSubtext: "text-xs text-neutral-400 font-medium flex items-center gap-1.5 pt-1",
 
-  // 4. Layout Central em 2 Colunas (Comandas à Esquerda + PDV Bar/Fila à Direita)
-  gridContent: "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start",
+  // 4. Layout das Comandas em Coluna (Linha por Linha, semelhante ao Superadmin)
+  gridContent: "space-y-8 w-full",
 
-  // Coluna Principal de Comandas (7 colunas)
-  comandasColumn: "lg:col-span-7 space-y-4",
+  // Lista Principal de Comandas (Disposição em Coluna, uma abaixo da outra)
+  comandasColumn: "w-full space-y-3",
   comandasHeader:
-    "flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-neutral-800",
+    "flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-neutral-800",
   sectionTitle:
     "text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2",
 
-  // Coluna Lateral de Lançamento Rápido de Bar e Fila (5 colunas)
-  sidebarColumn: "lg:col-span-5 space-y-5",
+  // Seção de Lançamento Rápido de Bar e Fila de Espera abaixo das comandas
+  sidebarColumn: "grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-neutral-800/80 w-full",
   quickBox:
     "p-5 bg-neutral-900/90 border border-neutral-800 rounded-3xl space-y-4 shadow-xl",
   quickHeader:
