@@ -33,7 +33,6 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { safeStorage } from "../../utils/safeStorage";
-import MultiTenantSecurityStudio from "../Security/MultiTenantSecurityStudio";
 import { useClientsCount } from "../../hooks/useClientsCount";
 
 export default function BarbershopDashboard({
@@ -388,12 +387,6 @@ export default function BarbershopDashboard({
       icon: "gift",
       badge: "Ganhe 50%",
     },
-    {
-      id: "seguranca_rls",
-      label: "Segurança RLS Multi-Tenant",
-      icon: "shield",
-      badge: "RLS Ativo",
-    },
   ];
 
   return (
@@ -558,7 +551,6 @@ export default function BarbershopDashboard({
                 perfil: "Meu Perfil",
                 configuracoes: "Configurações",
                 suporte: "Suporte",
-                seguranca_rls: "Segurança RLS Multi-Tenant",
               }[activeMenuTab] || "Agenda",
             ]}
             barberStatus={barberPresenceStatus}
@@ -736,20 +728,6 @@ export default function BarbershopDashboard({
             {activeMenuTab === "suporte" && (
               <ErrorBoundary componentName="Central de Suporte">
                 <SupportView onBack={() => setActiveMenuTab("agenda")} />
-              </ErrorBoundary>
-            )}
-            {activeMenuTab === "seguranca_rls" && (
-              <ErrorBoundary componentName="Segurança RLS Multi-Tenant">
-                <div className="py-2">
-                  <MultiTenantSecurityStudio
-                    onApplyTenantToApp={(selectedTenant) => {
-                      if (selectedTenant) {
-                        onUpdateTenant(selectedTenant);
-                      }
-                    }}
-                    onNavigate={() => setActiveMenuTab("agenda")}
-                  />
-                </div>
               </ErrorBoundary>
             )}
               </>

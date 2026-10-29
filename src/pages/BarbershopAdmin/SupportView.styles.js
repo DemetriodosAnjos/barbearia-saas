@@ -39,11 +39,4 @@ export const supportStyles = {
   ticketColumn: "lg:col-span-5 space-y-4",
   ticketCard:
     "p-6 bg-neutral-900/90 border border-neutral-800 rounded-3xl space-y-4 shadow-xl text-left",
-
-  // Rodapé de Vídeos Tutoriais Rápidos
-  tutorialBanner:
-    "p-5 bg-neutral-900/60 border border-neutral-800 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs",
-  tutorialItem: "flex items-center gap-3",
-  tutorialIcon:
-    "w-10 h-10 rounded-2xl bg-amber-600/20 border border-amber-500/30 text-amber-400 flex items-center justify-center text-lg shrink-0",
 };

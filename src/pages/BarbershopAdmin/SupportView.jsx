@@ -368,40 +368,6 @@ export default function SupportView({ tenant, user, onBack }) {
         </div>
       </div>
 
-      {/* 3. RODAPÉ COM VÍDEOS TUTORIAIS DE 1 MINUTO */}
-      <div className={supportStyles.tutorialBanner}>
-        <div className={supportStyles.tutorialItem}>
-          <div className={supportStyles.tutorialIcon}>
-            <ProjectIcon name="Video" size={20} className="text-amber-500" />
-          </div>
-          <div>
-            <h4 className="font-bold text-white text-xs">
-              Vídeos Tutoriais Rápidos (1 Minuto)
-            </h4>
-            <p className="text-[11px] text-neutral-400">
-              Aprenda a fechar o caixa diário, configurar os horários da equipe
-              e exportar relatórios de comissão.
-            </p>
-          </div>
-        </div>
-
-        {/* [Ação: abre central oficial de vídeos sem disparar popup intrusivo] */}
-        <Button
-          variant="outline"
-          onClick={() =>
-            window.open(
-              "https://www.youtube.com/results?search_query=gestao+de+barbearias+dicas",
-              "_blank",
-            )
-          }
-          className="text-xs py-1.5 px-3 shrink-0"
-        >
-          <span className="flex items-center gap-1.5">
-            Assistir Tutoriais
-            <ProjectIcon name="ExternalLink" size={13} colorVariant="inherit" />
-          </span>
-        </Button>
-      </div>
     </div>
   );
 }
