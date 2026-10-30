@@ -71,39 +71,40 @@ export default function TenantBookingLinkCard({
 
   return (
     <div
-      className={`p-4 sm:p-5 bg-gradient-to-br from-neutral-900 via-neutral-900 to-amber-950/20 border border-amber-500/30 rounded-3xl shadow-xl space-y-3.5 text-left ${className}`}
+      className={`w-full max-w-full overflow-hidden p-3.5 sm:p-5 bg-gradient-to-br from-neutral-900 via-neutral-900 to-amber-950/20 border border-amber-500/30 rounded-2xl sm:rounded-3xl shadow-xl space-y-3 text-left min-w-0 ${className}`}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-neutral-800">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-            <ProjectIcon name="Scissors" size={18} colorVariant="amber" />
+      <div className="flex items-center justify-between gap-2 pb-2 border-b border-neutral-800 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <ProjectIcon name="Scissors" size={16} colorVariant="amber" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                Link do Cliente (Tenant)
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 shrink-0">
+                Link do Cliente
               </span>
               {tenantSlug && (
-                <span className="text-[11px] font-mono text-neutral-400 truncate hidden md:inline">
+                <span className="text-[11px] font-mono text-neutral-400 truncate max-w-[120px] sm:max-w-[200px]">
                   @{tenantSlug}
                 </span>
               )}
             </div>
-            <h3 className="text-sm font-black text-white mt-0.5">
+            <h3 className="text-xs sm:text-sm font-black text-white mt-0.5 truncate">
               Link de Agendamento da Barbearia
             </h3>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {onOpenSettings && (
             <button
               type="button"
               onClick={onOpenSettings}
-              className="text-[11px] font-semibold text-neutral-400 hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-[11px] font-semibold text-neutral-400 hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors p-1"
+              title="Personalizar Slug"
             >
-              <ProjectIcon name="Settings" size={12} colorVariant="inherit" />
-              <span>Personalizar Slug</span>
+              <ProjectIcon name="Settings" size={13} colorVariant="inherit" />
+              <span className="hidden sm:inline">Personalizar Slug</span>
             </button>
           )}
           {onClose && (
@@ -125,56 +126,60 @@ export default function TenantBookingLinkCard({
       </p>
 
       {/* Caixa de exibição do link com cópia rápida */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-        <div className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 flex items-center gap-2 text-xs font-mono text-neutral-200 overflow-hidden shadow-inner">
+      <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full min-w-0 max-w-full">
+        <div className="flex-1 min-w-0 max-w-full bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 sm:px-3 py-2 flex items-center gap-2 text-xs font-mono text-neutral-200 overflow-hidden shadow-inner">
           <ProjectIcon name="Link" size={14} className="text-amber-400 shrink-0" />
-          <span className="truncate select-all">{clientBookingUrl}</span>
+          <span className="truncate select-all text-xs block min-w-0 flex-1">{clientBookingUrl}</span>
         </div>
 
         <Button
           variant={copiedLink ? "success" : "primary"}
           onClick={handleCopyLink}
-          className="text-xs py-2 px-3 font-bold cursor-pointer shrink-0"
+          className="text-xs py-2 px-3 font-bold cursor-pointer shrink-0 whitespace-nowrap"
+          title={copiedLink ? "Link Copiado!" : "Copiar Link"}
         >
           <span className="flex items-center justify-center gap-1.5">
             <ProjectIcon name={copiedLink ? "Check" : "Copy"} size={13} colorVariant="inherit" />
-            <span>{copiedLink ? "Link Copiado!" : "Copiar Link"}</span>
+            <span>{copiedLink ? "Copiado!" : "Copiar Link"}</span>
           </span>
         </Button>
       </div>
 
-      {/* Ações Rápidas de Divulgação */}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
+      {/* Ações Rápidas de Divulgação: Ícones simplificados centralizados */}
+      <div className="flex items-center justify-center gap-3 pt-2 w-full">
+        {/* 1. Botão divulgar no WhatsApp */}
         <a
           href={whatsAppShareUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="py-1.5 px-3 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-950/30 cursor-pointer"
+          className="w-10 h-10 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white transition-all flex items-center justify-center shadow-md shadow-emerald-950/30 cursor-pointer shrink-0"
+          title="Divulgar no WhatsApp"
+          aria-label="Divulgar no WhatsApp"
         >
-          <ProjectIcon name="MessageSquare" size={13} colorVariant="inherit" />
-          <span>Divulgar no WhatsApp</span>
-          <ProjectIcon name="ExternalLink" size={10} colorVariant="inherit" />
+          <ProjectIcon name="MessageSquare" size={18} colorVariant="inherit" />
         </a>
 
-        <Button
-          variant="secondary"
+        {/* 2. Botão QR code do balcão */}
+        <button
+          type="button"
           onClick={() => setIsQrModalOpen(true)}
-          className="text-xs py-1.5 px-3 font-semibold cursor-pointer"
+          className="w-10 h-10 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-200 hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-xs shrink-0"
+          title="QR Code do Balcão"
+          aria-label="QR Code do Balcão"
         >
-          <span className="flex items-center gap-1.5">
-            <ProjectIcon name="QrCode" size={13} colorVariant="inherit" />
-            <span>QR Code do Balcão</span>
-          </span>
-        </Button>
+          <ProjectIcon name="QrCode" size={18} colorVariant="inherit" />
+        </button>
 
+        {/* 3. Botão testar como cliente */}
         <a
           href={clientBookingUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="py-1.5 px-3 rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ml-auto"
+          className="w-10 h-10 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-200 hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-xs shrink-0"
+          title="Testar como Cliente"
+          aria-label="Testar como Cliente"
         >
-          <ProjectIcon name="Eye" size={13} colorVariant="inherit" />
-          <span>Testar como Cliente</span>
+          <ProjectIcon name="Eye" size={18} colorVariant="inherit" />
         </a>
       </div>
 

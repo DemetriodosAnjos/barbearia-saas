@@ -55,9 +55,9 @@ export default function Modal({
         <div
           className={`flex items-center ${
             title ? "justify-between" : "justify-end"
-          } px-6 ${title ? "py-4" : "pt-5 pb-0"} ${
+          } px-4 sm:px-6 ${title ? "py-3 sm:py-4" : "pt-4 pb-0"} ${
             hasHeaderBorder ? "border-b border-neutral-800" : ""
-          } shrink-0`}
+          } shrink-0 min-w-0`}
         >
           {title && (
             <h3 id="modal-title-heading" className={modalStyles.title}>
