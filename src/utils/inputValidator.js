@@ -189,6 +189,8 @@ export const SCHEMAS = {
     cpf: { type: "string", required: false, maxLength: 20 },
     birth_date: { type: "string", required: false, maxLength: 15 },
     frequency_days: { type: "number", required: false, min: 1, max: 365, default: 18 },
+    reminder_enabled: { type: "boolean", required: false, default: true },
+    alert_lead_days: { type: "number", required: false, min: 1, max: 30, default: 3 },
     notes: { type: "string", required: false, maxLength: 500, default: "" }, // Limite de 500 chars para evitar DoS
   },
 

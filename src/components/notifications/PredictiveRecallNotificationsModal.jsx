@@ -44,7 +44,7 @@ export default function PredictiveRecallNotificationsModal({
                 )}
               </h2>
               <p className="text-xs text-neutral-400 mt-0.5">
-                Clientes na janela habitual de retorno (3 dias, 2 dias, 1 dia ou Hoje)
+                Clientes na janela habitual de retorno configurada
               </p>
             </div>
           </div>
@@ -75,13 +75,23 @@ export default function PredictiveRecallNotificationsModal({
               const isTomorrow = reminder.daysRemaining === 1;
               const isOverdue = reminder.daysRemaining < 0;
 
-              const badgeColor = isToday
-                ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+              const badgeColor = isOverdue
+                ? "bg-red-500/10 border-red-500/30 text-red-400"
+                : isToday
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                 : isTomorrow
                 ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                : isOverdue
-                ? "bg-red-500/10 border-red-500/30 text-red-400"
                 : "bg-blue-500/10 border-blue-500/30 text-blue-400";
+
+              const badgeText =
+                reminder.tagText ||
+                (isOverdue
+                  ? `ATRASADO (${Math.abs(reminder.daysRemaining)}d)`
+                  : isToday
+                  ? "HOJE"
+                  : isTomorrow
+                  ? "FALTA 1 DIA"
+                  : `FALTAM ${reminder.daysRemaining} DIAS`);
 
               return (
                 <div
@@ -96,13 +106,7 @@ export default function PredictiveRecallNotificationsModal({
                       <span
                         className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${badgeColor}`}
                       >
-                        {isToday
-                          ? "HOJE"
-                          : isTomorrow
-                          ? "AMANHÃ"
-                          : isOverdue
-                          ? `ATRASADO (${Math.abs(reminder.daysRemaining)}d)`
-                          : `EM ${reminder.daysRemaining} DIAS`}
+                        {badgeText}
                       </span>
                     </div>
                     <p className="text-xs text-neutral-400 mt-0.5">

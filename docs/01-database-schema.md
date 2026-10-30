@@ -162,6 +162,8 @@ Mapeamento completo das **21 colunas SQL oficiais** da tabela `public.clients` n
 | `notes` | `text` | Não | Observações gerais do prontuário (ex: estilo de corte habitual). |
 | `technical_notes` | `jsonb` | Não | Ficha técnica detalhada em JSON (`cutSpecs`, `beardSpecs`, `allergyAlert`, histórico de lâminas). |
 | `frequency_days` | `integer` | Não | Intervalo habitual de retorno em dias (padrão: `18`). Usado para recall preditivo. |
+| `reminder_enabled` | `boolean` | Não | Chave ativa/desativa disparo automático do lembrete preditivo de retorno (padrão: `true`). |
+| `alert_lead_days` | `integer` | Não | Dias de antecedência da frequência habitual para início dos alertas de retorno (padrão: `3`). |
 | `is_vip` | `boolean` | Sim | Indicador de cliente VIP / fidelizado (padrão: `false`). |
 | `total_visits` | `integer` | Sim | Quantidade total de atendimentos concluídos (padrão: `0`). |
 | `total_spent` | `numeric(10,2)` | Sim | Total gasto acumulado pelo cliente (LTV) (padrão: `0.00`). |

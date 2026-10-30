@@ -13,6 +13,7 @@ import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import Alert from "../../components/ui/Alert";
+import Toggle from "../../components/ui/Toggle";
 import { SafeHtml } from "../../components/ui/SafeHtml";
 import ClientHistoryTimeline from "../../components/loyalty/ClientHistoryTimeline";
 import { validateSchema, SCHEMAS } from "../../utils/inputValidator";
@@ -30,9 +31,15 @@ import {
 } from "lucide-react";
 import { useClientsCount } from "../../hooks/useClientsCount";
 import { useAuth } from "../../context/AuthContext";
+import {
+  evaluateClientPredictiveRecall,
+  getActivePredictiveRecallReminders,
+  getClientLastVisit,
+  getDaysDifference,
+} from "../../utils/predictiveRecallEngine";
 
 // Normalização defensiva dos registros da tabela clients (suporta snake_case e camelCase)
-export function normalizeClientRecord(c) {
+export function normalizeClientRecord(c, appointments = []) {
   if (!c || typeof c !== "object") return {};
 
   const techNotes =
@@ -54,31 +61,50 @@ export function normalizeClientRecord(c) {
   const frequencyDays = Number(
     c.frequencyDays ?? c.frequency_days ?? techNotes.frequency_days ?? 18
   );
+  const reminderEnabled = Boolean(
+    c.reminderEnabled ??
+      c.reminder_enabled ??
+      techNotes.reminder_enabled ??
+      true
+  );
+  const alertLeadDays = Number(
+    c.alertLeadDays ??
+      c.alert_lead_days ??
+      techNotes.alert_lead_days ??
+      3
+  );
   const isVip = Boolean(c.isVip ?? c.is_vip ?? techNotes.is_vip);
+
+  // Avaliação preditiva unificada (mesmo motor utilizado na Navbar e nos Modais)
+  const recall = evaluateClientPredictiveRecall(
+    {
+      ...c,
+      frequencyDays: frequencyDays > 0 ? frequencyDays : 18,
+      reminderEnabled,
+      alertLeadDays: alertLeadDays > 0 ? alertLeadDays : 3,
+    },
+    appointments
+  );
+
   const rawLastVisit =
+    recall?.lastVisitDate ||
     c.lastVisitDate ||
     c.last_visit ||
     c.lastVisit ||
     techNotes.last_visit ||
     "";
 
-  let daysSinceLastVisit = Number(c.daysSinceLastVisit ?? techNotes.days_since_last_visit ?? 0);
-  if (!daysSinceLastVisit && rawLastVisit) {
-    try {
-      const visitDate = new Date(rawLastVisit);
-      if (!Number.isNaN(visitDate.getTime())) {
-        const diffMs = Date.now() - visitDate.getTime();
-        daysSinceLastVisit = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-      }
-    } catch {
-      daysSinceLastVisit = 0;
-    }
-  }
+  const daysSinceLastVisit =
+    recall?.hasVisit && recall?.daysSinceLastVisit !== null
+      ? recall.daysSinceLastVisit
+      : Number.isFinite(c.daysSinceLastVisit)
+      ? c.daysSinceLastVisit
+      : null;
 
   const rawStatus =
     c.status ||
     techNotes.status ||
-    (daysSinceLastVisit > 40 ? "at_risk" : isVip ? "vip" : "active");
+    ((daysSinceLastVisit !== null && daysSinceLastVisit > 40) ? "at_risk" : isVip ? "vip" : "active");
   const preferredBarber =
     c.preferredBarber ||
     c.preferred_barber ||
@@ -107,6 +133,10 @@ export function normalizeClientRecord(c) {
     status: rawStatus,
     frequencyDays: frequencyDays > 0 ? frequencyDays : 18,
     frequency_days: frequencyDays > 0 ? frequencyDays : 18,
+    reminderEnabled,
+    reminder_enabled: reminderEnabled,
+    alertLeadDays: alertLeadDays > 0 ? alertLeadDays : 3,
+    alert_lead_days: alertLeadDays > 0 ? alertLeadDays : 3,
     totalVisits: Number.isFinite(totalVisits) ? totalVisits : 0,
     total_visits: Number.isFinite(totalVisits) ? totalVisits : 0,
     totalSpent: Number.isFinite(totalSpent) ? totalSpent : 0,
@@ -116,15 +146,25 @@ export function normalizeClientRecord(c) {
         ? rawLastVisit.slice(0, 10)
         : "Recém-cadastrado"
       : "Recém-cadastrado",
-    daysSinceLastVisit: Number.isFinite(daysSinceLastVisit) ? daysSinceLastVisit : 0,
+    daysSinceLastVisit: daysSinceLastVisit !== null ? daysSinceLastVisit : 0,
+    hasPastVisit: Boolean(recall?.hasVisit),
+    recallStatus: recall,
     preferredBarber,
     preferred_barber: preferredBarber,
     notes,
-    technical_notes: techNotes,
+    technical_notes: {
+      ...techNotes,
+      frequency_days: frequencyDays > 0 ? frequencyDays : 18,
+      reminder_enabled: reminderEnabled,
+      alert_lead_days: alertLeadDays > 0 ? alertLeadDays : 3,
+    },
     technicalNotes: {
       cutSpecs: techNotes.cutSpecs || notes || "Primeiro atendimento na barbearia.",
       beardSpecs: techNotes.beardSpecs || "",
       allergyAlert: techNotes.allergyAlert || "",
+      frequency_days: frequencyDays > 0 ? frequencyDays : 18,
+      reminder_enabled: reminderEnabled,
+      alert_lead_days: alertLeadDays > 0 ? alertLeadDays : 3,
       ...techNotes,
     },
   };
@@ -158,7 +198,7 @@ export default function ClientsDirectoryView({
       const filtered = activeTenantId
         ? clientsList.filter((c) => (c.tenant_id || c.barbershop_id) === activeTenantId)
         : clientsList;
-      return filtered.map(normalizeClientRecord);
+      return filtered.map((c) => normalizeClientRecord(c, appointments));
     }
     try {
       if (activeTenantId) {
@@ -169,7 +209,7 @@ export default function ClientsDirectoryView({
           if (Array.isArray(parsed)) {
             return parsed
               .filter((c) => (c.tenant_id || c.barbershop_id) === activeTenantId)
-              .map(normalizeClientRecord);
+              .map((c) => normalizeClientRecord(c, appointments));
           }
         }
       }
@@ -194,9 +234,9 @@ export default function ClientsDirectoryView({
       const filtered = activeTenantId
         ? clientsList.filter((c) => (c.tenant_id || c.barbershop_id) === activeTenantId)
         : clientsList;
-      setClients(filtered.map(normalizeClientRecord));
+      setClients(filtered.map((c) => normalizeClientRecord(c, appointments)));
     }
-  }, [clientsList, activeTenantId]);
+  }, [clientsList, activeTenantId, appointments]);
 
   // Modal de Prontuário Técnico
   const [selectedClientForRecord, setSelectedClientForRecord] = useState(null);
@@ -210,6 +250,8 @@ export default function ClientsDirectoryView({
     cpf: "",
     totalSpent: "0,00",
     frequencyDays: "18",
+    reminderEnabled: true,
+    alertLeadDays: "3",
     preferredBarber: "",
     notes: "",
   });
@@ -225,6 +267,8 @@ export default function ClientsDirectoryView({
     cpf: "",
     birthDate: "",
     frequencyDays: "18", // Padrão 18 dias
+    reminderEnabled: true, // Padrão: disparo ativo
+    alertLeadDays: "3", // Padrão: 3 dias de antecedência
     notes: "",
   });
   const [formErrors, setFormErrors] = useState({});
@@ -261,6 +305,21 @@ export default function ClientsDirectoryView({
     const safeSpent = Number.isFinite(rawSpent) ? rawSpent : 0;
     const rawFreq = Number(client.frequencyDays ?? client.frequency_days ?? 18);
     const safeFreq = rawFreq > 0 ? rawFreq : 18;
+    const isReminderEnabled = Boolean(
+      client.reminderEnabled ??
+      client.reminder_enabled ??
+      client.technicalNotes?.reminder_enabled ??
+      client.technical_notes?.reminder_enabled ??
+      true
+    );
+    const rawLeadDays = Number(
+      client.alertLeadDays ??
+      client.alert_lead_days ??
+      client.technicalNotes?.alert_lead_days ??
+      client.technical_notes?.alert_lead_days ??
+      3
+    );
+    const safeLeadDays = rawLeadDays > 0 ? rawLeadDays : 3;
 
     const defaultBarber =
       client.preferredBarber ||
@@ -274,6 +333,8 @@ export default function ClientsDirectoryView({
       cpf: client.cpf || "",
       totalSpent: safeSpent.toFixed(2).replace(".", ","),
       frequencyDays: String(safeFreq),
+      reminderEnabled: isReminderEnabled,
+      alertLeadDays: String(safeLeadDays),
       preferredBarber: defaultBarber,
       notes: client.notes || client.technicalNotes?.cutSpecs || "",
     });
@@ -319,6 +380,13 @@ export default function ClientsDirectoryView({
         ? Math.min(365, Math.max(1, parsedFreq))
         : 18;
 
+      // Parse de Disparo Automático e Antecedência em Dias
+      const reminderEnabled = Boolean(fullEditForm.reminderEnabled ?? true);
+      const parsedLeadDays = parseInt(fullEditForm.alertLeadDays, 10);
+      const safeLeadDays = Number.isFinite(parsedLeadDays)
+        ? Math.min(30, Math.max(1, parsedLeadDays))
+        : 3;
+
       const oldPhone = editingClient.phone;
       const oldName = editingClient.name;
 
@@ -339,6 +407,10 @@ export default function ClientsDirectoryView({
         total_spent: safeSpent,
         frequencyDays: safeFreq,
         frequency_days: safeFreq,
+        reminderEnabled,
+        reminder_enabled: reminderEnabled,
+        alertLeadDays: safeLeadDays,
+        alert_lead_days: safeLeadDays,
         preferredBarber: selectedBarber,
         preferred_barber: selectedBarber,
         notes: sanitizedNotes,
@@ -346,15 +418,20 @@ export default function ClientsDirectoryView({
           ...existingTechNotes,
           total_spent: safeSpent,
           frequency_days: safeFreq,
+          reminder_enabled: reminderEnabled,
+          alert_lead_days: safeLeadDays,
           preferred_barber: selectedBarber,
           notes: sanitizedNotes,
           cutSpecs: sanitizedNotes || existingTechNotes.cutSpecs,
         },
         technicalNotes: {
           ...existingTechNotes,
+          frequency_days: safeFreq,
+          reminder_enabled: reminderEnabled,
+          alert_lead_days: safeLeadDays,
           cutSpecs: sanitizedNotes || existingTechNotes.cutSpecs,
         },
-      });
+      }, appointments);
 
       // 1. Atualiza lista de clientes local
       const updatedList = clients.map((c) =>
@@ -412,27 +489,57 @@ export default function ClientsDirectoryView({
         });
       }
 
-      // 5. Persistência no Supabase
+      // 5. Persistência resiliente no Supabase com tolerância a divergências de schema (PGRST204)
       try {
         if (
           editingClient.id &&
           !String(editingClient.id).startsWith("cli-mock") &&
           !String(editingClient.id).startsWith("temp-")
         ) {
-          await supabase
+          const techNotesPayload = {
+            ...(updatedRecord.technical_notes || {}),
+            total_spent: safeSpent,
+            frequency_days: safeFreq,
+            reminder_enabled: reminderEnabled,
+            alert_lead_days: safeLeadDays,
+            preferred_barber: selectedBarber,
+            notes: sanitizedNotes,
+          };
+
+          const basePayload = {
+            name: sanitizedName,
+            phone: sanitizedPhone,
+            email: sanitizedEmail,
+            cpf: sanitizedCpf,
+            total_spent: safeSpent,
+            frequency_days: safeFreq,
+            preferred_barber: selectedBarber,
+            notes: sanitizedNotes,
+            technical_notes: techNotesPayload,
+          };
+
+          // Tenta salvar incluindo as colunas dedicadas
+          const fullRes = await supabase
             .from("clients")
             .update({
-              name: sanitizedName,
-              phone: sanitizedPhone,
-              email: sanitizedEmail,
-              cpf: sanitizedCpf,
-              total_spent: safeSpent,
-              frequency_days: safeFreq,
-              preferred_barber: selectedBarber,
-              notes: sanitizedNotes,
-              technical_notes: updatedRecord.technical_notes,
+              ...basePayload,
+              reminder_enabled: reminderEnabled,
+              alert_lead_days: safeLeadDays,
             })
             .eq("id", editingClient.id);
+
+          // Se as colunas dedicadas ainda não existirem no Supabase, salva basePayload garantindo
+          // que reminder_enabled e alert_lead_days fiquem 100% gravados em technical_notes!
+          if (fullRes.error) {
+            console.warn(
+              "Aviso na atualização do Supabase com colunas dedicadas. Retendo em technical_notes:",
+              fullRes.error.message
+            );
+            await supabase
+              .from("clients")
+              .update(basePayload)
+              .eq("id", editingClient.id);
+          }
         }
       } catch (dbErr) {
         console.warn("Aviso na atualização do cliente no Supabase:", dbErr);
@@ -447,11 +554,11 @@ export default function ClientsDirectoryView({
     }
   };
 
-  // 1. Identifica os clientes na janela de ouro de retorno (faltam 3 dias ou menos)
+  // 1. Identifica os clientes na janela de alerta usando o motor oficial (idêntico ao sininho da Navbar)
   const recallDueClients = clients.filter((c) => {
-    if (c.status === "at_risk") return false;
-    const daysRemaining = c.frequencyDays - (c.daysSinceLastVisit || 0);
-    return daysRemaining <= 3 && daysRemaining >= 0;
+    if (c.status === "at_risk" || c.status === "inactive") return false;
+    const recall = c.recallStatus || evaluateClientPredictiveRecall(c, appointments);
+    return Boolean(recall?.hasVisit && recall?.isWithinAlertWindow);
   });
 
   // 2. Abre o Modal de Lembrete Preditivo montando a mensagem personalizada do Barbeiro
@@ -459,12 +566,11 @@ export default function ClientsDirectoryView({
     setRecallModalClient(client);
 
     const barberFirstName =
-      client.preferredBarber.split(" ")[0] || "Seu Barbeiro";
-    const clientFirstName = client.name.split(" ")[0];
-    const daysRemaining = Math.max(
-      1,
-      client.frequencyDays - (client.daysSinceLastVisit || 0),
-    );
+      (client.preferredBarber || "Seu Barbeiro").split(" ")[0] || "Seu Barbeiro";
+    const clientFirstName = (client.name || "Cliente").split(" ")[0];
+
+    const recall = client.recallStatus || evaluateClientPredictiveRecall(client, appointments);
+    const daysRemaining = recall?.daysRemaining ?? ((Number(client.frequencyDays) || 18) - (client.daysSinceLastVisit || 0));
 
     // [Link dinâmico e seguro: aponta para a URL pública real vinculada à barbearia/tenant]
     const customLink = buildClientBookingUrl({
@@ -475,13 +581,39 @@ export default function ClientsDirectoryView({
       clientPhone: client.phone,
     });
 
-    // Mensagem humanizada pronta com o link funcional
-    const prebuiltMsg =
-      `Fala ${clientFirstName}, aqui é o ${barberFirstName}! Tudo bem por aí?\n\n` +
-      `Vi aqui na minha agenda que faltam apenas ${daysRemaining} dias para fechar seu prazo habitual de ${client.frequencyDays} dias de corte e barba.\n\n` +
-      `O que acha de já deixar seu horário garantido na minha cadeira para não ficar sem vaga?\n\n` +
-      `Escolha seu horário aqui: ${customLink}\n\n` +
-      `Te espero na cadeira!`;
+    // Mensagem humanizada e contextualizada conforme o ciclo de retorno oficial
+    let prebuiltMsg = "";
+
+    if (daysRemaining < 0) {
+      const daysLate = Math.abs(daysRemaining);
+      prebuiltMsg =
+        `Fala ${clientFirstName}, aqui é o ${barberFirstName}! Tudo bem por aí?\n\n` +
+        `Passando para avisar que o tempo estimado para o seu retorno de ${client.frequencyDays} dias expirou há ${daysLate} dia${daysLate > 1 ? "s" : ""}!\n\n` +
+        `Bora dar aquele trato no visual e renovar o corte?\n\n` +
+        `Escolha seu melhor horário diretamente pelo link:\n${customLink}\n\n` +
+        `Te espero na cadeira!`;
+    } else if (daysRemaining === 0) {
+      prebuiltMsg =
+        `Fala ${clientFirstName}, aqui é o ${barberFirstName}! Tudo bem por aí?\n\n` +
+        `Hoje é o dia do seu retorno habitual de ${client.frequencyDays} dias de corte e barba!\n\n` +
+        `Ainda tenho alguns horários disponíveis hoje. Vamos garantir sua vaga?\n\n` +
+        `Escolha seu horário aqui:\n${customLink}\n\n` +
+        `Te espero na barbearia!`;
+    } else if (daysRemaining === 1) {
+      prebuiltMsg =
+        `Fala ${clientFirstName}, aqui é o ${barberFirstName}! Tudo bem por aí?\n\n` +
+        `Falta apenas 1 dia para o seu retorno habitual de ${client.frequencyDays} dias de corte e barba!\n\n` +
+        `Que tal já deixar seu horário reservado para amanhã e garantir sua vaga?\n\n` +
+        `Escolha seu horário aqui:\n${customLink}\n\n` +
+        `Te espero na cadeira!`;
+    } else {
+      prebuiltMsg =
+        `Fala ${clientFirstName}, aqui é o ${barberFirstName}! Tudo bem por aí?\n\n` +
+        `Vi aqui na minha agenda que faltam ${daysRemaining} dias para fechar seu prazo habitual de ${client.frequencyDays} dias de corte e barba.\n\n` +
+        `O que acha de já deixar seu horário garantido na minha cadeira com antecedência?\n\n` +
+        `Escolha seu horário aqui:\n${customLink}\n\n` +
+        `Te espero na cadeira!`;
+    }
 
     setCustomMessage(prebuiltMsg);
   };
@@ -491,7 +623,9 @@ export default function ClientsDirectoryView({
     const freqNum = Number(newFrequency);
 
     const updated = clients.map((c) =>
-      c.id === clientId ? { ...c, frequencyDays: freqNum, frequency_days: freqNum } : c,
+      c.id === clientId
+        ? normalizeClientRecord({ ...c, frequencyDays: freqNum, frequency_days: freqNum }, appointments)
+        : c,
     );
     setClients(updated);
 
@@ -610,6 +744,8 @@ export default function ClientsDirectoryView({
       cpf: DOMPurify.sanitize(newClientForm.cpf?.trim() || "", { ALLOWED_TAGS: [] }),
       birth_date: newClientForm.birthDate || "",
       frequency_days: Number(newClientForm.frequencyDays || 18),
+      reminder_enabled: Boolean(newClientForm.reminderEnabled ?? true),
+      alert_lead_days: Number(newClientForm.alertLeadDays || 3),
       notes: DOMPurify.sanitize(newClientForm.notes?.trim() || "", { ALLOWED_TAGS: ["b", "i", "strong", "em", "p", "span"] }),
     };
 
@@ -630,11 +766,15 @@ export default function ClientsDirectoryView({
     const cleanBirthDate = validation.sanitized.birth_date || null;
     const cleanNotes = validation.sanitized.notes || "";
     const cleanFrequency = Number(validation.sanitized.frequency_days || 18);
+    const cleanReminderEnabled = Boolean(validation.sanitized.reminder_enabled ?? true);
+    const cleanAlertLeadDays = Number(validation.sanitized.alert_lead_days || 3);
 
     const techNotes = {
       cpf: cleanCpf,
       birth_date: cleanBirthDate,
       frequency_days: cleanFrequency,
+      reminder_enabled: cleanReminderEnabled,
+      alert_lead_days: cleanAlertLeadDays,
       status: "active",
       notes: cleanNotes,
       cutSpecs: cleanNotes || "Primeiro atendimento na barbearia.",
@@ -679,6 +819,8 @@ export default function ClientsDirectoryView({
       birth_date: cleanBirthDate,
       notes: cleanNotes,
       frequency_days: cleanFrequency,
+      reminder_enabled: cleanReminderEnabled,
+      alert_lead_days: cleanAlertLeadDays,
       is_vip: false,
       total_visits: 0,
       total_spent: 0,
@@ -710,6 +852,9 @@ export default function ClientsDirectoryView({
           email: cleanEmail,
           tenant_id: resolvedTenantId,
           barbershop_id: resolvedBarbershopId,
+          frequency_days: cleanFrequency,
+          reminder_enabled: cleanReminderEnabled,
+          alert_lead_days: cleanAlertLeadDays,
           is_vip: false,
           total_visits: 0,
           average_ticket: 0,
@@ -725,14 +870,41 @@ export default function ClientsDirectoryView({
         if (!fallbackRes.error && fallbackRes.data) {
           savedRecord = fallbackRes.data;
         } else {
-          console.warn("Aviso ao salvar no Supabase (cliente será mantido no cache local seguro):", fallbackRes.error?.message);
+          console.warn("Aviso na inserção de cliente. Tentando payload com retenção em technical_notes:", fallbackRes.error?.message);
+          const schemaSafePayload = {
+            name: cleanName,
+            phone: cleanPhone,
+            email: cleanEmail,
+            tenant_id: resolvedTenantId,
+            barbershop_id: resolvedBarbershopId,
+            frequency_days: cleanFrequency,
+            is_vip: false,
+            total_visits: 0,
+            average_ticket: 0,
+            technical_notes: {
+              ...techNotes,
+              reminder_enabled: cleanReminderEnabled,
+              alert_lead_days: cleanAlertLeadDays,
+              frequency_days: cleanFrequency,
+            },
+          };
+          const safeRes = await supabase
+            .from("clients")
+            .insert([schemaSafePayload])
+            .select()
+            .single();
+          if (!safeRes.error && safeRes.data) {
+            savedRecord = safeRes.data;
+          } else {
+            console.warn("Aviso ao salvar no Supabase (cliente será mantido no cache local seguro):", safeRes.error?.message);
+          }
         }
       }
     } catch (err) {
       console.warn("Supabase indisponível no momento. Salvando no cache local seguro:", err);
     }
 
-    // Normaliza o objeto para o estado React
+    // Normaliza o objeto para o estado React passando os agendamentos atuais
     const created = normalizeClientRecord({
       ...(savedRecord || fullClientPayload),
       id: savedRecord?.id || generatedId,
@@ -745,8 +917,12 @@ export default function ClientsDirectoryView({
       notes: cleanNotes,
       frequencyDays: cleanFrequency,
       frequency_days: cleanFrequency,
+      reminderEnabled: cleanReminderEnabled,
+      reminder_enabled: cleanReminderEnabled,
+      alertLeadDays: cleanAlertLeadDays,
+      alert_lead_days: cleanAlertLeadDays,
       technical_notes: techNotes,
-    });
+    }, appointments);
 
     const updated = [created, ...clients.filter((c) => c.id !== created.id && c.phone !== created.phone)];
     setClients(updated);
@@ -775,6 +951,8 @@ export default function ClientsDirectoryView({
       cpf: "",
       birthDate: "",
       frequencyDays: "18",
+      reminderEnabled: true,
+      alertLeadDays: "3",
       notes: "",
     });
     setFormErrors({});
@@ -993,9 +1171,8 @@ export default function ClientsDirectoryView({
               label: "Cliente",
               sortable: true,
               render: (row) => {
-                const daysRemaining =
-                  row.frequencyDays - (row.daysSinceLastVisit || 0);
-                const isDueRecall = daysRemaining <= 3 && daysRemaining >= 0;
+                const recall = row.recallStatus || evaluateClientPredictiveRecall(row, appointments);
+                const isWithinAlertWindow = recall?.hasVisit && recall?.isWithinAlertWindow;
 
                 return (
                   <div className="flex items-center gap-3">
@@ -1009,9 +1186,11 @@ export default function ClientsDirectoryView({
                             <span>VIP</span>
                           </span>
                         )}
-                        {isDueRecall && (
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                            Faltam {daysRemaining}d
+                        {isWithinAlertWindow && (
+                          <span
+                            className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${recall.badgeClass}`}
+                          >
+                            {recall.shortTag}
                           </span>
                         )}
                       </p>
@@ -1027,16 +1206,24 @@ export default function ClientsDirectoryView({
               key: "lastVisitDate",
               label: "Última Visita",
               sortable: true,
-              render: (row) => (
-                <div className="flex flex-col">
-                  <span className="font-mono text-xs text-neutral-200">
-                    {row.lastVisitDate}
-                  </span>
-                  <span className="text-[10px] text-neutral-500">
-                    há {row.daysSinceLastVisit} dias
-                  </span>
-                </div>
-              ),
+              render: (row) => {
+                const recall = row.recallStatus || evaluateClientPredictiveRecall(row, appointments);
+                const hasVisit = recall?.hasVisit;
+                const daysSince = recall?.daysSinceLastVisit ?? row.daysSinceLastVisit;
+
+                return (
+                  <div className="flex flex-col">
+                    <span className="font-mono text-xs text-neutral-200">
+                      {row.lastVisitDate}
+                    </span>
+                    <span className="text-[10px] text-neutral-500">
+                      {hasVisit && daysSince !== null && row.lastVisitDate !== "Recém-cadastrado"
+                        ? `há ${daysSince} dias`
+                        : "Sem histórico"}
+                    </span>
+                  </div>
+                );
+              },
             },
             {
               key: "frequencyDays",
@@ -1342,28 +1529,6 @@ export default function ClientsDirectoryView({
               error={formErrors.phone}
             />
 
-            {/* NOVO: PARAMETRIZAÇÃO DA FREQUÊNCIA NO CADASTRO */}
-            <Select
-              label="Frequência Habitual de Retorno"
-              value={newClientForm.frequencyDays}
-              onChange={(e) =>
-                setNewClientForm({
-                  ...newClientForm,
-                  frequencyDays: e.target.value,
-                })
-              }
-              options={[
-                { value: "15", label: "A cada 15 dias (Barba & Corte)" },
-                { value: "18", label: "A cada 18 dias (Padrão)" },
-                { value: "20", label: "A cada 20 dias" },
-                { value: "25", label: "A cada 25 dias" },
-                { value: "30", label: "A cada 30 dias (Mensal)" },
-              ]}
-              helperText="Usado para o disparo do lembrete automático."
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="E-mail (Opcional)"
               type="email"
@@ -1373,7 +1538,9 @@ export default function ClientsDirectoryView({
                 setNewClientForm({ ...newClientForm, email: e.target.value })
               }
             />
+          </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="CPF (Opcional)"
               mask="cpf"
@@ -1383,9 +1550,7 @@ export default function ClientsDirectoryView({
                 setNewClientForm({ ...newClientForm, cpf: e.target.value })
               }
             />
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Data de Nascimento (Opcional)"
               type="date"
@@ -1397,6 +1562,85 @@ export default function ClientsDirectoryView({
                 })
               }
             />
+          </div>
+
+          {/* BLOCO DE PARAMETRIZAÇÃO DO LEMBRETE PREDITIVO & DISPARO AUTOMÁTICO */}
+          <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-950/70 [html:not(.dark)_&]:bg-zinc-50 [html:not(.dark)_&]:border-zinc-200 space-y-3">
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4 text-amber-500 [html:not(.dark)_&]:text-emerald-600 shrink-0" />
+              <h4 className="text-xs font-bold text-neutral-200 [html:not(.dark)_&]:text-zinc-800">
+                Lembrete Preditivo & Disparo Automático de Mensagens
+              </h4>
+            </div>
+
+            <div className="pt-0.5">
+              <Toggle
+                label="Ativar disparo automático e alerta no sino para este cliente"
+                description="Quando desativado, o sistema não emitirá notificações de retorno nem sugerirá mensagens automáticas."
+                checked={newClientForm.reminderEnabled}
+                onChange={(val) =>
+                  setNewClientForm((prev) => ({ ...prev, reminderEnabled: val }))
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <Select
+                label="Frequência Habitual em Dias *"
+                value={newClientForm.frequencyDays}
+                onChange={(e) =>
+                  setNewClientForm({
+                    ...newClientForm,
+                    frequencyDays: e.target.value,
+                  })
+                }
+                options={[
+                  { value: "15", label: "A cada 15 dias (Barba & Corte)" },
+                  { value: "18", label: "A cada 18 dias (Padrão)" },
+                  { value: "20", label: "A cada 20 dias" },
+                  { value: "25", label: "A cada 25 dias" },
+                  { value: "30", label: "A cada 30 dias (Mensal)" },
+                ]}
+                helperText="Frequência habitual estimada de retorno"
+              />
+
+              <Input
+                label="Disparo Automático (Antecedência em Dias) *"
+                type="number"
+                min="1"
+                max="30"
+                disabled={!newClientForm.reminderEnabled}
+                value={newClientForm.alertLeadDays}
+                onChange={(e) =>
+                  setNewClientForm((prev) => ({
+                    ...prev,
+                    alertLeadDays: e.target.value,
+                  }))
+                }
+                placeholder="3"
+                helperText="Ex: 3 = O sistema alertará faltando 3 dias para a frequência"
+              />
+            </div>
+
+            {/* Cálculo Dinâmico em Tempo Real */}
+            {newClientForm.reminderEnabled ? (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 [html:not(.dark)_&]:bg-emerald-50 [html:not(.dark)_&]:border-emerald-200 [html:not(.dark)_&]:text-emerald-800 text-xs flex items-start gap-2.5">
+                <Lightbulb className="w-4 h-4 shrink-0 mt-0.5 text-amber-400 [html:not(.dark)_&]:text-emerald-600" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-neutral-100 [html:not(.dark)_&]:text-zinc-900">
+                    Regra de Disparo em Tempo Real:
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-neutral-300 [html:not(.dark)_&]:text-zinc-700">
+                    Com frequência de <strong className="font-mono text-amber-400 [html:not(.dark)_&]:text-emerald-700">{Number(newClientForm.frequencyDays) || 18} dias</strong> e antecedência de <strong className="font-mono text-amber-400 [html:not(.dark)_&]:text-emerald-700">{Number(newClientForm.alertLeadDays) || 3} dias</strong>, o alerta será emitido no <strong className="font-mono text-amber-400 [html:not(.dark)_&]:text-emerald-700">{Math.max(1, (Number(newClientForm.frequencyDays) || 18) - (Number(newClientForm.alertLeadDays) || 3))}º dia</strong> após o atendimento (faltando {Number(newClientForm.alertLeadDays) || 3} dias para o corte ideal).
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 [html:not(.dark)_&]:bg-zinc-100 [html:not(.dark)_&]:border-zinc-300 [html:not(.dark)_&]:text-zinc-600 text-xs flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-neutral-600 [html:not(.dark)_&]:bg-zinc-400" />
+                <span>Disparo de lembrete desativado. O sino não emitirá notificações de retorno para este cliente.</span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1 text-left">
@@ -1509,19 +1753,6 @@ export default function ClientsDirectoryView({
               />
 
               <Input
-                label="Frequência Habitual (em dias)"
-                type="number"
-                min="1"
-                max="365"
-                value={fullEditForm.frequencyDays}
-                onChange={(e) =>
-                  setFullEditForm((prev) => ({ ...prev, frequencyDays: e.target.value }))
-                }
-                placeholder="18"
-                helperText="Intervalo habitual entre atendimentos (usado no lembrete preditivo)"
-              />
-
-              <Input
                 label="CPF do Cliente (Opcional)"
                 value={fullEditForm.cpf}
                 onChange={(e) =>
@@ -1530,6 +1761,87 @@ export default function ClientsDirectoryView({
                 mask="cpf"
                 placeholder="000.000.000-00"
               />
+
+              {/* BLOCO DE PARAMETRIZAÇÃO: LEMBRETE PREDITIVO & DISPARO AUTOMÁTICO */}
+              <div className="col-span-1 md:col-span-2 p-3.5 rounded-xl border border-neutral-800 bg-neutral-950/70 [html:not(.dark)_&]:bg-zinc-50 [html:not(.dark)_&]:border-zinc-200 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-amber-500 [html:not(.dark)_&]:text-emerald-600 shrink-0" />
+                  <h4 className="text-xs font-bold text-neutral-200 [html:not(.dark)_&]:text-zinc-800">
+                    Lembrete Preditivo & Disparo Automático de Mensagens
+                  </h4>
+                </div>
+
+                <div className="pt-0.5">
+                  <Toggle
+                    label="Ativar disparo automático e alerta no sino para este cliente"
+                    description="Quando desativado, o sistema não emitirá notificações de retorno nem sugerirá mensagens automáticas."
+                    checked={fullEditForm.reminderEnabled}
+                    onChange={(val) =>
+                      setFullEditForm((prev) => ({ ...prev, reminderEnabled: val }))
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <Input
+                    label="Frequência Habitual em Dias *"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={fullEditForm.frequencyDays}
+                    onChange={(e) =>
+                      setFullEditForm((prev) => ({
+                        ...prev,
+                        frequencyDays: e.target.value,
+                      }))
+                    }
+                    placeholder="18"
+                    helperText="Intervalo habitual entre cortes/atendimentos"
+                  />
+
+                  <Input
+                    label="Disparo Automático de Mensagem (Antecedência em Dias) *"
+                    type="number"
+                    min="1"
+                    max="30"
+                    disabled={!fullEditForm.reminderEnabled}
+                    value={fullEditForm.alertLeadDays}
+                    onChange={(e) =>
+                      setFullEditForm((prev) => ({
+                        ...prev,
+                        alertLeadDays: e.target.value,
+                      }))
+                    }
+                    placeholder="3"
+                    helperText="Ex: 3 = O sistema emitirá o alerta 3 dias antes de vencer a frequência"
+                  />
+                </div>
+
+                {/* Cálculo Dinâmico em Tempo Real */}
+                {fullEditForm.reminderEnabled ? (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 [html:not(.dark)_&]:bg-emerald-50 [html:not(.dark)_&]:border-emerald-200 [html:not(.dark)_&]:text-emerald-800 text-xs flex items-start gap-2.5">
+                    <Lightbulb className="w-4 h-4 shrink-0 mt-0.5 text-amber-400 [html:not(.dark)_&]:text-emerald-600" />
+                    <div className="space-y-1">
+                      <p className="font-semibold text-neutral-100 [html:not(.dark)_&]:text-zinc-900">
+                        Regra de Disparo em Tempo Real:
+                      </p>
+                      <p className="text-[11px] leading-relaxed text-neutral-300 [html:not(.dark)_&]:text-zinc-700">
+                        Com frequência de <strong className="font-mono text-amber-400 [html:not(.dark)_&]:text-emerald-700">{Number(fullEditForm.frequencyDays) || 18} dias</strong> e antecedência de <strong className="font-mono text-amber-400 [html:not(.dark)_&]:text-emerald-700">{Number(fullEditForm.alertLeadDays) || 3} dias</strong>, o alerta será emitido no <strong className="font-mono text-amber-400 [html:not(.dark)_&]:text-emerald-700">{Math.max(1, (Number(fullEditForm.frequencyDays) || 18) - (Number(fullEditForm.alertLeadDays) || 3))}º dia</strong> após o último atendimento (faltando {Number(fullEditForm.alertLeadDays) || 3} dias para o retorno ideal).
+                      </p>
+                      {editingClient.lastVisitDate && editingClient.lastVisitDate !== "Recém-cadastrado" && (
+                        <p className="text-[10px] text-neutral-400 [html:not(.dark)_&]:text-zinc-500 pt-0.5">
+                          Última visita registrada: <span className="font-mono font-medium">{editingClient.lastVisitDate}</span> ({editingClient.daysSinceLastVisit || 0} dias atrás) · Previsão de disparo: {editingClient.daysSinceLastVisit >= Math.max(1, (Number(fullEditForm.frequencyDays) || 18) - (Number(fullEditForm.alertLeadDays) || 3)) ? <span className="text-amber-400 [html:not(.dark)_&]:text-emerald-700 font-bold">Janela de alerta já atingida (ativa no sino de notificações)</span> : <span>faltam {Math.max(1, (Number(fullEditForm.frequencyDays) || 18) - (Number(fullEditForm.alertLeadDays) || 3)) - (editingClient.daysSinceLastVisit || 0)} dias para o sino alertar</span>}.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 [html:not(.dark)_&]:bg-zinc-100 [html:not(.dark)_&]:border-zinc-300 [html:not(.dark)_&]:text-zinc-600 text-xs flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-neutral-600 [html:not(.dark)_&]:bg-zinc-400" />
+                    <span>Disparo de lembrete desativado para este cliente. O sino de notificações não exibirá avisos de retorno.</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-1">

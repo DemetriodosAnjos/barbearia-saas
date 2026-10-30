@@ -14,6 +14,7 @@ import Login from "./pages/Auth/Login";
 import SuperAdminDashboard from "./pages/SuperAdmin/SuperAdminDashboard";
 import BarbershopDashboard from "./pages/BarbershopAdmin/BarbershopDashboard";
 import ClientBookingView from "./pages/ClientBooking/ClientBookingView";
+import { normalizeClientRecord } from "./pages/BarbershopAdmin/ClientsDirectoryView";
 import OnboardingQuiz from "./components/onboarding/OnboardingQuiz";
 import { registerSoloBarberInSupabase } from "./services/soloOnboardingService";
 import { safeStorage } from "./utils/safeStorage";
@@ -1068,7 +1069,7 @@ export default function App() {
     list.forEach((c) => {
       if (!c) return;
       const k = c.id || (c.phone ? c.phone.replace(/\D/g, "") : null) || c.name;
-      if (k) dedupMap.set(k, c);
+      if (k) dedupMap.set(k, normalizeClientRecord(c, appointments));
     });
     const uniqueList = Array.from(dedupMap.values());
     setClients(uniqueList);
@@ -1079,7 +1080,7 @@ export default function App() {
       safeStorage.removeItem("saas_clients_cache");
       safeStorage.removeItem("barbearia_saas_clients_v2");
     } catch {}
-  }, [tenant?.id, currentUser?.id, currentUser?.user_metadata?.barbershop_id]);
+  }, [tenant?.id, currentUser?.id, currentUser?.user_metadata?.barbershop_id, appointments]);
 
   // Sincronização centralizada de Cliente individual com cascata nos Agendamentos e Supabase
   const handleUpdateClient = useCallback(async (clientData, options = {}) => {
@@ -1090,6 +1091,8 @@ export default function App() {
     const cleanOldPhone = (oldPhone || "").replace(/\D/g, "");
     const targetName = (clientData.name || "").trim();
     const oldTargetName = (oldName || "").trim().toLowerCase();
+
+    const normalizedData = normalizeClientRecord(clientData, appointments);
 
     // 1. Atualiza lista de clientes em memória com desduplicação estrita
     setClients((prev) => {
@@ -1102,11 +1105,11 @@ export default function App() {
           (cleanOldPhone && cPhone === cleanOldPhone)
         ) {
           found = true;
-          return { ...c, ...clientData };
+          return { ...c, ...normalizedData };
         }
         return c;
       });
-      const rawList = found ? updated : [clientData, ...updated];
+      const rawList = found ? updated : [normalizedData, ...updated];
       const dedupMap = new Map();
       rawList.forEach((c) => {
         if (!c) return;
@@ -1149,36 +1152,59 @@ export default function App() {
       });
     }
 
-    // 3. Persistência no Supabase
+    // 3. Persistência resiliente no Supabase com tolerância a divergências de schema
     try {
       if (cleanId && !String(cleanId).startsWith("temp-") && !String(cleanId).startsWith("cli-mock")) {
-        await supabase
+        const reminderEnabled = clientData.reminderEnabled ?? clientData.reminder_enabled ?? true;
+        const alertLeadDays = Number(clientData.alertLeadDays ?? clientData.alert_lead_days ?? 3);
+        const freqDays = Number(clientData.frequencyDays ?? clientData.frequency_days ?? 18);
+
+        const techNotesPayload = {
+          ...(clientData.technical_notes || clientData.technicalNotes || {}),
+          reminder_enabled: reminderEnabled,
+          alert_lead_days: alertLeadDays,
+          frequency_days: freqDays,
+        };
+
+        const basePayload = {
+          name: clientData.name,
+          phone: clientData.phone,
+          ...(clientData.email !== undefined ? { email: clientData.email } : {}),
+          ...(clientData.cpf !== undefined ? { cpf: clientData.cpf } : {}),
+          ...(clientData.birthDate !== undefined || clientData.birth_date !== undefined
+            ? { birth_date: clientData.birthDate || clientData.birth_date }
+            : {}),
+          ...(clientData.totalSpent !== undefined || clientData.total_spent !== undefined
+            ? { total_spent: Number(clientData.totalSpent ?? clientData.total_spent ?? 0) }
+            : {}),
+          frequency_days: freqDays,
+          ...(clientData.preferredBarber !== undefined || clientData.preferred_barber !== undefined
+            ? { preferred_barber: clientData.preferredBarber || clientData.preferred_barber }
+            : {}),
+          ...(clientData.notes !== undefined ? { notes: clientData.notes } : {}),
+          technical_notes: techNotesPayload,
+        };
+
+        const fullRes = await supabase
           .from("clients")
           .update({
-            name: clientData.name,
-            phone: clientData.phone,
-            ...(clientData.email !== undefined ? { email: clientData.email } : {}),
-            ...(clientData.cpf !== undefined ? { cpf: clientData.cpf } : {}),
-            ...(clientData.birthDate !== undefined || clientData.birth_date !== undefined
-              ? { birth_date: clientData.birthDate || clientData.birth_date }
-              : {}),
-            ...(clientData.totalSpent !== undefined || clientData.total_spent !== undefined
-              ? { total_spent: Number(clientData.totalSpent ?? clientData.total_spent ?? 0) }
-              : {}),
-            ...(clientData.frequencyDays !== undefined || clientData.frequency_days !== undefined
-              ? { frequency_days: Number(clientData.frequencyDays ?? clientData.frequency_days ?? 18) }
-              : {}),
-            ...(clientData.preferredBarber !== undefined || clientData.preferred_barber !== undefined
-              ? { preferred_barber: clientData.preferredBarber || clientData.preferred_barber }
-              : {}),
-            ...(clientData.notes !== undefined ? { notes: clientData.notes } : {}),
+            ...basePayload,
+            reminder_enabled: reminderEnabled,
+            alert_lead_days: alertLeadDays,
           })
           .eq("id", cleanId);
+
+        if (fullRes.error) {
+          await supabase
+            .from("clients")
+            .update(basePayload)
+            .eq("id", cleanId);
+        }
       }
     } catch (err) {
       console.warn("Aviso na atualização do cliente no Supabase:", err);
     }
-  }, []);
+  }, [appointments, tenant?.id, currentUser?.id, currentUser?.user_metadata?.barbershop_id]);
 
   // Handlers reativos para Serviços
   const handleAddService = useCallback((newServ) => {
@@ -1419,7 +1445,9 @@ export default function App() {
         if (c?.id) map.set(c.id, c);
         else if (c?.phone) map.set(c.phone, c);
       });
-      const mergedClients = Array.from(map.values());
+      const mergedClients = Array.from(map.values()).map((c) =>
+        normalizeClientRecord(c, finalAppointments)
+      );
 
       setClients(mergedClients);
       try {

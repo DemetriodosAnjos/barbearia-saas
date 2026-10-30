@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS public.clients (
     notes TEXT,
     technical_notes JSONB DEFAULT '{}'::jsonb,
     frequency_days INTEGER DEFAULT 18,
+    reminder_enabled BOOLEAN DEFAULT true,
+    alert_lead_days INTEGER DEFAULT 3,
     is_vip BOOLEAN DEFAULT false,
     total_visits INTEGER DEFAULT 0,
     total_spent NUMERIC(10,2) DEFAULT 0.00,
@@ -42,6 +44,8 @@ ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS birth_date DATE;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS technical_notes JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS frequency_days INTEGER DEFAULT 18;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS reminder_enabled BOOLEAN DEFAULT true;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS alert_lead_days INTEGER DEFAULT 3;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS is_vip BOOLEAN DEFAULT false;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS total_visits INTEGER DEFAULT 0;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS total_spent NUMERIC(10,2) DEFAULT 0.00;

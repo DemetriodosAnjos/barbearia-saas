@@ -13,12 +13,24 @@ A funcionalidade calcula dinamicamente a contagem regressiva até a data estimad
    - Obtida do cadastro do cliente (`client.frequency_days` ou `client.frequencyDays`).
    - Valor padrão de referência: **18 dias** (caso não esteja explicitamente configurado no prontuário).
 
-2. **Data da Última Visita (`last_visit`):**
+2. **Disparo Automático de Mensagem (`reminder_enabled`):**
+   - Chave seletora (Toggle) individual no cadastro e na edição do cliente.
+   - Padrão: **Ativado** (`true`). Se desativado, o cliente não gera alertas no sino nem entra na lista de lembretes automáticos.
+
+3. **Antecedência do Alerta em Dias (`alert_lead_days`):**
+   - Campo numérico personalizável no cadastro e na edição do cliente (ex: 2, 3, 5 dias).
+   - Valor padrão de referência: **3 dias**.
+
+4. **Data da Última Visita (`last_visit`):**
    - Obtida do campo `client.last_visit` ou do agendamento concluído mais recente no histórico.
 
-3. **Cálculo dos Dias Restantes:**
+5. **Cálculo dos Dias Restantes e Janela de Disparo:**
    $$\text{Dias Desde o Último Corte} = \text{Data Atual} - \text{Data da Última Visita}$$
    $$\text{Dias Restantes} = \text{Frequência Habitual} - \text{Dias Desde o Último Corte}$$
+   $$\text{Dia do Disparo} = \text{Frequência Habitual} - \text{Antecedência do Alerta}$$
+
+O alerta no sino e na lista de disparos é acionado assim que:
+$$\text{Dias Restantes} \le \text{Antecedência do Alerta} \quad (\text{com } \text{reminder\_enabled} = \text{true})$$
 
 ---
 
@@ -26,11 +38,10 @@ A funcionalidade calcula dinamicamente a contagem regressiva até a data estimad
 
 | Dias Restantes | Rótulo do Alerta | Urgência | Exibição no Sino |
 |---|---|---|---|
-| **3 dias** | *"Faltam 3 dias para [Nome] cortar o cabelo"* | Média | Badge ativo |
-| **2 dias** | *"Faltam 2 dias para [Nome] cortar o cabelo"* | Média | Badge ativo |
-| **1 dia** | *"Falta 1 dia para [Nome] cortar o cabelo"* | Alta | Badge ativo |
-| **0 dias (Hoje)** | *"Hoje [Nome] tem que cortar o cabelo"* | Crítica / D-Day | Badge ativo |
-| **Negativo (Atrasado)** | *"[Nome] deveria ter retornado há X dias"* | Atrasado | Badge ativo |
+| **> 1 dia (até limite)** | *"Faltam X dias para [Nome] cortar o cabelo"* | Média/Baixa | Badge ativo (se ativado) |
+| **1 dia** | *"Falta 1 dia para [Nome] cortar o cabelo"* | Alta | Badge ativo (se ativado) |
+| **0 dias (Hoje)** | *"Hoje [Nome] tem que cortar o cabelo"* | Crítica / D-Day | Badge ativo (se ativado) |
+| **Negativo (Atrasado)** | *"[Nome] deveria ter retornado há X dias"* | Atrasado | Badge ativo (se ativado) |
 
 ---
 
