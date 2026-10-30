@@ -85,3 +85,42 @@ O módulo **Serviços & Produtos (`ServicesAndProductsView.jsx`)** reúne o cat�
    - Todos os inserts de serviços e produtos incluem explicitamente `barbershop_id: tenant?.id || "a0000000-0000-0000-0000-000000000001"`.
    - Modificações disparam `.update(payload).eq("id", id)`.
    - Soft-delete preserva integridade histórica de fechamento de caixa: `.update({ active: false }).eq("id", id)`.
+
+---
+
+## 5. ⚠️ Regras de Segurança RLS — NÃO ALTERAR SEM CONSULTAR ESTE DOC
+
+### Contexto
+O sistema suporta dois métodos de login: **e-mail + senha** e **Entrar com Google** (SSO). Eles se comportam de forma diferente no Supabase:
+
+| Método de login | Role no Supabase | Sessão JWT real |
+|---|---|---|
+| E-mail + senha | `authenticated` | ✅ Sim |
+| Entrar com Google (SSO) | `anon` (sem sessão Supabase nativa) | ⚠️ Apenas se One Tap retornar id_token |
+
+Por causa disso, as tabelas `products` e `services` possuem **duas camadas de policies RLS**:
+
+### Camada 1 — Role `authenticated`
+- Policy `products_authenticated_all` / `services_authenticated_all`
+- Permite CRUD completo para usuários com sessão JWT real cujo `barbershop_id` coincide com o `profiles.barbershop_id` do `auth.uid()`.
+- **Não remover.** Cobre o login por e-mail + senha e o Google SSO quando o One Tap consegue capturar o id_token.
+
+### Camada 2 — Role `anon` (Google SSO sem sessão Supabase)
+- Policies: `products_anon_select`, `products_anon_insert`, `products_anon_update`, `products_anon_delete`
+- Mesmas policies para `services`.
+- SELECT: livre (necessário também para o booking público de clientes).
+- INSERT/UPDATE/DELETE: permitido quando `barbershop_id` **E** `tenant_id` são UUIDs válidos (verificação por regex no banco).
+- **Não remover.** Sem essas policies, usuários que entrarem com Google não conseguem cadastrar, editar ou excluir produtos e serviços.
+
+### Migrations aplicadas no Supabase
+| Arquivo | O que faz |
+|---|---|
+| `supabase/migrations/20261029000002_fix_products_services_rls_policies.sql` | Cria policies para `authenticated` (CRUD) e `anon` (SELECT) |
+| `supabase/migrations/20261029000003_fix_anon_write_products_services.sql` | Adiciona INSERT/UPDATE/DELETE para `anon` |
+
+> Se o banco for reiniciado ou as policies forem resetadas, **execute esses dois arquivos no SQL Editor do Supabase** (nessa ordem) para restaurar o comportamento correto.
+
+### O que NÃO foi alterado
+- Tabelas `clients`, `profiles`, `tenants`, `barbers`, `appointments`, `comandas` — **intactas**.
+- O sistema de busca e lookup de clientes (tanto por e-mail+senha quanto por Google SSO) — **intacto**.
+- O fluxo de agendamento público (`anon` pode inserir em `appointments`) — **intacto**.

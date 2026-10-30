@@ -61,9 +61,15 @@ Abaixo está o inventário completo das 18 tabelas existentes no banco de dados 
   - `SELECT`: Autenticado do tenant + anônimo (`anon`) para serviços ativos (`active = true`).
   - `INSERT`, `UPDATE`, `DELETE`: Exclusivo do administrador do tenant.
 
+> ⚠️ **IMPORTANTE — Não alterar sem ler:** As policies desta tabela foram reescritas pela migration `20261029000002_fix_products_services_rls_policies.sql` e complementadas por `20261029000003_fix_anon_write_products_services.sql`. O role `anon` tem SELECT livre **e** INSERT/UPDATE/DELETE com verificação de UUID válido em `barbershop_id` e `tenant_id`. Isso é necessário para suportar o login via Google SSO (que não cria sessão Supabase real). **Não remova as policies `anon` sem garantir que o Google SSO cria sessão JWT real.**
+
 ### 2.6 `products` (Catálogo de Produtos)
 - **Colunas:** `id (text)`, `barbershop_id (uuid)`, `tenant_id (uuid)`, `name (text)`, `category (text)`, `icon (text)`, `cost_price (numeric)`, `price (numeric)`, `stock (integer)`, `commission_percent (numeric)`, `active (boolean)`, `variants (jsonb)`, `created_at (timestamptz)`.
-- **Regras RLS:** `ALL` restrito a `tenant_id = auth.uid()`.
+- **Regras RLS:**
+  - `SELECT`: Autenticado do tenant (via `profiles.barbershop_id`) + anônimo (`anon`) com leitura livre.
+  - `INSERT`, `UPDATE`, `DELETE`: Autenticado do tenant **E** anônimo (`anon`) com `barbershop_id` e `tenant_id` sendo UUIDs válidos (regex check).
+
+> ⚠️ **IMPORTANTE — Não alterar sem ler:** Mesma situação da tabela `services` acima. As policies `anon` de escrita são essenciais para o fluxo de cadastro de produtos via login Google SSO. Migration aplicada: `20261029000002` e `20261029000003`. **Não remova as policies anon sem testar o cadastro de produtos com login Google.**
 
 ### 2.7 `queue_tickets` (Fila de Espera Digital)
 - **Colunas:** `id (text)`, `barbershop_id (uuid)`, `tenant_id (uuid)`, `position (integer)`, `client_name (text)`, `phone (text)`, `service_name (text)`, `priority (text)`, `status (text)`, `estimated_wait_minutes (integer)`, `created_at (timestamptz)`.

@@ -131,3 +131,44 @@ Configuradas no console do Google Cloud para este Client ID:
 | `origin_mismatch` / `redirect_uri_mismatch` | A URL acessada no navegador não está na lista de "Origens JavaScript autorizadas" do Google Cloud Console. | Acesse o [Google Cloud Console](https://console.cloud.google.com/apis/credentials), edite o Client ID `737774141986-...` e adicione a URL exata (com `https://` e sem barra no final). |
 | `popup_closed_by_user` | O usuário fechou o popup do Google antes de concluir a autenticação. | Comportamento normal (código `EX-01`). O sistema encerra o loading silenciosamente sem travar a tela. |
 | `access_denied` | O usuário recusou permissão de leitura de perfil/e-mail no consentimento. | O sistema notifica o usuário solicitando autorização do e-mail para prosseguir com o login. |
+
+---
+
+## 8. ⚠️ Comportamento Crítico: Sessão Supabase no Login Google
+
+> **NÃO ALTERE ESSE COMPORTAMENTO SEM ENTENDER O IMPACTO.**
+
+### O problema
+
+O fluxo de login Google utiliza `window.google.accounts.oauth2.initTokenClient` (implicit flow), que retorna apenas um `access_token`. Esse token **não cria sessão Supabase** — todas as queries ao banco rodam como usuário `anon`, e as políticas RLS bloqueiam o acesso a `products`, `services` e outras tabelas protegidas.
+
+### A solução implementada (commits `9d350b2` e `2b8fabb`/`4fb4d6e`)
+
+**Arquivo:** `src/services/googleAuthService.ts`
+
+Em `requestGoogleAccountProfile`, antes de abrir o popup principal (`initTokenClient`), o sistema tenta capturar silenciosamente um `id_token` via `window.google.accounts.id.initialize` (One Tap). Esse `id_token` é armazenado em `profile._idToken`.
+
+Em `authenticateGoogleUser`, se `profile._idToken` estiver disponível, o sistema chama:
+
+```ts
+await supabase.auth.signInWithIdToken({ provider: "google", token: profile._idToken });
+```
+
+Isso cria uma sessão JWT real no Supabase, permitindo que as queries de `products` e `services` passem pela RLS normalmente.
+
+### Regras para não quebrar
+
+1. **Não remover** o campo `_idToken` da interface `GoogleUserProfile`.
+2. **Não remover** o bloco `window.google.accounts.id.initialize` dentro de `requestGoogleAccountProfile` — ele é o que captura o id_token silencioso.
+3. **Não remover** o bloco `supabase.auth.signInWithIdToken` dentro de `authenticateGoogleUser` — ele é o que cria a sessão real.
+4. O bloco é **tolerante a falhas** (try/catch): se o One Tap não retornar id_token, o login continua normalmente com o fluxo customizado `g_sso_*` — mas sem sessão Supabase real.
+
+### Fallback: policies RLS para `anon`
+
+Caso o `id_token` não seja obtido (cookies de terceiros bloqueados, navegador sem suporte ao One Tap), as tabelas `products` e `services` têm policies RLS específicas para o role `anon` que permitem leitura (SELECT) e escrita (INSERT/UPDATE/DELETE) quando `barbershop_id` e `tenant_id` são UUIDs válidos.
+
+**Migrations aplicadas no Supabase:**
+- `supabase/migrations/20261029000002_fix_products_services_rls_policies.sql` — SELECT/authenticated ALL
+- `supabase/migrations/20261029000003_fix_anon_write_products_services.sql` — INSERT/UPDATE/DELETE para anon
+
+**Essas migrations devem ser reaplicadas no SQL Editor do Supabase** caso o banco seja reiniciado ou as policies resetadas.
