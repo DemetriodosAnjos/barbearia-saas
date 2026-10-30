@@ -211,6 +211,88 @@ export default function CashierPosView({
     };
   }, [services]);
 
+  // Helper inteligente para decompor serviços cadastrados e aplicar preços oficiais do sistema
+  const resolveAppointmentServicesList = useCallback(
+    (appt) => {
+      const rawName = (appt.serviceName || appt.service_name || "").trim();
+      const apptPrice = Number(appt.price || 0);
+      const catalog = Array.isArray(posServices) && posServices.length > 0 ? posServices : services;
+
+      if (!rawName) {
+        return [
+          {
+            id: `serv-${appt.id}-0`,
+            name: "Serviço Agendado",
+            price: apptPrice || 40,
+            barberCommission: (apptPrice || 40) * 0.5,
+          },
+        ];
+      }
+
+      // Divide por '+' ou ',' caso haja múltiplos serviços combinados no agendamento
+      const serviceParts = rawName.includes("+")
+        ? rawName.split("+").map((s) => s.trim()).filter(Boolean)
+        : rawName.includes(",")
+          ? rawName.split(",").map((s) => s.trim()).filter(Boolean)
+          : [rawName];
+
+      const resolved = [];
+      let totalFoundCatalogPrice = 0;
+
+      serviceParts.forEach((part, idx) => {
+        const cleanPart = part.toLowerCase();
+        // Busca exata ou por correspondência no catálogo oficial
+        const matched = catalog.find((c) => {
+          const cName = (c.name || "").toLowerCase().trim();
+          return cName === cleanPart || cName.includes(cleanPart) || cleanPart.includes(cName);
+        });
+
+        if (matched) {
+          const pPrice = Number(matched.price || 0);
+          const commPercent = Number(matched.commissionPercent || matched.commission_percent || 50);
+          totalFoundCatalogPrice += pPrice;
+          resolved.push({
+            id: `serv-${appt.id}-${matched.id || idx}`,
+            serviceId: matched.id,
+            name: matched.name,
+            category: matched.category || "Cabelo",
+            price: pPrice,
+            barberCommission: pPrice * (commPercent / 100),
+          });
+        } else {
+          resolved.push({
+            id: `serv-${appt.id}-${idx}`,
+            name: part,
+            price: null,
+            barberCommission: null,
+          });
+        }
+      });
+
+      // Se todas as partes foram encontradas no catálogo, retorna as linhas individuais com preços oficiais
+      const allFound = resolved.every((r) => r.price !== null);
+      if (allFound && resolved.length > 0) {
+        return resolved;
+      }
+
+      // Se alguma parte não foi encontrada no catálogo mas havia preço total no agendamento
+      const missingCount = resolved.filter((r) => r.price === null).length;
+      const remainingPrice = Math.max(0, apptPrice - totalFoundCatalogPrice);
+      const perMissingPrice = missingCount > 0 ? remainingPrice / missingCount : 0;
+
+      return resolved.map((r) => {
+        if (r.price !== null) return r;
+        const assignedPrice = perMissingPrice > 0 ? perMissingPrice : (apptPrice / (resolved.length || 1));
+        return {
+          ...r,
+          price: assignedPrice,
+          barberCommission: assignedPrice * 0.5,
+        };
+      });
+    },
+    [posServices, services]
+  );
+
   // =========================================================================
   // 2. SINCRONIZAÇÃO UNIFICADA: MERGE ENTRE AGENDA E COMANDAS DE BALCÃO
   // =========================================================================
@@ -238,7 +320,7 @@ export default function CashierPosView({
         });
       }
 
-      // 3. Converter e sincronizar TODOS os appointments registrados
+      // 3. Converter e sincronizar TODOS os appointments registrados com serviços decompostos
       if (Array.isArray(appointments) && appointments.length > 0) {
         appointments.forEach((appt) => {
           const isPaid = Boolean(
@@ -257,11 +339,32 @@ export default function CashierPosView({
             derivedStatus = "open";
           }
 
-          const apptPrice = Number(appt.price || 0);
+          const resolvedServices = resolveAppointmentServicesList(appt);
+          const servicesTotal = resolvedServices.reduce((acc, s) => acc + Number(s.price || 0), 0);
           const existing = mergedMap.get(appt.id);
 
           if (existing) {
-            // Se já existe no caixa, atualiza status e dados básicos sem perder produtos extras
+            // Se já existe no caixa, preserva produtos extras adicionados e atualiza serviços decompostos
+            const existingProducts = existing.products || [];
+            const productsTotal = existingProducts.reduce(
+              (acc, p) =>
+                acc +
+                Number(
+                  p.total ||
+                    Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+                ),
+              0,
+            );
+            const totalComandaPrice = servicesTotal + productsTotal;
+
+            // Se os serviços anteriores tinham "+" agrupado, substitui pelas linhas decompostas
+            const currentServices =
+              existing.services &&
+              existing.services.length > 0 &&
+              existing.services.every((s) => !s.name.includes("+"))
+                ? existing.services
+                : resolvedServices;
+
             mergedMap.set(appt.id, {
               ...existing,
               clientName: appt.clientName || appt.client_name || existing.clientName,
@@ -272,20 +375,12 @@ export default function CashierPosView({
               isPaid: isPaid,
               date: getAppointmentDateYMD(appt),
               openedAt: appt.startTime || appt.start_time || existing.openedAt,
-              services:
-                existing.services && existing.services.length > 0
-                  ? existing.services
-                  : [
-                      {
-                        id: `serv-${appt.id}`,
-                        name: appt.serviceName || appt.service_name || "Serviço Agendado",
-                        price: apptPrice,
-                        barberCommission: apptPrice * 0.5,
-                      },
-                    ],
+              services: currentServices,
+              products: existingProducts,
+              price: totalComandaPrice,
             });
           } else {
-            // Cria nova comanda automática oriunda da agenda
+            // Cria nova comanda automática oriunda da agenda com serviços individuais decompostos
             mergedMap.set(appt.id, {
               id: appt.id,
               appointmentId: appt.id,
@@ -298,15 +393,9 @@ export default function CashierPosView({
               date: getAppointmentDateYMD(appt),
               status: derivedStatus,
               isPaid: isPaid,
-              services: [
-                {
-                  id: `serv-${appt.id}`,
-                  name: appt.serviceName || appt.service_name || "Serviço Agendado",
-                  price: apptPrice,
-                  barberCommission: apptPrice * 0.5,
-                },
-              ],
+              services: resolvedServices,
               products: [],
+              price: servicesTotal,
             });
           }
         });
@@ -315,7 +404,7 @@ export default function CashierPosView({
       const mergedList = Array.from(mergedMap.values());
       return mergedList;
     });
-  }, [appointments, sharedComandas]);
+  }, [appointments, sharedComandas, resolveAppointmentServicesList]);
 
   // Propaga comandas para o pai quando sofrem mutação interna
   const updateComandasState = useCallback(
@@ -722,34 +811,7 @@ export default function CashierPosView({
     if (updatedCmd) {
       setTargetComandaForAddItem(updatedCmd);
 
-      // Sincroniza com a Agenda e Supabase se for vinculado a agendamento
-      if (updatedCmd.appointmentId || updatedCmd.source === "agenda") {
-        const apptId = updatedCmd.appointmentId || updatedCmd.id;
 
-        if (onUpdateAppointments) {
-          onUpdateAppointments((prevAppts) =>
-            prevAppts.map((a) =>
-              a.id === apptId
-                ? {
-                    ...a,
-                    price: updatedCmd.price,
-                  }
-                : a,
-            ),
-          );
-        }
-
-        try {
-          await supabase
-            .from("appointments")
-            .update({
-              price: updatedCmd.price,
-            })
-            .eq("id", apptId);
-        } catch (err) {
-          console.warn("Aviso ao sincronizar produto no Supabase:", err);
-        }
-      }
 
       // Atualiza estoque no Supabase
       try {
@@ -878,21 +940,7 @@ export default function CashierPosView({
       if (targetComandaForAddItem?.id === updatedCmd.id) {
         setTargetComandaForAddItem(updatedCmd);
       }
-      if (updatedCmd.appointmentId || updatedCmd.source === "agenda") {
-        const apptId = updatedCmd.appointmentId || updatedCmd.id;
-        if (onUpdateAppointments) {
-          onUpdateAppointments((prevAppts) =>
-            prevAppts.map((a) =>
-              a.id === apptId
-                ? {
-                    ...a,
-                    price: updatedCmd.price,
-                  }
-                : a,
-            ),
-          );
-        }
-      }
+
     }
   };
 
