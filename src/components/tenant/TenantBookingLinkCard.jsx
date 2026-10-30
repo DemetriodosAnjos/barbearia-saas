@@ -72,6 +72,7 @@ export default function TenantBookingLinkCard({
   return (
     <div
       className={`w-full max-w-full overflow-hidden p-3.5 sm:p-5 bg-gradient-to-br from-neutral-900 via-neutral-900 to-amber-950/20 border border-amber-500/30 rounded-2xl sm:rounded-3xl shadow-xl space-y-3 text-left min-w-0 ${className}`}
+      style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
     >
       <div className="flex items-center justify-between gap-2 pb-2 border-b border-neutral-800 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -125,22 +126,24 @@ export default function TenantBookingLinkCard({
         Envie este link para seus clientes pelo WhatsApp ou Instagram. Eles escolhem o serviço, o barbeiro e o horário com confirmação direta.
       </p>
 
-      {/* Caixa de exibição do link com cópia rápida */}
-      <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full min-w-0 max-w-full">
-        <div className="flex-1 min-w-0 max-w-full bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 sm:px-3 py-2 flex items-center gap-2 text-xs font-mono text-neutral-200 overflow-hidden shadow-inner">
-          <ProjectIcon name="Link" size={14} className="text-amber-400 shrink-0" />
-          <span className="truncate select-all text-xs block min-w-0 flex-1">{clientBookingUrl}</span>
+      {/* Caixa de exibição do link com quebra em duas linhas para caber perfeitamente no mobile */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full min-w-0 max-w-full">
+        <div className="flex-1 min-w-0 max-w-full bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 sm:px-3 py-2 flex items-start gap-2 text-xs font-mono text-neutral-200 overflow-hidden shadow-inner">
+          <ProjectIcon name="Link" size={14} className="text-amber-400 shrink-0 mt-0.5" />
+          <span className="break-all select-all text-[11px] sm:text-xs leading-snug line-clamp-2 min-w-0 flex-1 text-neutral-300">
+            {clientBookingUrl}
+          </span>
         </div>
 
         <Button
           variant={copiedLink ? "success" : "primary"}
           onClick={handleCopyLink}
-          className="text-xs py-2 px-3 font-bold cursor-pointer shrink-0 whitespace-nowrap"
+          className="text-xs py-2 px-3.5 font-bold cursor-pointer shrink-0 w-full sm:w-auto whitespace-nowrap"
           title={copiedLink ? "Link Copiado!" : "Copiar Link"}
         >
           <span className="flex items-center justify-center gap-1.5">
             <ProjectIcon name={copiedLink ? "Check" : "Copy"} size={13} colorVariant="inherit" />
-            <span>{copiedLink ? "Copiado!" : "Copiar Link"}</span>
+            <span>{copiedLink ? "Link Copiado!" : "Copiar Link"}</span>
           </span>
         </Button>
       </div>
