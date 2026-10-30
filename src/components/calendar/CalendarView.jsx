@@ -21,6 +21,7 @@ import Modal from "../ui/Modal";
 import Badge from "../ui/Badge";
 import IconButton from "../ui/IconButton";
 import Button from "../ui/Button";
+import TenantBookingLinkCard from "../tenant/TenantBookingLinkCard";
 
 // Helper: formata Date em YYYY-MM-DD no fuso horário local (evita desvio UTC)
 export const formatDateToYMD = (dateObj) => {
@@ -125,9 +126,33 @@ export default function CalendarView({
   currentDate: controlledDate,
   onDateChange,
   onNavigateToShareAgenda,
+  tenant,
 }) {
   const [internalViewMode, setInternalViewMode] = useState("day"); // 'day' | 'week' | 'month'
   const [internalCurrentDate, setInternalCurrentDate] = useState(() => new Date());
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+  const resolvedTenant = useMemo(() => {
+    if (tenant && (tenant.id || tenant.slug || tenant.name)) return tenant;
+    try {
+      const savedUserStr = typeof window !== "undefined" ? localStorage.getItem("saas_auth_user") : null;
+      if (savedUserStr) {
+        const u = JSON.parse(savedUserStr);
+        return {
+          id: u?.barbeariaId || u?.tenant_id || u?.user_metadata?.barbershop_id || "minha-barbearia",
+          slug: u?.user_metadata?.slug || "minha-barbearia",
+          name: u?.user_metadata?.barbershop_name || u?.barbeariaName || "Minha Barbearia",
+          owner_name: u?.name || "Gestor",
+          phone: u?.phone || "",
+        };
+      }
+    } catch {}
+    return {
+      id: "minha-barbearia",
+      slug: "minha-barbearia",
+      name: "Minha Barbearia",
+    };
+  }, [tenant]);
 
   const viewMode = controlledViewMode !== undefined ? controlledViewMode : internalViewMode;
   const currentDate = controlledDate !== undefined ? controlledDate : internalCurrentDate;
@@ -462,20 +487,19 @@ export default function CalendarView({
           </h2>
         </div>
 
-        <a
-          href="#compartilhar-agenda"
+        <button
+          type="button"
           onClick={(e) => {
             e.preventDefault();
-            if (onNavigateToShareAgenda) {
-              onNavigateToShareAgenda();
-            }
+            setIsShareModalOpen(true);
           }}
           className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-amber-500 hover:text-amber-400 dark:text-amber-400 dark:hover:text-amber-300 no-underline hover:no-underline transition-colors cursor-pointer select-none"
-          title="Ir para Compartilhar agenda"
+          title="Compartilhar agenda"
+          aria-label="Compartilhar agenda"
         >
           <Share2 className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
-          <span>Compartilhar agenda</span>
-        </a>
+          <span className="hidden sm:inline">Compartilhar agenda</span>
+        </button>
       </div>
 
       {/* LINHA DIVISÓRIA (DIVIDER): Separa visualmente o título dos controles de navegação e filtros */}
@@ -1143,6 +1167,23 @@ export default function CalendarView({
           </div>
         )}
       </Modal>
+
+      {/* MODAL: Link de Agendamento da Barbearia (Compartilhar Agenda) */}
+      {isShareModalOpen && (
+        <Modal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          title="Link de Agendamento da Barbearia"
+          size="lg"
+        >
+          <div className="p-1 sm:p-2">
+            <TenantBookingLinkCard
+              tenant={resolvedTenant}
+              onClose={() => setIsShareModalOpen(false)}
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -26,11 +26,11 @@ export const calendarViewStyles = {
   gridWrapper:
     "relative flex-1 flex overflow-x-auto overflow-y-auto min-h-[500px]",
 
-  // Régua Horária da Esquerda (Time Gutter)
+  // Régua Horária da Esquerda (Time Gutter) - z-30 para sobrepor o cabeçalho dos slots da agenda (z-20) no mobile
   timeGutter:
-    "w-16 shrink-0 bg-neutral-900/40 border-r border-neutral-800/80 flex flex-col sticky left-0 z-20 select-none",
+    "w-16 shrink-0 bg-neutral-900/95 backdrop-blur-md border-r border-neutral-800/80 flex flex-col sticky left-0 z-30 select-none shadow-sm",
   timeGutterHeader:
-    "h-[62px] border-b border-neutral-800 bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-neutral-500 uppercase sticky top-0 z-30",
+    "h-[62px] border-b border-neutral-800 bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-neutral-500 uppercase sticky top-0 z-40",
   timeGutterSlot:
     "flex items-start justify-center pt-1 text-[11px] font-mono text-neutral-500 border-b border-neutral-800/30",
 

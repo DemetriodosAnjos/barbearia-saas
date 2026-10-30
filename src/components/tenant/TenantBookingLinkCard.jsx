@@ -12,6 +12,7 @@ import {
 export default function TenantBookingLinkCard({
   tenant,
   onOpenSettings,
+  onClose,
   className = "",
 }) {
   const [copiedLink, setCopiedLink] = useState(false);
@@ -94,16 +95,29 @@ export default function TenantBookingLinkCard({
           </div>
         </div>
 
-        {onOpenSettings && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="text-[11px] font-semibold text-neutral-400 hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            <ProjectIcon name="Settings" size={12} colorVariant="inherit" />
-            <span>Personalizar Slug</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="text-[11px] font-semibold text-neutral-400 hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <ProjectIcon name="Settings" size={12} colorVariant="inherit" />
+              <span>Personalizar Slug</span>
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fechar link de agendamento"
+              className="p-1.5 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
+              title="Fechar"
+            >
+              <ProjectIcon name="X" size={16} colorVariant="inherit" />
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="text-xs text-neutral-300 leading-relaxed">

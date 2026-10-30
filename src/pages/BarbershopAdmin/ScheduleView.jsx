@@ -1223,7 +1223,7 @@ export default function ScheduleView({
         onSaveClient={handleSaveClientFromAppointment}
         onOpenClientRecord={handleOpenClientRecord}
         onDropAppointment={handleDropAppointment}
-        onNavigateToShareAgenda={onNavigateToShareAgenda}
+        tenant={tenant}
       />
 
       {/* MODAL 1: DETALHES & EDIÇÃO */}
