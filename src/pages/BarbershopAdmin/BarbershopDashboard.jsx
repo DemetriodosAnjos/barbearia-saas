@@ -34,6 +34,9 @@ import {
 import { supabase } from "../../lib/supabase";
 import { safeStorage } from "../../utils/safeStorage";
 import { useClientsCount } from "../../hooks/useClientsCount";
+import { getActivePredictiveRecallReminders } from "../../utils/predictiveRecallEngine";
+import { buildClientBookingUrl } from "../../utils/publicBookingUrl";
+import PredictiveRecallNotificationsModal from "../../components/notifications/PredictiveRecallNotificationsModal";
 
 export default function BarbershopDashboard({
   tenant, // Objeto real da barbearia vindo do Supabase
@@ -67,6 +70,7 @@ export default function BarbershopDashboard({
   const [targetCashierComandaId, setTargetCashierComandaId] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [barberPresenceStatus, setBarberPresenceStatus] = useState("available");
   const [openNewAppointmentTrigger, setOpenNewAppointmentTrigger] = useState(0);
 
@@ -343,6 +347,11 @@ export default function BarbershopDashboard({
   const activeTenantId = tenant?.id || user?.user_metadata?.barbershop_id || user?.id;
   const { count: clientsCount } = useClientsCount(activeTenantId, clients, { loading: isLoading, user });
 
+  // [Lembretes Preditivos de Retorno: calcula clientes na janela habitual (3d, 2d, 1d, hoje)]
+  const predictiveRecallReminders = useMemo(() => {
+    return getActivePredictiveRecallReminders(clients, appointments);
+  }, [clients, appointments]);
+
   const barbershopMenuItems = [
     {
       id: "agenda",
@@ -555,7 +564,8 @@ export default function BarbershopDashboard({
             ]}
             barberStatus={barberPresenceStatus}
             onStatusChange={setBarberPresenceStatus}
-            notificationsCount={todayActiveAppointments.length}
+            notificationsCount={predictiveRecallReminders.length}
+            onNotificationsClick={() => setIsNotificationsModalOpen(true)}
             onMenuClick={() => setIsMobileSidebarOpen(true)}
             onQuickAction={() => setActiveMenuTab("agenda")}
             onProfileClick={() => setActiveMenuTab("perfil")}
@@ -744,6 +754,32 @@ export default function BarbershopDashboard({
         onChange={handleBottomNavChange}
         onNavigate={setActiveMenuTab}
         onLogout={onLogout}
+      />
+
+      {/* 6. MODAL DE NOTIFICAÇÕES: Lembretes Preditivos de Retorno */}
+      <PredictiveRecallNotificationsModal
+        isOpen={isNotificationsModalOpen}
+        onClose={() => setIsNotificationsModalOpen(false)}
+        reminders={predictiveRecallReminders}
+        onOpenWhatsAppModal={(reminder) => {
+          if (!reminder) return;
+          const phoneClean = String(reminder.clientPhone || "").replace(/\D/g, "");
+          if (!phoneClean) {
+            setActiveMenuTab("clientes");
+            return;
+          }
+          const clientFirstName = (reminder.clientName || "").split(" ")[0] || "Cliente";
+          const barberFirstName = (reminder.preferredBarber || "").split(" ")[0] || "Seu Barbeiro";
+          const bookingLink = buildClientBookingUrl({
+            slug: tenant?.slug,
+            tenantId: tenant?.id,
+            barber: reminder.preferredBarber || "geral",
+            clientName: reminder.clientName,
+            clientPhone: reminder.clientPhone,
+          });
+          const messageText = `Fala, ${clientFirstName}! Aqui é o ${barberFirstName} da ${tenant?.name || "sua Barbearia"}. Passando para avisar que está no momento ideal para renovar o seu corte e manter o alinhamento impecável! ✂️💈\n\nReserve seu horário com antecedência pelo link:\n${bookingLink}`;
+          window.open(`https://wa.me/55${phoneClean}?text=${encodeURIComponent(messageText)}`, "_blank");
+        }}
       />
     </div>
   );

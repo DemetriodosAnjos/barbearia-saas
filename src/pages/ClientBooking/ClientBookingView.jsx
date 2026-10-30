@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { supabase } from "../../lib/supabase";
 import { safeStorage } from "../../utils/safeStorage";
@@ -24,6 +24,7 @@ import {
   getRegisteredUserPixKey,
 } from "../../utils/pixQrCode";
 import { masks } from "../../utils/masks";
+import { evaluateClientPredictiveRecall } from "../../utils/predictiveRecallEngine";
 
 // Horários base do dia
 const baseTimeSlots = [
@@ -269,6 +270,19 @@ export default function ClientBookingView({
       fetchClientHistory(clientPhone);
     }
   }, [targetTenantId]);
+
+  // [Lembrete Preditivo do Cliente: calcula a janela habitual de retorno baseado no histórico]
+  const clientRecallAlert = useMemo(() => {
+    if (!Array.isArray(clientAppointmentsHistory) || clientAppointmentsHistory.length === 0) {
+      return null;
+    }
+    const syntheticClient = {
+      name: clientName || "Cliente",
+      phone: clientPhone,
+      frequencyDays: 18,
+    };
+    return evaluateClientPredictiveRecall(syntheticClient, clientAppointmentsHistory);
+  }, [clientAppointmentsHistory, clientName, clientPhone]);
 
   useEffect(() => {
     if (initialBarberId && (!selectedBarberId || selectedBarberId === "any")) {
@@ -841,9 +855,23 @@ export default function ClientBookingView({
           avatar: clientName ? clientName.slice(0, 2).toUpperCase() : "CL",
           loyaltyPoints: 120,
         }}
-        onNotificationsClick={() =>
-          setNotificationNotice("Lembrete: Agendamento prático e sem filas na sua barbearia favorita!")
-        }
+        notificationsCount={clientRecallAlert ? 1 : 0}
+        onNotificationsClick={() => {
+          if (clientRecallAlert) {
+            const days = clientRecallAlert.daysRemaining;
+            const msg =
+              days === 0
+                ? "Hoje é o dia do seu retorno habitual de corte! Que tal agendar seu horário agora?"
+                : days === 1
+                ? "Falta apenas 1 dia para o seu retorno habitual! Garanta seu horário com antecedência."
+                : days > 1
+                ? `Faltam ${days} dias para o seu retorno habitual de corte! Reserve já o seu horário.`
+                : `Já se passaram ${Math.abs(days)} dias desde o prazo habitual para renovar seu corte! Escolha seu melhor horário.`;
+            setNotificationNotice(msg);
+          } else {
+            setNotificationNotice("Lembrete: Agendamento prático e sem filas na sua barbearia favorita!");
+          }
+        }}
         onQuickAction={() => setCurrentStep(1)}
       />
 
