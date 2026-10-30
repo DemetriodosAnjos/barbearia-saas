@@ -126,9 +126,9 @@ export default function TenantBookingLinkCard({
         Envie este link para seus clientes pelo WhatsApp ou Instagram. Eles escolhem o serviço, o barbeiro e o horário com confirmação direta.
       </p>
 
-      {/* Caixa de exibição do link com quebra em duas linhas para caber perfeitamente no mobile */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full min-w-0 max-w-full">
-        <div className="flex-1 min-w-0 max-w-full bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 sm:px-3 py-2 flex items-start gap-2 text-xs font-mono text-neutral-200 overflow-hidden shadow-inner">
+      {/* Caixa de exibição do link com quebra em duas linhas para caber perfeitamente no mobile (máximo 280px) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full max-w-[280px] mx-auto min-w-0">
+        <div className="w-full max-w-[280px] min-w-0 bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 sm:px-3 py-2 flex items-start gap-2 text-xs font-mono text-neutral-200 overflow-hidden shadow-inner">
           <ProjectIcon name="Link" size={14} className="text-amber-400 shrink-0 mt-0.5" />
           <span className="break-all select-all text-[11px] sm:text-xs leading-snug line-clamp-2 min-w-0 flex-1 text-neutral-300">
             {clientBookingUrl}

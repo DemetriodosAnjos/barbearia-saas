@@ -1174,13 +1174,14 @@ export default function CalendarView({
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           title="Link de Agendamento da Barbearia"
-          size="md"
+          size="xs"
+          className="max-w-[320px]"
         >
-          <div className="w-full min-w-0 max-w-full overflow-hidden">
+          <div className="w-full max-w-[280px] mx-auto min-w-0 overflow-hidden">
             <TenantBookingLinkCard
               tenant={resolvedTenant}
               onClose={() => setIsShareModalOpen(false)}
-              className="border-0 bg-transparent p-0 shadow-none space-y-3"
+              className="border-0 bg-transparent p-0 shadow-none space-y-3 max-w-[280px] mx-auto"
             />
           </div>
         </Modal>

@@ -12,6 +12,7 @@ export const modalStyles = {
 
   // Tamanhos disponíveis para modais
   sizes: {
+    xs: "max-w-[320px]",
     sm: "max-w-md",
     md: "max-w-lg", // Tamanho padrão anterior
     lg: "max-w-2xl",
