@@ -3264,11 +3264,32 @@ export default function DesignSystem({ onGoToLogin }) {
                 services: prev.services.filter((s) => s.id !== id),
               }));
             }}
-            onRemoveProduct={(id) => {
-              setActiveComanda((prev) => ({
-                ...prev,
-                products: prev.products.filter((p) => p.id !== id),
-              }));
+            onRemoveProduct={(id, rowId) => {
+              setActiveComanda((prev) => {
+                let decremented = false;
+                const nextProducts = [];
+                (prev.products || []).forEach((p) => {
+                  if ((p.id === id || p.id === rowId) && !decremented) {
+                    if (Number(p.quantity || 1) > 1) {
+                      const nextQ = Number(p.quantity) - 1;
+                      const uPrice = Number(p.unitPrice || 0);
+                      nextProducts.push({
+                        ...p,
+                        quantity: nextQ,
+                        total: nextQ * uPrice,
+                        sellerCommission: nextQ * (uPrice * 0.1),
+                      });
+                    }
+                    decremented = true;
+                  } else {
+                    nextProducts.push(p);
+                  }
+                });
+                return {
+                  ...prev,
+                  products: nextProducts,
+                };
+              });
             }}
             onStatusChange={(status) => {
               setActiveComanda((prev) => ({ ...prev, status }));

@@ -647,7 +647,7 @@ export default function CashierPosView({
     }
   };
 
-  // Inclusão de Produto na Comanda
+  // Inclusão de Produto na Comanda (itens lançados separados por linha)
   const handleAddProductToComanda = async (
     product,
     quantity = 1,
@@ -659,46 +659,31 @@ export default function CashierPosView({
 
     const qty = Math.max(1, Number(quantity) || 1);
     const prodPrice = Number(product.price || 0);
+    const commPercent = Number(product.commissionPercent || product.commission_percent || 10);
+    const unitCommission = prodPrice * (commPercent / 100);
 
     let updatedCmd = null;
     const nextComandas = comandas.map((c) => {
       if (c.id !== cmdId) return c;
 
-      const currentProducts = c.products || [];
-      const existingIdx = currentProducts.findIndex(
-        (p) => p.id === product.id || p.name === product.name,
-      );
+      const currentProducts = Array.isArray(c.products) ? c.products : [];
 
-      let nextProducts;
-      if (existingIdx >= 0) {
-        nextProducts = currentProducts.map((p, idx) => {
-          if (idx !== existingIdx) return p;
-          const nextQty = (p.quantity || 1) + qty;
-          const uPrice = Number(p.unitPrice || prodPrice);
-          return {
-            ...p,
-            quantity: nextQty,
-            total: nextQty * uPrice,
-            sellerCommission:
-              nextQty * (uPrice * ((product.commissionPercent || 10) / 100)),
-          };
-        });
-      } else {
-        nextProducts = [
-          ...currentProducts,
-          {
-            id: product.id,
-            productId: product.id,
-            name: product.name,
-            category: product.category || "Bar",
-            quantity: qty,
-            unitPrice: prodPrice,
-            total: qty * prodPrice,
-            sellerCommission:
-              qty * (prodPrice * ((product.commissionPercent || 10) / 100)),
-          },
-        ];
-      }
+      // Cada unidade lançada é adicionada como uma linha individual separada com ID único,
+      // garantindo que fiquem separadas por linha e com opção de remoção item por item
+      const newLines = Array.from({ length: qty }, (_, i) => ({
+        id: `p-${Date.now()}-${Math.random().toString(36).substring(2, 7)}-${i}`,
+        productId: product.id,
+        name: product.name,
+        category: product.category || "Bar",
+        quantity: 1,
+        unitPrice: prodPrice,
+        price: prodPrice,
+        total: prodPrice,
+        sellerCommission: unitCommission,
+        commissionPercent: commPercent,
+      }));
+
+      const nextProducts = [...currentProducts, ...newLines];
 
       const servicesTotal = (c.services || []).reduce(
         (acc, s) => acc + Number(s.price || 0),
@@ -781,6 +766,133 @@ export default function CashierPosView({
         `${qty}x "${product.name}" lançado na comanda de ${updatedCmd.clientName}!`,
       );
       setTimeout(() => setAlertSuccess(""), 4000);
+    }
+  };
+
+  // Remoção de Produto da Comanda (item por item, linha por linha)
+  const handleRemoveProductFromComanda = (comandaId, prodId, rowId, unitIndex) => {
+    let removedProduct = null;
+    let updatedCmd = null;
+
+    const nextComandas = comandas.map((c) => {
+      if (c.id !== comandaId) return c;
+
+      const currentProducts = Array.isArray(c.products) ? c.products : [];
+
+      // 1. Tenta encontrar a linha específica pelo ID único (ou rowId)
+      const exactIndex = currentProducts.findIndex(
+        (p) => p.id === rowId || p.id === prodId,
+      );
+
+      let nextProducts;
+      if (exactIndex >= 0) {
+        const item = currentProducts[exactIndex];
+        removedProduct = item;
+        // Se o registro possuía quantity > 1 (agrupado legadamente), decrementa 1 unidade
+        if (Number(item.quantity || 1) > 1) {
+          const nextQty = Number(item.quantity) - 1;
+          const uPrice = Number(item.unitPrice || item.price || 0);
+          const commPercent = Number(item.commissionPercent || 10);
+          nextProducts = currentProducts.map((p, idx) =>
+            idx === exactIndex
+              ? {
+                  ...p,
+                  quantity: nextQty,
+                  total: nextQty * uPrice,
+                  sellerCommission: nextQty * (uPrice * (commPercent / 100)),
+                }
+              : p,
+          );
+        } else {
+          // Remove a linha exata
+          nextProducts = currentProducts.filter((_, idx) => idx !== exactIndex);
+        }
+      } else {
+        // 2. Busca por productId ou nome
+        const matchIndex = currentProducts.findIndex(
+          (p) => p.productId === prodId || p.id === prodId || p.name === prodId,
+        );
+        if (matchIndex >= 0) {
+          const item = currentProducts[matchIndex];
+          removedProduct = item;
+          if (Number(item.quantity || 1) > 1) {
+            const nextQty = Number(item.quantity) - 1;
+            const uPrice = Number(item.unitPrice || item.price || 0);
+            const commPercent = Number(item.commissionPercent || 10);
+            nextProducts = currentProducts.map((p, idx) =>
+              idx === matchIndex
+                ? {
+                    ...p,
+                    quantity: nextQty,
+                    total: nextQty * uPrice,
+                    sellerCommission: nextQty * (uPrice * (commPercent / 100)),
+                  }
+                : p,
+            );
+          } else {
+            nextProducts = currentProducts.filter((_, idx) => idx !== matchIndex);
+          }
+        } else {
+          nextProducts = currentProducts;
+        }
+      }
+
+      const servicesTotal = (c.services || []).reduce(
+        (acc, s) => acc + Number(s.price || 0),
+        0,
+      );
+      const productsTotal = nextProducts.reduce(
+        (acc, p) =>
+          acc +
+          Number(
+            p.total ||
+              Number(p.quantity || 1) * Number(p.unitPrice || p.price || 0),
+          ),
+        0,
+      );
+      const newPrice = servicesTotal + productsTotal;
+
+      updatedCmd = {
+        ...c,
+        products: nextProducts,
+        price: newPrice,
+      };
+      return updatedCmd;
+    });
+
+    updateComandasState(nextComandas);
+
+    // Devolve 1 unidade ao estoque do catálogo
+    if (removedProduct) {
+      const prodIdToRestore = removedProduct.productId || removedProduct.id;
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === prodIdToRestore || p.name === removedProduct.name
+            ? { ...p, stock: (p.stock || 0) + 1 }
+            : p,
+        ),
+      );
+    }
+
+    if (updatedCmd) {
+      if (targetComandaForAddItem?.id === updatedCmd.id) {
+        setTargetComandaForAddItem(updatedCmd);
+      }
+      if (updatedCmd.appointmentId || updatedCmd.source === "agenda") {
+        const apptId = updatedCmd.appointmentId || updatedCmd.id;
+        if (onUpdateAppointments) {
+          onUpdateAppointments((prevAppts) =>
+            prevAppts.map((a) =>
+              a.id === apptId
+                ? {
+                    ...a,
+                    price: updatedCmd.price,
+                  }
+                : a,
+            ),
+          );
+        }
+      }
     }
   };
 
@@ -1026,9 +1138,10 @@ export default function CashierPosView({
           <Button
             variant="primary"
             onClick={() => setIsNewComandaModalOpen(true)}
-            className="text-xs py-2 px-3.5 bg-amber-600 hover:bg-amber-500 font-bold shrink-0"
+            className="text-xs py-2 px-3.5 bg-amber-600 hover:bg-amber-500 font-bold shrink-0 flex items-center gap-1.5"
           >
-            <span>+</span> Nova Comanda Balcão
+            <Plus className="w-4 h-4" />
+            <span>Nova Comanda Balcão</span>
           </Button>
 
           {onBack && (
@@ -1308,16 +1421,8 @@ export default function CashierPosView({
                         );
                         updateComandasState(updated);
                       }}
-                      onRemoveProduct={(prodId) => {
-                        const updated = comandas.map((c) =>
-                          c.id === cmd.id
-                            ? {
-                                ...c,
-                                products: (c.products || []).filter((p) => p.id !== prodId),
-                              }
-                            : c,
-                        );
-                        updateComandasState(updated);
+                      onRemoveProduct={(prodId, rowId, unitIndex) => {
+                        handleRemoveProductFromComanda(cmd.id, prodId, rowId, unitIndex);
                       }}
                       onStatusChange={(newStatus) => {
                         handleComandaStatusChange(cmd.id, newStatus);
@@ -1340,7 +1445,7 @@ export default function CashierPosView({
                 Nenhum agendamento ou comanda para esta data
               </p>
               <p className="text-neutral-400 max-w-sm mx-auto">
-                Agendamentos criados na Agenda aparecem aqui automaticamente. Você também pode clicar em "+ Nova Comanda Balcão" ou navegar pelas datas acima.
+                Agendamentos criados na Agenda aparecem aqui automaticamente. Você também pode clicar em "Nova Comanda Balcão" ou navegar pelas datas acima.
               </p>
               <div className="pt-2 flex justify-center gap-2">
                 <Button

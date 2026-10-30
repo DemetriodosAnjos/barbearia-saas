@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { comandaStyles } from "./ComandaCard.styles";
 import {
   ChevronDown,
@@ -30,6 +30,37 @@ export default function ComandaCard({
   // Normalização defensiva dos serviços e produtos
   const servicesList = Array.isArray(comanda?.services) ? comanda.services : [];
   const productsList = Array.isArray(comanda?.products) ? comanda.products : [];
+
+  // Garante que cada item de consumo (bar & vitrine) seja exibido separadamente por linha (1 por 1),
+  // permitindo a visualização limpa e a remoção item por item mesmo quando lançado com quantity > 1
+  const individualProductLines = useMemo(() => {
+    const lines = [];
+    productsList.forEach((prod, pIdx) => {
+      const qty = Math.max(1, Number(prod.quantity) || 1);
+      const unitPrice = Number(
+        prod.unitPrice ?? prod.price ?? (prod.total && qty > 0 ? prod.total / qty : 0)
+      );
+      const unitCommission = Number(
+        prod.sellerCommission && qty > 0
+          ? prod.sellerCommission / qty
+          : unitPrice * ((prod.commissionPercent || 10) / 100)
+      );
+
+      for (let i = 0; i < qty; i++) {
+        lines.push({
+          ...prod,
+          rowId: qty === 1 && prod.id ? prod.id : `${prod.id || prod.productId || `prod-${pIdx}`}-line-${i}`,
+          targetRemoveId: prod.id,
+          unitIndex: i,
+          quantity: 1,
+          unitPrice: unitPrice,
+          total: unitPrice,
+          sellerCommission: unitCommission,
+        });
+      }
+    });
+    return lines;
+  }, [productsList]);
 
   const clientName =
     comanda?.clientName || comanda?.client_name || "Cliente sem Identificação";
@@ -166,7 +197,7 @@ export default function ComandaCard({
             R$ {totalComanda.toFixed(2).replace(".", ",")}
           </span>
           <span className={comandaStyles.priceSub}>
-            {servicesList.length} serviço(s) {productsList.length > 0 ? `· ${productsList.length} prod.` : ""}
+            {servicesList.length} serviço(s) {individualProductLines.length > 0 ? `· ${individualProductLines.length} prod.` : ""}
           </span>
         </div>
 
@@ -374,12 +405,12 @@ export default function ComandaCard({
               </div>
             </div>
 
-            {/* PRODUTOS CONSUMIDOS (BAR & VITRINE) */}
+            {/* PRODUTOS CONSUMIDOS (BAR & VITRINE) - SEPARADOS POR LINHA */}
             <div className={comandaStyles.section}>
               <div className={comandaStyles.sectionTitle}>
                 <span className="flex items-center gap-1.5 text-neutral-300 font-bold">
                   <Beer className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Consumo de Bar & Vitrine ({productsList.length})</span>
+                  <span>Consumo de Bar & Vitrine ({individualProductLines.length})</span>
                 </span>
                 <span className="text-neutral-200 font-mono font-bold">
                   R$ {totalProducts.toFixed(2).replace(".", ",")}
@@ -387,11 +418,11 @@ export default function ComandaCard({
               </div>
 
               <div className="space-y-1.5">
-                {productsList.map((prod) => (
-                  <div key={prod.id} className={comandaStyles.itemRow}>
+                {individualProductLines.map((prod, lineIdx) => (
+                  <div key={prod.rowId || `item-${lineIdx}`} className={comandaStyles.itemRow}>
                     <div className="flex-1 min-w-0 pr-2">
                       <p className={comandaStyles.itemName}>
-                        {prod.quantity}x {prod.name}
+                        1x {prod.name}
                       </p>
                       <span className={comandaStyles.itemCommission}>
                         Comissão de venda: R${" "}
@@ -404,20 +435,17 @@ export default function ComandaCard({
                     <div className="flex items-center gap-2.5 shrink-0">
                       <span className={comandaStyles.itemPrice}>
                         R${" "}
-                        {Number(
-                          prod.total ||
-                            Number(prod.quantity || 1) *
-                              Number(prod.unitPrice || prod.price || 0),
-                        )
+                        {Number(prod.unitPrice || prod.price || prod.total || 0)
                           .toFixed(2)
                           .replace(".", ",")}
                       </span>
                       {!isPaid && onRemoveProduct && (
                         <button
                           type="button"
-                          onClick={() => onRemoveProduct(prod.id)}
+                          onClick={() => onRemoveProduct(prod.targetRemoveId || prod.id, prod.rowId, prod.unitIndex)}
                           className={comandaStyles.itemDeleteBtn}
-                          title="Remover produto"
+                          title={`Remover 1x ${prod.name}`}
+                          aria-label={`Remover 1x ${prod.name}`}
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -426,7 +454,7 @@ export default function ComandaCard({
                   </div>
                 ))}
 
-                {productsList.length === 0 && (
+                {individualProductLines.length === 0 && (
                   <p className="text-xs text-neutral-500 italic p-2 bg-neutral-950/40 rounded-xl">
                     Nenhum produto consumido até o momento.
                   </p>
