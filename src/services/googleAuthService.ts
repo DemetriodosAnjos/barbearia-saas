@@ -18,6 +18,8 @@ export interface GoogleUserProfile {
   given_name?: string;
   family_name?: string;
   picture?: string | null;
+  /** id_token do Google obtido via tokeninfo — usado para estabelecer sessão real no Supabase */
+  _idToken?: string;
 }
 
 export interface GoogleAuthResult {
@@ -108,6 +110,16 @@ export function saveGoogleClientId(clientId: string): void {
 /**
  * Abre o modal oficial do Google (Google Identity Services / OAuth 2.0 Popup)
  * e retorna os dados reais do perfil (e-mail real, nome, foto, verificação).
+ *
+ * Estratégia híbrida para obtenção do id_token:
+ * 1. Usa `accounts.id.initialize` + `prompt()` (One Tap) para capturar o credential
+ *    (id_token JWT) de forma silenciosa ANTES do popup principal. Esse id_token é
+ *    necessário para `supabase.auth.signInWithIdToken` (sessão real com RLS).
+ * 2. Usa `initTokenClient` para obter o access_token e buscar dados de perfil via
+ *    userinfo — esse é o popup com seletor de conta que o usuário já conhece.
+ *
+ * O id_token capturado é armazenado em `profile._idToken` e utilizado em
+ * `authenticateGoogleUser` para que produtos e serviços sejam visíveis via RLS.
  */
 export async function requestGoogleAccountProfile(clientId?: string): Promise<GoogleUserProfile> {
   await loadGoogleGsiScript();
@@ -122,6 +134,49 @@ export async function requestGoogleAccountProfile(clientId?: string): Promise<Go
     throw new Error("GOOGLE_GSI_NOT_LOADED");
   }
 
+  // Passo 1: Tenta capturar id_token via accounts.id (One Tap / Sign In with Google).
+  // Executa silenciosamente — se o usuário já estiver logado no Google, retorna o credential.
+  // Se não estiver ou recusar, retorna null e o fluxo continua normalmente com access_token.
+  const idTokenFromOneTap = await new Promise<string | null>((resolveIdToken) => {
+    if (!window.google?.accounts?.id) {
+      return resolveIdToken(null);
+    }
+
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) { resolved = true; resolveIdToken(null); }
+    }, 8000);
+
+    try {
+      window.google.accounts.id.initialize({
+        client_id: resolvedClientId,
+        callback: (credentialResponse: any) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            resolveIdToken(credentialResponse?.credential || null);
+          }
+        },
+        auto_select: true,
+        cancel_on_tap_outside: false,
+      });
+      window.google.accounts.id.prompt((notification: any) => {
+        const skipped =
+          notification.isNotDisplayed?.() ||
+          notification.isSkippedMoment?.() ||
+          notification.isDismissedMoment?.();
+        if (skipped && !resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolveIdToken(null);
+        }
+      });
+    } catch {
+      if (!resolved) { resolved = true; clearTimeout(timeout); resolveIdToken(null); }
+    }
+  });
+
+  // Passo 2: Usa initTokenClient para obter access_token e buscar dados do perfil.
   return new Promise((resolve, reject) => {
     let hasResolved = false;
 
@@ -164,6 +219,11 @@ export async function requestGoogleAccountProfile(clientId?: string): Promise<Go
 
           const profileData = await userInfoResponse.json();
 
+          // Usa o id_token capturado via One Tap no Passo 1 (ou do próprio response se disponível).
+          // O initTokenClient pode incluir id_token no response em alguns flows — verificamos ambos.
+          const idToken: string | undefined =
+            response.id_token || idTokenFromOneTap || undefined;
+
           const profile: GoogleUserProfile = {
             sub: String(profileData.sub || ""),
             email: String(profileData.email || "").toLowerCase().trim(),
@@ -179,6 +239,7 @@ export async function requestGoogleAccountProfile(clientId?: string): Promise<Go
             given_name: profileData.given_name,
             family_name: profileData.family_name,
             picture: profileData.picture || null,
+            _idToken: idToken,
           };
 
           resolve(profile);
@@ -241,8 +302,16 @@ export async function findExistingAccountByEmail(email: string): Promise<{
     console.warn("Aviso ao buscar profiles por e-mail:", err);
   }
 
-  // 2. Se encontrou perfil com barbershop_id, busca os dados da barbearia em 'barbershops'
-  const shopIdCandidate = profileMatch?.barbershop_id;
+  // 2. Se encontrou perfil com barbershop_id ou se for conta oficial do gestor Demetrio dos Anjos
+  const isDemetrioAccount =
+    normalizedEmail === "fullstackanjos01@gmail.com" ||
+    normalizedEmail === "fullstackanjo01@gmail.com" ||
+    normalizedEmail === "ddoanjos@gmail.com" ||
+    normalizedEmail === "atendmentor@gmail.com";
+
+  const shopIdCandidate =
+    profileMatch?.barbershop_id ||
+    (isDemetrioAccount ? "db3f8187-8771-4f7c-b2bf-b7486d4eb1b6" : undefined);
   if (shopIdCandidate) {
     try {
       const { data: bShop } = await supabase
@@ -374,6 +443,26 @@ export async function authenticateGoogleUser(
   }
 
   try {
+    // =========================================================================
+    // SESSÃO REAL NO SUPABASE: Tenta estabelecer sessão nativa com id_token do Google.
+    // Sem isso, queries subsequentes rodam como "anon" e a RLS bloqueia products/services.
+    // =========================================================================
+    if (profile._idToken) {
+      try {
+        const { error: signInErr } = await supabase.auth.signInWithIdToken({
+          provider: "google",
+          token: profile._idToken,
+        });
+        if (signInErr) {
+          console.warn("[GoogleAuth] signInWithIdToken falhou (continuando sem sessão Supabase):", signInErr.message);
+        } else {
+          console.info("[GoogleAuth] Sessão Supabase estabelecida via id_token ✓");
+        }
+      } catch (signInEx) {
+        console.warn("[GoogleAuth] signInWithIdToken lançou exceção (continuando):", signInEx);
+      }
+    }
+
     // Consulta centralizada de existência da conta no banco
     const accountCheck = await findExistingAccountByEmail(normalizedEmail);
     let tenantMatch = accountCheck.tenant;
